@@ -1914,17 +1914,27 @@ class U1FullSpectrumApp(ctk.CTk):
         return fils
 
     def _simulate_mix(self, sequence, fils):
-        """Gewichteter Lab-Durchschnitt — funktioniert für jede Sequenzlänge."""
-        n = len(sequence)
-        weights = get_layer_weights(n)
-        total_w = sum(weights)
-        lab_sum = [0.0, 0.0, 0.0]
+        """Linearer RGB-Durchschnitt (gamma-korrigiert) — entspricht dem visuellen Eindruck
+        bei dünnen alternierenden Schichten (wie Pixel auf einem Bildschirm / FilamentMixer-Modell).
+        Jedes Vorkommen in der Sequenz zählt gleich — kein progressives Gewicht."""
         by_id = {f["id"]: f for f in fils}
-        for pos, fid in enumerate(sequence):
-            w = weights[pos]
-            for j, v in enumerate(by_id[fid]["lab"]):
-                lab_sum[j] += w * v
-        return tuple(v / total_w for v in lab_sum)
+        counts = {}
+        for fid in sequence:
+            counts[fid] = counts.get(fid, 0) + 1
+        total = len(sequence)
+        r_lin = g_lin = b_lin = 0.0
+        for fid, cnt in counts.items():
+            r, g, b = hex_to_rgb(by_id[fid]["hex"])
+            w = cnt / total
+            # in linearen Lichtraum umrechnen (sRGB-Gamma entfernen)
+            r_lin += ((r / 255) ** 2.2) * w
+            g_lin += ((g / 255) ** 2.2) * w
+            b_lin += ((b / 255) ** 2.2) * w
+        # zurück in sRGB (Gamma anwenden)
+        r_out = round(min(255, max(0, r_lin ** (1 / 2.2) * 255)))
+        g_out = round(min(255, max(0, g_lin ** (1 / 2.2) * 255)))
+        b_out = round(min(255, max(0, b_lin ** (1 / 2.2) * 255)))
+        return rgb_to_lab((r_out, g_out, b_out))
 
     def _build_sequence(self, ordered, tot, n):
         """Baut eine n-Layer-Sequenz (1–10). Höchster Score → oberste Positionen."""
