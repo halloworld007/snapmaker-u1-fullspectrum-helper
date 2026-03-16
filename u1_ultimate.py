@@ -243,6 +243,14 @@ STRINGS = {
     # Slicer-Guide
     "btn_slicer_guide": "📖 Slicer-Guide",
     "slicer_guide_title": "Export → OrcaSlicer FullSpectrum",
+    # Web-Update
+    "btn_web_update": "🌐 Online-Update",
+    "tip_web_update": "Neue Filament-Farben aus der Community-Datenbank laden",
+    "web_update_title": "Filament-Datenbank aktualisieren",
+    "web_update_fetching": "Lade Daten von GitHub …",
+    "web_update_ok": "✅  {n_brands} Marken / {n_fils} Filamente geladen.\n{new} neue Einträge hinzugefügt.",
+    "web_update_no_new": "Datenbank ist bereits aktuell.",
+    "web_update_err": "Fehler beim Laden:\n{e}",
     # OrcaSlicer Direkt-Export
     "btn_orca_export": "🚀 → OrcaSlicer",
     "tip_orca_export": "Filament-Profile direkt in OrcaSlicer importieren",
@@ -464,6 +472,14 @@ STRINGS = {
     "swatch_saved": "Swatch saved:\n{path}",
     "btn_slicer_guide": "📖 Slicer Guide",
     "slicer_guide_title": "Export → OrcaSlicer FullSpectrum",
+    # Web update
+    "btn_web_update": "🌐 Online Update",
+    "tip_web_update": "Load new filament colors from the community database",
+    "web_update_title": "Update Filament Database",
+    "web_update_fetching": "Fetching data from GitHub …",
+    "web_update_ok": "✅  {n_brands} brands / {n_fils} filaments loaded.\n{new} new entries added.",
+    "web_update_no_new": "Database is already up to date.",
+    "web_update_err": "Error loading data:\n{e}",
     # OrcaSlicer direct export
     "btn_orca_export": "🚀 → OrcaSlicer",
     "tip_orca_export": "Import filament profiles directly into OrcaSlicer",
@@ -500,31 +516,275 @@ MAX_VIRTUAL     = 20   # Default; wird aus settings.json überschrieben
 MAX_VIRTUAL_HARD = 24  # Absolutes Maximum
 
 DEFAULT_LIBRARY = {
+    # ── Bambu Lab Basic PLA ─────────────────────────────────────────────────────
+    # Hex-Codes basierend auf Bambu Lab Produktkatalog (bambulab.com)
+    # TD-Werte: gemessen/geschätzt für FullSpectrum (höher = transparenter)
     "Bambu Lab Basic": [
-        {"name": "Jade White",  "hex": "#FFFFFF", "td": 5.0},
-        {"name": "Cyan",        "hex": "#0086D6", "td": 4.0},
-        {"name": "Magenta",     "hex": "#EC008C", "td": 8.0},
-        {"name": "Yellow",      "hex": "#FCE300", "td": 6.0},
-        {"name": "Black",       "hex": "#101010", "td": 0.4},
-        {"name": "Red",         "hex": "#D32F2F", "td": 3.0},
-        {"name": "Green",       "hex": "#388E3C", "td": 4.5},
+        {"name": "Jade White",       "hex": "#F5F5F3", "td": 8.5},
+        {"name": "Cream White",      "hex": "#FFFAEF", "td": 8.0},
+        {"name": "Silver",           "hex": "#B8BCBE", "td": 2.5},
+        {"name": "Light Gray",       "hex": "#A8AAAC", "td": 2.0},
+        {"name": "Gray",             "hex": "#6B6D6F", "td": 1.5},
+        {"name": "Dark Gray",        "hex": "#414345", "td": 0.8},
+        {"name": "Charcoal",         "hex": "#2D2926", "td": 0.4},
+        {"name": "Black",            "hex": "#101012", "td": 0.3},
+        {"name": "Lemon Yellow",     "hex": "#FFF176", "td": 7.5},
+        {"name": "Yellow",           "hex": "#FCE300", "td": 6.5},
+        {"name": "Banana Yellow",    "hex": "#FFD54F", "td": 6.0},
+        {"name": "Gold",             "hex": "#FFAB00", "td": 5.5},
+        {"name": "Tangerine",        "hex": "#FF7043", "td": 5.5},
+        {"name": "Orange",           "hex": "#E65100", "td": 4.5},
+        {"name": "Flame Red",        "hex": "#D32F2F", "td": 3.5},
+        {"name": "Vivid Red",        "hex": "#E53935", "td": 3.5},
+        {"name": "Cherry Red",       "hex": "#B71C1C", "td": 2.5},
+        {"name": "Coral",            "hex": "#FF6B6B", "td": 5.0},
+        {"name": "Sakura Pink",      "hex": "#F8BBD0", "td": 7.5},
+        {"name": "Hot Pink",         "hex": "#F06292", "td": 6.5},
+        {"name": "Magenta",          "hex": "#EC008C", "td": 8.0},
+        {"name": "Fuchsia",          "hex": "#D500F9", "td": 7.0},
+        {"name": "Lilac",            "hex": "#CE93D8", "td": 6.0},
+        {"name": "Lavender",         "hex": "#B39DDB", "td": 5.5},
+        {"name": "Purple",           "hex": "#7B1FA2", "td": 3.5},
+        {"name": "Violet",           "hex": "#4527A0", "td": 3.0},
+        {"name": "Cobalt Blue",      "hex": "#1565C0", "td": 3.5},
+        {"name": "Azure Blue",       "hex": "#1976D2", "td": 4.0},
+        {"name": "Blue",             "hex": "#0047AB", "td": 3.5},
+        {"name": "Sky Blue",         "hex": "#64B5F6", "td": 6.0},
+        {"name": "Baby Blue",        "hex": "#BBDEFB", "td": 7.5},
+        {"name": "Cyan",             "hex": "#0086D6", "td": 5.0},
+        {"name": "Teal",             "hex": "#00796B", "td": 3.0},
+        {"name": "Mint",             "hex": "#A5D6A7", "td": 7.0},
+        {"name": "Grass Green",      "hex": "#43A047", "td": 4.5},
+        {"name": "Forest Green",     "hex": "#2E7D32", "td": 3.0},
+        {"name": "Lime Green",       "hex": "#C6E24E", "td": 7.0},
+        {"name": "Olive",            "hex": "#827717", "td": 2.5},
+        {"name": "Caramel",          "hex": "#BF7E45", "td": 3.0},
+        {"name": "Brown",            "hex": "#795548", "td": 2.0},
+        {"name": "Skin",             "hex": "#FFCCB3", "td": 7.5},
     ],
+    # ── Bambu Lab Matte PLA ─────────────────────────────────────────────────────
     "Bambu Lab Matte": [
-        {"name": "Ivory White",  "hex": "#F2F2F2", "td": 3.5},
-        {"name": "Charcoal",     "hex": "#2D2926", "td": 0.2},
-        {"name": "Lilac Purple", "hex": "#A181C1", "td": 2.5},
+        {"name": "Ivory White",      "hex": "#F2EFDF", "td": 7.0},
+        {"name": "Beige",            "hex": "#E8D8B8", "td": 6.0},
+        {"name": "Cream",            "hex": "#FFF8E1", "td": 6.5},
+        {"name": "Matte Black",      "hex": "#1A1A1A", "td": 0.3},
+        {"name": "Charcoal",         "hex": "#2D2926", "td": 0.4},
+        {"name": "Stone Gray",       "hex": "#7B7B7B", "td": 1.5},
+        {"name": "Sunflower",        "hex": "#FFC107", "td": 6.0},
+        {"name": "Terracotta",       "hex": "#C1440E", "td": 3.0},
+        {"name": "Brick Red",        "hex": "#A93226", "td": 2.5},
+        {"name": "Dusty Rose",       "hex": "#D4848A", "td": 5.0},
+        {"name": "Mauve",            "hex": "#BD7EA6", "td": 4.5},
+        {"name": "Lilac Purple",     "hex": "#A181C1", "td": 4.0},
+        {"name": "Deep Purple",      "hex": "#512DA8", "td": 2.5},
+        {"name": "Ocean Blue",       "hex": "#1565C0", "td": 3.0},
+        {"name": "Powder Blue",      "hex": "#B0BEC5", "td": 6.0},
+        {"name": "Sage Green",       "hex": "#8FAF8B", "td": 4.0},
+        {"name": "Moss Green",       "hex": "#6B7C45", "td": 3.0},
+        {"name": "Army Green",       "hex": "#4A5240", "td": 2.0},
+        {"name": "Desert Sand",      "hex": "#C2B280", "td": 4.5},
+        {"name": "Caramel Brown",    "hex": "#9C6330", "td": 2.5},
     ],
-    "Prusament": [
-        {"name": "Vanilla White", "hex": "#D9D4C4", "td": 7.1},
-        {"name": "Jet Black",     "hex": "#24292A", "td": 0.3},
-        {"name": "Prusa Orange",  "hex": "#FE6E31", "td": 6.6},
-        {"name": "Galaxy Silver", "hex": "#868F98", "td": 1.5},
+    # ── Bambu Lab Silk PLA ──────────────────────────────────────────────────────
+    "Bambu Lab Silk": [
+        {"name": "Silk Gold",        "hex": "#D4A843", "td": 2.0},
+        {"name": "Silk Rose Gold",   "hex": "#B76E79", "td": 2.0},
+        {"name": "Silk Copper",      "hex": "#B87333", "td": 1.8},
+        {"name": "Silk Bronze",      "hex": "#8C6239", "td": 1.8},
+        {"name": "Silk Silver",      "hex": "#C0C4C8", "td": 2.5},
+        {"name": "Silk Black",       "hex": "#1A1A1A", "td": 0.5},
+        {"name": "Silk Red",         "hex": "#B71C1C", "td": 2.5},
+        {"name": "Silk Ruby",        "hex": "#9B111E", "td": 2.2},
+        {"name": "Silk Sapphire",    "hex": "#1A237E", "td": 2.0},
+        {"name": "Silk Jade",        "hex": "#1A6644", "td": 2.0},
+        {"name": "Silk Galaxy Black","hex": "#1C1C2E", "td": 0.6},
+        {"name": "Silk Rainbow",     "hex": "#FF6B35", "td": 2.5},
+        {"name": "Silk Ice",         "hex": "#C9E8F0", "td": 3.5},
     ],
+    # ── Prusament PLA ───────────────────────────────────────────────────────────
+    # Hex aus Prusa Color Picker, TD geschätzt
+    "Prusament PLA": [
+        {"name": "Vanilla White",    "hex": "#D9D4C4", "td": 7.0},
+        {"name": "Chalk White",      "hex": "#F0EDDE", "td": 7.5},
+        {"name": "Jet Black",        "hex": "#24292A", "td": 0.3},
+        {"name": "Galaxy Black",     "hex": "#17191A", "td": 0.4},
+        {"name": "Grey Matter",      "hex": "#908E8E", "td": 1.8},
+        {"name": "Galaxy Silver",    "hex": "#868F98", "td": 2.0},
+        {"name": "Prusa Orange",     "hex": "#FE6E31", "td": 6.5},
+        {"name": "Carrot Orange",    "hex": "#E9601A", "td": 5.5},
+        {"name": "Mango Yellow",     "hex": "#FFB21F", "td": 6.5},
+        {"name": "Sunflower Yellow", "hex": "#F9D011", "td": 6.5},
+        {"name": "Lipstick Red",     "hex": "#B11A29", "td": 3.0},
+        {"name": "Fire Engine Red",  "hex": "#CE1F1A", "td": 3.5},
+        {"name": "Terracotta",       "hex": "#C04821", "td": 3.5},
+        {"name": "Coral",            "hex": "#E95641", "td": 5.0},
+        {"name": "Raspberry Red",    "hex": "#9B1B30", "td": 2.5},
+        {"name": "Azure Blue",       "hex": "#0762AD", "td": 3.5},
+        {"name": "Ultramarine",      "hex": "#2E3AB1", "td": 3.5},
+        {"name": "Cobalt Blue",      "hex": "#004EA1", "td": 3.5},
+        {"name": "Mystic Petrol",    "hex": "#1E6E7E", "td": 3.0},
+        {"name": "Pirate Blue",      "hex": "#193B81", "td": 2.5},
+        {"name": "Gentian Blue",     "hex": "#3558C1", "td": 4.0},
+        {"name": "Urban Grey",       "hex": "#595959", "td": 1.2},
+        {"name": "Anthracite Grey",  "hex": "#3A3A3A", "td": 0.6},
+        {"name": "Lemon Yellow",     "hex": "#F8E045", "td": 7.0},
+        {"name": "Mystic Green",     "hex": "#256B3A", "td": 3.0},
+    ],
+    # ── eSUN PLA+ ───────────────────────────────────────────────────────────────
+    "eSUN PLA+": [
+        {"name": "Cold White",       "hex": "#F8F8F8", "td": 8.5},
+        {"name": "Warm White",       "hex": "#FFF8E7", "td": 8.0},
+        {"name": "Black",            "hex": "#0A0A0A", "td": 0.3},
+        {"name": "Silver",           "hex": "#C0C0C0", "td": 2.5},
+        {"name": "Dark Gray",        "hex": "#404040", "td": 0.8},
+        {"name": "Fire Red",         "hex": "#CC1010", "td": 3.5},
+        {"name": "Red",              "hex": "#C0392B", "td": 3.0},
+        {"name": "Pink",             "hex": "#FF69B4", "td": 6.5},
+        {"name": "Orange",           "hex": "#FF5500", "td": 5.5},
+        {"name": "Yellow",           "hex": "#FFD700", "td": 6.5},
+        {"name": "Lemon Yellow",     "hex": "#FFF44F", "td": 7.0},
+        {"name": "Grass Green",      "hex": "#00A86B", "td": 4.5},
+        {"name": "Pine Green",       "hex": "#01796F", "td": 3.5},
+        {"name": "Teal",             "hex": "#008B8B", "td": 3.5},
+        {"name": "Blue",             "hex": "#1560BD", "td": 3.5},
+        {"name": "Dark Blue",        "hex": "#00008B", "td": 2.5},
+        {"name": "Light Blue",       "hex": "#5B9BD5", "td": 5.5},
+        {"name": "Purple",           "hex": "#7B2FBE", "td": 3.5},
+        {"name": "Magenta",          "hex": "#E040FB", "td": 7.0},
+        {"name": "Skin",             "hex": "#FFDAB9", "td": 7.5},
+        {"name": "Brown",            "hex": "#8B4513", "td": 2.0},
+        {"name": "Wood",             "hex": "#966432", "td": 2.5},
+    ],
+    # ── Polymaker PolyTerra PLA ─────────────────────────────────────────────────
+    "Polymaker PolyTerra": [
+        {"name": "Cotton White",     "hex": "#F5F0EB", "td": 7.5},
+        {"name": "Stone White",      "hex": "#E0DDD5", "td": 6.5},
+        {"name": "Charcoal",         "hex": "#2D2D2D", "td": 0.4},
+        {"name": "Stone Grey",       "hex": "#7C7C70", "td": 1.5},
+        {"name": "Sakura Pink",      "hex": "#F4C2C2", "td": 7.0},
+        {"name": "Coral",            "hex": "#F28B66", "td": 5.5},
+        {"name": "Muted Rose",       "hex": "#C48B8B", "td": 4.5},
+        {"name": "Army Red",         "hex": "#9B2335", "td": 2.5},
+        {"name": "Savanna Yellow",   "hex": "#C8A020", "td": 5.0},
+        {"name": "Muted Orange",     "hex": "#C0672A", "td": 4.0},
+        {"name": "Jungle Green",     "hex": "#29AB87", "td": 4.0},
+        {"name": "Forest Green",     "hex": "#228B22", "td": 3.5},
+        {"name": "Army Green",       "hex": "#4B5320", "td": 2.0},
+        {"name": "Muted Teal",       "hex": "#4E8577", "td": 3.5},
+        {"name": "Midnight Blue",    "hex": "#1A1A6E", "td": 2.0},
+        {"name": "Cloud Blue",       "hex": "#ADC8E6", "td": 6.5},
+        {"name": "Indigo",           "hex": "#4B0082", "td": 2.5},
+        {"name": "Desert Sand",      "hex": "#C2B280", "td": 4.5},
+        {"name": "Coffee Brown",     "hex": "#7B4A25", "td": 2.0},
+        {"name": "Cotton Candy",     "hex": "#FFBCD9", "td": 7.5},
+    ],
+    # ── Hatchbox PLA ────────────────────────────────────────────────────────────
+    "Hatchbox PLA": [
+        {"name": "White",            "hex": "#FDFDFD", "td": 8.5},
+        {"name": "Black",            "hex": "#0D0D0D", "td": 0.3},
+        {"name": "Silver",           "hex": "#C0C0C0", "td": 2.5},
+        {"name": "Gold",             "hex": "#CFB53B", "td": 2.5},
+        {"name": "True Red",         "hex": "#CC1010", "td": 3.5},
+        {"name": "Galaxy Red",       "hex": "#8B0000", "td": 2.0},
+        {"name": "Pink",             "hex": "#FF69B4", "td": 6.5},
+        {"name": "Orange",           "hex": "#FF6600", "td": 5.5},
+        {"name": "Yellow",           "hex": "#FFE900", "td": 6.5},
+        {"name": "Teal",             "hex": "#008080", "td": 3.5},
+        {"name": "Blue",             "hex": "#0047AB", "td": 3.5},
+        {"name": "Green",            "hex": "#00A550", "td": 4.5},
+        {"name": "Purple",           "hex": "#7B2FBE", "td": 3.5},
+        {"name": "Brown",            "hex": "#8B4513", "td": 2.0},
+        {"name": "Wood",             "hex": "#8B6914", "td": 2.5},
+        {"name": "Glow Green",       "hex": "#39FF14", "td": 7.5},
+    ],
+    # ── Overture PLA ────────────────────────────────────────────────────────────
+    "Overture PLA": [
+        {"name": "White",            "hex": "#F8F8F8", "td": 8.5},
+        {"name": "Black",            "hex": "#141414", "td": 0.3},
+        {"name": "Gray",             "hex": "#787878", "td": 1.5},
+        {"name": "Marble White",     "hex": "#E8E8E8", "td": 5.0},
+        {"name": "True Red",         "hex": "#C01010", "td": 3.5},
+        {"name": "Scarlet Red",      "hex": "#E81010", "td": 3.5},
+        {"name": "Pink",             "hex": "#FF69B4", "td": 6.5},
+        {"name": "Orange",           "hex": "#FF6600", "td": 5.5},
+        {"name": "Yellow",           "hex": "#FFD700", "td": 6.5},
+        {"name": "Blue",             "hex": "#2060C0", "td": 3.5},
+        {"name": "Sky Blue",         "hex": "#6EB5FF", "td": 6.0},
+        {"name": "Green",            "hex": "#009050", "td": 4.5},
+        {"name": "Purple",           "hex": "#6B2FBE", "td": 3.5},
+        {"name": "Glow Blue",        "hex": "#00BFFF", "td": 7.0},
+    ],
+    # ── Snapmaker PLA ───────────────────────────────────────────────────────────
+    "Snapmaker PLA": [
+        {"name": "White",            "hex": "#F8F8F8", "td": 8.5},
+        {"name": "Black",            "hex": "#141414", "td": 0.3},
+        {"name": "Gray",             "hex": "#808080", "td": 1.5},
+        {"name": "Red",              "hex": "#CC2020", "td": 3.5},
+        {"name": "Orange",           "hex": "#FF8C00", "td": 5.5},
+        {"name": "Yellow",           "hex": "#FFD700", "td": 6.5},
+        {"name": "Green",            "hex": "#228B22", "td": 3.5},
+        {"name": "Blue",             "hex": "#0047AB", "td": 3.5},
+        {"name": "Purple",           "hex": "#7B2FBE", "td": 3.5},
+        {"name": "Pink",             "hex": "#FF69B4", "td": 6.5},
+    ],
+    # ── Anycubic PLA ────────────────────────────────────────────────────────────
     "Anycubic": [
-        {"name": "White",   "hex": "#FFFFFF", "td": 8.5},
-        {"name": "Cyan",    "hex": "#00FFFF", "td": 4.2},
-        {"name": "Magenta", "hex": "#FF00FF", "td": 3.8},
-        {"name": "Yellow",  "hex": "#FFFF00", "td": 5.5},
+        {"name": "White",            "hex": "#F8F8F6", "td": 8.5},
+        {"name": "Silk White",       "hex": "#F0F0EC", "td": 6.5},
+        {"name": "Black",            "hex": "#121212", "td": 0.3},
+        {"name": "Gray",             "hex": "#808080", "td": 1.5},
+        {"name": "Cyan",             "hex": "#00C8FF", "td": 5.5},
+        {"name": "Magenta",          "hex": "#FF0090", "td": 7.5},
+        {"name": "Yellow",           "hex": "#FFE500", "td": 6.5},
+        {"name": "Red",              "hex": "#CC1010", "td": 3.5},
+        {"name": "Orange",           "hex": "#FF6000", "td": 5.5},
+        {"name": "Blue",             "hex": "#0050C8", "td": 3.5},
+        {"name": "Green",            "hex": "#00A040", "td": 4.5},
+        {"name": "Purple",           "hex": "#8020C0", "td": 3.5},
+        {"name": "Pink",             "hex": "#FF80A0", "td": 7.0},
+        {"name": "Gold Silk",        "hex": "#D4A843", "td": 2.0},
+        {"name": "Silver Silk",      "hex": "#C0C4C8", "td": 2.5},
+    ],
+    # ── SUNLU PLA+ ──────────────────────────────────────────────────────────────
+    "SUNLU PLA+": [
+        {"name": "White",            "hex": "#F5F5F5", "td": 8.5},
+        {"name": "Black",            "hex": "#121212", "td": 0.3},
+        {"name": "Gray",             "hex": "#7C7C7C", "td": 1.5},
+        {"name": "Red",              "hex": "#D01010", "td": 3.5},
+        {"name": "Orange",           "hex": "#FF5500", "td": 5.5},
+        {"name": "Yellow",           "hex": "#FFDD00", "td": 6.5},
+        {"name": "Green",            "hex": "#009050", "td": 4.5},
+        {"name": "Blue",             "hex": "#0055CC", "td": 3.5},
+        {"name": "Purple",           "hex": "#7020B0", "td": 3.5},
+        {"name": "Pink",             "hex": "#FF70A0", "td": 7.0},
+        {"name": "Skin",             "hex": "#FFDAB9", "td": 7.5},
+        {"name": "Glow Green",       "hex": "#39FF14", "td": 7.5},
+        {"name": "Glow Blue",        "hex": "#00BFFF", "td": 7.5},
+    ],
+    # ── BambuLab PETG HF ────────────────────────────────────────────────────────
+    "Bambu Lab PETG": [
+        {"name": "Jade White",       "hex": "#F4F2ED", "td": 7.5},
+        {"name": "Black",            "hex": "#101010", "td": 0.3},
+        {"name": "Translucent",      "hex": "#E8EFF5", "td": 9.5},
+        {"name": "Red",              "hex": "#D01515", "td": 3.5},
+        {"name": "Yellow",           "hex": "#FFD600", "td": 6.5},
+        {"name": "Blue",             "hex": "#0052CC", "td": 3.5},
+        {"name": "Green",            "hex": "#00913F", "td": 4.5},
+        {"name": "Orange",           "hex": "#FF6A00", "td": 5.5},
+        {"name": "Gray",             "hex": "#8A8A8A", "td": 1.5},
+    ],
+    # ── FullSpectrum CMY-System ─────────────────────────────────────────────────
+    # Optimierte Primärfarben für maximale Mischgamut (ΔE-minimiert)
+    # Orientiert an Druckfarben-CMY für beste optische Mischung
+    "FS CMY System": [
+        {"name": "FS White",         "hex": "#F8F8F8", "td": 9.0},
+        {"name": "FS Cyan",          "hex": "#00ADEF", "td": 6.0},
+        {"name": "FS Magenta",       "hex": "#EC008C", "td": 8.0},
+        {"name": "FS Yellow",        "hex": "#FFD700", "td": 7.0},
+        {"name": "FS Black",         "hex": "#0A0A0A", "td": 0.3},
+        {"name": "FS Orange",        "hex": "#FF6600", "td": 5.5},
+        {"name": "FS Blue",          "hex": "#0047AB", "td": 4.0},
+        {"name": "FS Green",         "hex": "#00A651", "td": 5.0},
     ],
     "Eigene Favoriten": [],
 }
@@ -910,7 +1170,12 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkButton(self.sidebar, text=self.t("btn_new_brand"), fg_color="#1e3a5f",
                       command=self.add_brand).pack(fill="x", padx=12, pady=(8, 3))
         ctk.CTkButton(self.sidebar, text=self.t("btn_library"), fg_color="#374151",
-                      command=self.open_library_manager).pack(fill="x", padx=12, pady=(3, 8))
+                      command=self.open_library_manager).pack(fill="x", padx=12, pady=(3, 2))
+        web_btn = ctk.CTkButton(self.sidebar, text=self.t("btn_web_update"),
+                      fg_color="#164e63", hover_color="#155e75",
+                      command=self.web_update_library)
+        web_btn.pack(fill="x", padx=12, pady=(0, 8))
+        self.tip(web_btn, "tip_web_update")
 
         # Schichthöhe — global für Cadence-Berechnung
         lh_frame = ctk.CTkFrame(self.sidebar, fg_color="#0f172a", corner_radius=8)
@@ -2624,6 +2889,81 @@ class U1FullSpectrumApp(ctk.CTk):
                       font=("Segoe UI", 14, "bold")).pack(pady=(16, 4), padx=40, fill="x")
         ctk.CTkButton(win, text=self.t("orca_btn_cancel"), fg_color="#334155",
                       command=win.destroy, height=36).pack(padx=40, fill="x")
+
+    # ── WEB-UPDATE ─────────────────────────────────────────────────────────────
+
+    # Community-Datenbank: als Fallback auch lokal gespeichert
+    _COMMUNITY_URL = (
+        "https://raw.githubusercontent.com/halloworld007/"
+        "snapmaker-u1-fullspectrum-helper/main/filament_community.json"
+    )
+
+    def web_update_library(self):
+        """Lädt Community-Farbdaten von GitHub und merged sie in die Bibliothek."""
+        import threading
+
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("web_update_title"))
+        win.geometry("420x160")
+        win.grab_set()
+        lbl = ctk.CTkLabel(win, text=self.t("web_update_fetching"),
+                           font=("Segoe UI", 12))
+        lbl.pack(expand=True, pady=30)
+        pb = ctk.CTkProgressBar(win, mode="indeterminate")
+        pb.pack(padx=40, fill="x"); pb.start()
+
+        def fetch():
+            try:
+                import urllib.request
+                with urllib.request.urlopen(self._COMMUNITY_URL, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+            except Exception as e:
+                win.after(0, lambda: done(None, str(e)))
+                return
+            win.after(0, lambda: done(data, None))
+
+        def done(data, err):
+            pb.stop(); pb.pack_forget()
+            if err:
+                lbl.configure(text=self.t("web_update_err", e=err),
+                               text_color="#f87171", wraplength=380)
+                ctk.CTkButton(win, text="OK", command=win.destroy,
+                               width=100).pack(pady=8)
+                return
+
+            if not isinstance(data, dict):
+                lbl.configure(text=self.t("web_update_err", e="Invalid format"),
+                               text_color="#f87171")
+                ctk.CTkButton(win, text="OK", command=win.destroy,
+                               width=100).pack(pady=8)
+                return
+
+            new_count = 0
+            n_brands  = 0
+            n_fils    = 0
+            for brand, entries in data.items():
+                if brand == "Eigene Favoriten":
+                    continue
+                n_brands += 1
+                existing_names = {f["name"] for f in self.library.get(brand, [])}
+                for entry in entries:
+                    n_fils += 1
+                    if entry.get("name") not in existing_names:
+                        self.library.setdefault(brand, []).append(entry)
+                        new_count += 1
+
+            if new_count:
+                self.save_db()
+                msg = self.t("web_update_ok", n_brands=n_brands,
+                              n_fils=n_fils, new=new_count)
+                lbl.configure(text=msg, text_color="#4ade80", wraplength=380)
+            else:
+                lbl.configure(text=self.t("web_update_no_new"),
+                               text_color="#94a3b8")
+            ctk.CTkButton(win, text="OK", command=win.destroy,
+                           width=100).pack(pady=8)
+
+        threading.Thread(target=fetch, daemon=True).start()
 
     # ── BIBLIOTHEK-MANAGER ─────────────────────────────────────────────────────
 
