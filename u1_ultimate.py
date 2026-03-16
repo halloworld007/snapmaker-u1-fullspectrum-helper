@@ -1260,9 +1260,9 @@ class U1FullSpectrumApp(ctk.CTk):
         self.target_circle = ctk.CTkLabel(mf, text="", width=42, height=42,
                                            fg_color="#1e293b", corner_radius=21)
         self.target_circle.grid(row=0, column=1, padx=4)
-        self.de_label = ctk.CTkLabel(mf, text="ΔE  —",
-                                      font=("Segoe UI", 16, "bold"), text_color="#475569")
-        self.de_label.grid(row=0, column=2, padx=14)
+        self.de_disp = ctk.CTkLabel(mf, text="ΔE  —",
+                                     font=("Segoe UI", 16, "bold"), text_color="#475569")
+        self.de_disp.grid(row=0, column=2, padx=14)
         self.sim_circle = ctk.CTkLabel(mf, text="", width=42, height=42,
                                         fg_color="#1e293b", corner_radius=21)
         self.sim_circle.grid(row=0, column=3, padx=4)
@@ -1735,7 +1735,7 @@ class U1FullSpectrumApp(ctk.CTk):
         tgt_display = self._simulate_colorblind(self.target, mode)
         self.sim_circle.configure(fg_color=sim_display)
         self.target_circle.configure(fg_color=tgt_display)
-        self.de_label.configure(text=self.de_label(dv), text_color=de_color(dv))
+        self.de_disp.configure(text=self.de_label(dv), text_color=de_color(dv))
 
         self.last_result = result
 
