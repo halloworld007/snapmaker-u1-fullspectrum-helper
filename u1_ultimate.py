@@ -1455,46 +1455,51 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # ── ABSCHNITT 2: VIRTUELLE DRUCKKÖPFE ────────────────────────────────
         sec2_hdr = ctk.CTkFrame(self.main, fg_color="transparent")
-        sec2_hdr.grid(row=1, column=0, padx=0, pady=(0, 6), sticky="ew")
+        sec2_hdr.grid(row=1, column=0, padx=0, pady=(0, 4), sticky="ew")
         sec2_hdr.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(sec2_hdr,
+        # Zeile 0: Titel + Untertitel
+        title_row = ctk.CTkFrame(sec2_hdr, fg_color="transparent")
+        title_row.grid(row=0, column=0, sticky="ew")
+        ctk.CTkLabel(title_row,
                      text=self.t("sec2_title"),
-                     font=("Segoe UI", 15, "bold"), text_color="#a78bfa").grid(
-            row=0, column=0, sticky="w")
-        ctk.CTkLabel(sec2_hdr,
-                     text=self.t("sec2_desc", max_v=self._max_virtual),
-                     font=("Segoe UI", 10), text_color="#64748b").grid(
-            row=1, column=0, sticky="w")
+                     font=("Segoe UI", 15, "bold"), text_color="#a78bfa").pack(side="left")
+        ctk.CTkLabel(title_row,
+                     text="  " + self.t("sec2_desc", max_v=self._max_virtual),
+                     font=("Segoe UI", 10), text_color="#64748b").pack(side="left")
 
+        # Zeile 1: alle Aktions-Buttons (volle Breite, kein Clipping)
         btn_row2 = ctk.CTkFrame(sec2_hdr, fg_color="transparent")
-        btn_row2.grid(row=0, column=1, sticky="e", padx=(10, 0))
+        btn_row2.grid(row=1, column=0, sticky="ew", pady=(4, 0))
         tmf_btn = ctk.CTkButton(btn_row2, text=self.t("btn_3mf"), fg_color="#0f4c81",
-                      hover_color="#1e3a5f", height=40, width=160,
-                      font=("Segoe UI", 12, "bold"),
+                      hover_color="#1e3a5f", height=36, width=150,
+                      font=("Segoe UI", 11, "bold"),
                       command=self.open_3mf_assistant)
-        tmf_btn.pack(side="left", padx=(0, 6))
+        tmf_btn.pack(side="left", padx=(0, 4))
         self.tip(tmf_btn, "tip_3mf")
 
         bat_btn = ctk.CTkButton(btn_row2, text=self.t("btn_batch"), fg_color="#4338ca",
-                      hover_color="#3730a3", height=40, width=140,
+                      hover_color="#3730a3", height=36, width=130,
                       font=("Segoe UI", 11, "bold"),
                       command=self.open_batch_dialog)
-        bat_btn.pack(side="left", padx=(0, 6))
+        bat_btn.pack(side="left", padx=(0, 4))
         self.tip(bat_btn, "tip_batch")
+
         undo_btn = ctk.CTkButton(btn_row2, text=self.t("btn_undo"), fg_color="#374151",
-                      height=40, width=110, command=self.undo_virtual)
-        undo_btn.pack(side="left", padx=(0, 6))
-        self.tip(undo_btn, "tip_calculate")  # reuse
+                      height=36, width=110, command=self.undo_virtual)
+        undo_btn.pack(side="left", padx=(0, 4))
+        self.tip(undo_btn, "tip_calculate")
 
         ctk.CTkButton(btn_row2, text=self.t("btn_del_all"), fg_color="#7f1d1d",
-                      hover_color="#991b1b", height=40, width=120,
-                      command=self.clear_virtual).pack(side="left", padx=(0, 6))
+                      hover_color="#991b1b", height=36, width=110,
+                      command=self.clear_virtual).pack(side="left", padx=(0, 4))
+
         ctk.CTkButton(btn_row2, text=self.t("btn_export_all"), fg_color="#374151",
-                      height=40, width=140,
-                      command=self.open_export_dialog).pack(side="left", padx=(0, 6))
+                      height=36, width=130,
+                      command=self.open_export_dialog).pack(side="left", padx=(0, 4))
+
         orca_btn = ctk.CTkButton(btn_row2, text=self.t("btn_orca_export"), fg_color="#0f766e",
-                      hover_color="#0d6660", height=40, width=140,
+                      hover_color="#0d6660", height=36, width=140,
                       font=("Segoe UI", 11, "bold"),
                       command=self.open_orca_export_dialog)
         orca_btn.pack(side="left")
