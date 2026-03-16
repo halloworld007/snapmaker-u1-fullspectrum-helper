@@ -2334,79 +2334,167 @@ class U1FullSpectrumApp(ctk.CTk):
     # ── ORCASLICER DIREKT-EXPORT ───────────────────────────────────────────────
 
     @staticmethod
-    def _detect_orca_filament_path() -> str:
-        """Sucht den OrcaSlicer-User-Filament-Ordner auf Windows/Mac/Linux."""
+    def _find_orca_installations() -> list:
+        """
+        Sucht alle OrcaSlicer-kompatiblen Installationen auf dem System.
+        Gibt eine Liste von Dicts zurück: {"label": str, "path": str, "exists": bool}
+        Durchsucht AppData/Roaming nach Ordnern mit user/default/filament Struktur,
+        sowie bekannte portable Pfade (Exe-Verzeichnis + data/).
+        """
         import platform
-        candidates = []
+        found = []
+        seen = set()
+
+        def add(label, path):
+            norm = os.path.normcase(os.path.normpath(path))
+            if norm not in seen:
+                seen.add(norm)
+                found.append({"label": label, "path": path,
+                               "exists": os.path.isdir(path)})
+
         if platform.system() == "Windows":
             appdata = os.environ.get("APPDATA", "")
-            candidates = [
-                os.path.join(appdata, "OrcaSlicer", "user", "default", "filament"),
-                os.path.join(appdata, "OrcaSlicer", "user", "filament"),
-                os.path.join(os.path.expanduser("~"), "AppData", "Roaming",
-                             "OrcaSlicer", "user", "default", "filament"),
+            if appdata and os.path.isdir(appdata):
+                # Alle Unterordner von AppData\Roaming durchsuchen
+                for entry in os.scandir(appdata):
+                    if not entry.is_dir():
+                        continue
+                    name = entry.name
+                    # OrcaSlicer-ähnliche Ordnernamen
+                    if any(x in name.lower() for x in
+                           ["orca", "snapmaker_orca", "bambu", "orca slicer"]):
+                        for sub in ["user/default/filament", "user/filament"]:
+                            p = os.path.join(entry.path, sub)
+                            add(f"{name}  ({p})", p)
+
+            # Bekannte portable Pfade: wenn neben einer Exe ein "data"-Ordner liegt
+            portable_hints = [
+                os.path.expanduser("~/Desktop"),
+                os.path.expanduser("~/Downloads"),
+                "C:/OrcaSlicer",
+                "D:/OrcaSlicer",
+                "C:/Snapmaker_Orca",
             ]
+            for base in portable_hints:
+                if not os.path.isdir(base):
+                    continue
+                for entry in os.scandir(base):
+                    if not entry.is_dir():
+                        continue
+                    # data/user/default/filament neben Exe
+                    p = os.path.join(entry.path, "data", "user", "default", "filament")
+                    if os.path.isdir(p):
+                        add(f"{entry.name} [portable]  ({p})", p)
+                    # AppData-style innerhalb portablem Ordner
+                    p2 = os.path.join(entry.path, "user", "default", "filament")
+                    if os.path.isdir(p2):
+                        add(f"{entry.name} [portable]  ({p2})", p2)
+
         elif platform.system() == "Darwin":
-            base = os.path.expanduser("~/Library/Application Support/OrcaSlicer")
-            candidates = [
-                os.path.join(base, "user", "default", "filament"),
-                os.path.join(base, "user", "filament"),
-            ]
-        else:  # Linux
-            base = os.path.expanduser("~/.config/OrcaSlicer")
-            candidates = [
-                os.path.join(base, "user", "default", "filament"),
-                os.path.join(base, "user", "filament"),
-            ]
-        for p in candidates:
-            if os.path.isdir(p):
-                return p
-        # Verzeichnis existiert noch nicht — erster Kandidat als Ziel zurückgeben
-        return candidates[0] if candidates else ""
+            base = os.path.expanduser("~/Library/Application Support")
+            if os.path.isdir(base):
+                for entry in os.scandir(base):
+                    if entry.is_dir() and "orca" in entry.name.lower():
+                        for sub in ["user/default/filament", "user/filament"]:
+                            p = os.path.join(entry.path, sub)
+                            add(f"{entry.name}  ({p})", p)
+        else:
+            base = os.path.expanduser("~/.config")
+            if os.path.isdir(base):
+                for entry in os.scandir(base):
+                    if entry.is_dir() and "orca" in entry.name.lower():
+                        p = os.path.join(entry.path, "user", "default", "filament")
+                        add(f"{entry.name}  ({p})", p)
+
+        # Existierende zuerst, dann potenzielle
+        found.sort(key=lambda x: (0 if x["exists"] else 1, x["label"]))
+        return found
+
+    @staticmethod
+    def _detect_orca_filament_path() -> str:
+        """Gibt den ersten gefundenen Filament-Pfad zurück (Rückwärtskompatibilität)."""
+        installs = App._find_orca_installations()
+        for i in installs:
+            if i["exists"]:
+                return i["path"]
+        return installs[0]["path"] if installs else ""
 
     def _build_orca_filament_json(self, name: str, hex_color: str, notes: str,
-                                   filament_type: str = "PLA") -> dict:
-        """Erstellt ein minimales OrcaSlicer-Filament-Profil-JSON."""
+                                   filament_type: str = "PLA",
+                                   target_path: str = "") -> dict:
+        """
+        Erstellt ein OrcaSlicer-kompatibles Filament-Profil-JSON.
+        Wählt automatisch das richtige 'inherits'-Format je nach Slicer
+        (OrcaSlicer: fdm_filament_pla  vs.  Snapmaker_Orca: Generic PLA).
+        """
         hex_clean = hex_color if hex_color.startswith("#") else f"#{hex_color}"
+        ft = filament_type.upper()
+        # Snapmaker_Orca und ähnliche nutzen "Generic XYZ" als Basisklasse
+        if "snapmaker" in target_path.lower() or "snapmaker_orca" in target_path.lower():
+            inherits = f"Generic {ft}"
+        else:
+            inherits = f"fdm_filament_{ft.lower()}"
         return {
             "type": "filament",
             "name": name,
-            "inherits": f"fdm_filament_{filament_type.lower()}",
-            "from": "user",
+            "inherits": inherits,
+            "from": "User",
+            "is_custom_defined": "0",
             "instantiation": "true",
             "filament_vendor": ["U1 FullSpectrum"],
             "filament_notes": [notes],
             "default_filament_colour": [hex_clean],
             "compatible_printers": [],
+            "filament_settings_id": [name],
         }
 
     def open_orca_export_dialog(self):
-        detected = self._detect_orca_filament_path()
-        path_var = ctk.StringVar(value=detected)
+        installs = self._find_orca_installations()
+        path_var = ctk.StringVar(value=installs[0]["path"] if installs else "")
 
         win = ctk.CTkToplevel(self)
         win.title(self.t("orca_title"))
-        win.geometry("560x500")
+        win.geometry("600x560")
         win.grab_set()
 
         ctk.CTkLabel(win, text=self.t("orca_header"),
-                     font=("Segoe UI", 14, "bold")).pack(pady=(18, 10))
+                     font=("Segoe UI", 14, "bold")).pack(pady=(18, 6))
 
-        # Pfad-Zeile
+        # Slicer-Auswahl (Dropdown wenn mehrere gefunden)
+        if installs:
+            ctk.CTkLabel(win, text="Erkannte Slicer-Installation:",
+                         font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=20)
+            # Kurze Labels für Dropdown (nur Ordnername)
+            def short_label(i):
+                parts = i["path"].replace("\\", "/").split("/")
+                # z.B. "Snapmaker_Orca ✓" oder "OrcaSlicer (leer)"
+                appname = parts[-4] if len(parts) >= 4 else i["label"]
+                status = " ✓" if i["exists"] else " (noch nicht vorhanden)"
+                return f"{appname}{status}"
+            labels = [short_label(i) for i in installs]
+            sel_var = ctk.StringVar(value=labels[0])
+            def on_slicer_select(choice):
+                idx = labels.index(choice)
+                path_var.set(installs[idx]["path"])
+            ctk.CTkOptionMenu(win, variable=sel_var, values=labels,
+                              command=on_slicer_select,
+                              width=560).pack(padx=20, pady=(2, 8))
+        else:
+            ctk.CTkLabel(win, text=self.t("orca_no_path"),
+                         text_color="#f87171", font=("Segoe UI", 10)).pack(pady=(0, 4))
+
+        # Pfad-Zeile (manuell überschreibbar)
         pf = ctk.CTkFrame(win, fg_color="transparent"); pf.pack(fill="x", padx=20, pady=(0, 4))
         ctk.CTkLabel(pf, text=self.t("orca_path_label"),
-                     font=("Segoe UI", 10, "bold")).pack(anchor="w")
-        pe = ctk.CTkEntry(pf, textvariable=path_var, width=440)
+                     font=("Segoe UI", 9), text_color="#64748b").pack(anchor="w")
+        pe = ctk.CTkEntry(pf, textvariable=path_var, width=460,
+                          font=("Segoe UI", 9))
         pe.pack(side="left", fill="x", expand=True, pady=2)
         def browse_path():
             p = filedialog.askdirectory(title=self.t("orca_path_label"))
             if p: path_var.set(p)
-        ctk.CTkButton(pf, text=self.t("orca_path_browse"), width=90,
+        ctk.CTkButton(pf, text=self.t("orca_path_browse"), width=80,
                       command=browse_path).pack(side="left", padx=(6, 0))
-
-        if not detected:
-            ctk.CTkLabel(win, text=self.t("orca_no_path"),
-                         text_color="#f87171", font=("Segoe UI", 10)).pack(pady=(0, 4))
 
         # Scope
         ctk.CTkLabel(win, text="Exportieren:", font=("Segoe UI", 11, "bold")).pack(
@@ -2466,7 +2554,7 @@ class U1FullSpectrumApp(ctk.CTk):
                     td     = s["td"].get().strip()
                     pname  = f"{prefix}-T{i+1} {name}" if name and name not in _SLOT_SKIP else f"{prefix}-T{i+1}"
                     notes  = self.t("orca_filament_notes_t", i=i+1, brand=brand, name=name, td=td)
-                    data   = self._build_orca_filament_json(pname, hex_c, notes, ftype)
+                    data   = self._build_orca_filament_json(pname, hex_c, notes, ftype, folder)
                     safe_fn = re.sub(r'[\\/:*?"<>|]', "_", pname) + ".json"
                     profiles_to_write.append((safe_fn, data))
 
@@ -2495,7 +2583,7 @@ class U1FullSpectrumApp(ctk.CTk):
                         pname  = f"{prefix}-V{v['vid']} {label}"
                         notes  = self.t("orca_filament_notes_v",
                                         seq=runs_str, de=v.get("de", 0.0), hint=hint)
-                        data   = self._build_orca_filament_json(pname, sim_hex, notes, ftype)
+                        data   = self._build_orca_filament_json(pname, sim_hex, notes, ftype, folder)
                         safe_fn = re.sub(r'[\\/:*?"<>|]', "_", pname) + ".json"
                         profiles_to_write.append((safe_fn, data))
 
