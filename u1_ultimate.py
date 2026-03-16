@@ -8,6 +8,23 @@ from itertools import permutations as iter_permutations
 from tkinter import colorchooser, messagebox, filedialog
 import math
 from datetime import datetime
+try:
+    from CTkColorPicker import AskColor as _AskColor
+    _HAS_CTKPICKER = True
+except ImportError:
+    _HAS_CTKPICKER = False
+
+try:
+    from CTkToolTip import CTkToolTip as _Tip
+    _HAS_TOOLTIP = True
+except ImportError:
+    _HAS_TOOLTIP = False
+
+try:
+    from PIL import Image as _PILImage
+    _HAS_PIL = True
+except ImportError:
+    _HAS_PIL = False
 
 # ── ÜBERSETZUNGEN ─────────────────────────────────────────────────────────────
 
@@ -146,6 +163,40 @@ STRINGS = {
     "save_dialog_title": "Speichern",
     "open_3mf_title": "3MF-Datei für Farbanalyse öffnen",
     "3mf_filetypes": "3MF-Dateien",
+    "btn_copy": "📋 Kopieren",
+    "btn_random": "🎲 Zufall",
+    "copied_msg": "Sequenz in Zwischenablage kopiert!",
+    "btn_batch": "🎨 Batch-Farben",
+    "batch_title": "Batch-Farben berechnen",
+    "batch_desc": "Hex-Codes eingeben (eine Farbe pro Zeile, z.B. #FF5500):",
+    "batch_btn_calc": "⚙  Alle berechnen & übernehmen",
+    "batch_btn_cancel": "Abbrechen",
+    "batch_done": "{n} virtuelle Druckköpfe aus Batch hinzugefügt.",
+    "batch_warn_max": "Maximale Anzahl virtueller Köpfe erreicht ({max_v}).",
+    "settings_title": "Einstellungen",
+    "settings_saved": "Einstellungen gespeichert.",
+    "tab_calculator": "Rechner",
+    "tab_virtual": "Virtuelle Köpfe",
+    "color_picker_title": "Farbe wählen — T{i}",
+    "target_picker_title": "Zielfarbe wählen",
+    "btn_img_pick": "🖼 Aus Bild",
+    "img_pick_title": "Bild öffnen — Farbe auswählen",
+    "img_filetypes": "Bilddateien",
+    "img_instruction": "Klicke auf eine Farbe im Bild",
+    "btn_undo": "↩ Rückgängig",
+    "undo_empty": "Nichts zum Rückgängigmachen.",
+    "tip_calculate": "Sequenz berechnen (Enter)",
+    "tip_optimizer": "Testet alle 24 Filament-Reihenfolgen",
+    "tip_add_virtual": "Als virtuellen Druckkopf V5-V24 hinzufügen",
+    "tip_copy": "Sequenz in Zwischenablage kopieren",
+    "tip_export": "Als JSON oder TXT exportieren",
+    "tip_random": "Zufällige Zielfarbe",
+    "tip_img_pick": "Farbe aus Bild wählen",
+    "tip_3mf": "3MF-Datei öffnen und Farben analysieren",
+    "tip_batch": "Mehrere Hex-Codes auf einmal berechnen",
+    "tip_lang": "Sprache umschalten",
+    "tip_td": "Transmission Distance: 0=deckend, 10=transparent",
+    "colorinfo_label": "RGB: {r} {g} {b}   Lab: {L:.0f} {a:.0f} {b_:.0f}",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
@@ -281,6 +332,40 @@ STRINGS = {
     "save_dialog_title": "Save",
     "open_3mf_title": "Open 3MF file for color analysis",
     "3mf_filetypes": "3MF Files",
+    "btn_copy": "📋 Copy",
+    "btn_random": "🎲 Random",
+    "copied_msg": "Sequence copied to clipboard!",
+    "btn_batch": "🎨 Batch Colors",
+    "batch_title": "Batch Color Calculator",
+    "batch_desc": "Enter hex codes (one color per line, e.g. #FF5500):",
+    "batch_btn_calc": "⚙  Calculate All & Add",
+    "batch_btn_cancel": "Cancel",
+    "batch_done": "{n} virtual print heads added from batch.",
+    "batch_warn_max": "Maximum virtual heads reached ({max_v}).",
+    "settings_title": "Settings",
+    "settings_saved": "Settings saved.",
+    "tab_calculator": "Calculator",
+    "tab_virtual": "Virtual Heads",
+    "color_picker_title": "Pick Color — T{i}",
+    "target_picker_title": "Pick Target Color",
+    "btn_img_pick": "🖼 From Image",
+    "img_pick_title": "Open Image — Pick Color",
+    "img_filetypes": "Image Files",
+    "img_instruction": "Click on a color in the image",
+    "btn_undo": "↩ Undo",
+    "undo_empty": "Nothing to undo.",
+    "tip_calculate": "Calculate sequence (Enter)",
+    "tip_optimizer": "Tests all 24 filament permutations",
+    "tip_add_virtual": "Add as virtual print head V5-V24",
+    "tip_copy": "Copy sequence to clipboard",
+    "tip_export": "Export as JSON or TXT",
+    "tip_random": "Random target color",
+    "tip_img_pick": "Pick color from an image file",
+    "tip_3mf": "Open 3MF file and analyze colors",
+    "tip_batch": "Calculate multiple hex codes at once",
+    "tip_lang": "Switch language",
+    "tip_td": "Transmission Distance: 0=opaque, 10=transparent",
+    "colorinfo_label": "RGB: {r} {g} {b}   Lab: {L:.0f} {a:.0f} {b_:.0f}",
 },
 }
 
@@ -452,8 +537,10 @@ def parse_3mf_colors(filepath):
 class U1FullSpectrumApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.lang          = "de"
-        self.title(STRINGS["de"]["app_title"])
+        self.settings_file = "settings.json"
+        self.settings      = self._load_settings()
+        self.lang          = self.settings.get("lang", "de")
+        self.title(STRINGS[self.lang]["app_title"])
         self.geometry("1420x1000")
         ctk.set_appearance_mode("dark")
         self.db_file       = "filament_db.json"
@@ -461,17 +548,50 @@ class U1FullSpectrumApp(ctk.CTk):
         self.history       = []
         self.presets       = {}
         self.virtual_fils  = []   # list of virtual filament dicts
+        self.virtual_undo  = []   # undo stack for virtual heads
         self.last_result   = {}   # last calc() result for "hinzufügen"
         self.load_db()
         self.load_presets()
         self.setup_ui()
+        # Einstellungen wiederherstellen
+        lh = self.settings.get("layer_height", "0.2")
+        self.layer_height_entry.delete(0, "end")
+        self.layer_height_entry.insert(0, lh)
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _on_close(self):
+        self._save_settings()
+        self.destroy()
 
     def t(self, key, **kwargs):
         s = STRINGS[self.lang].get(key, STRINGS["de"].get(key, key))
         return s.format(**kwargs) if kwargs else s
 
+    def tip(self, widget, key):
+        """Tooltip hinzufügen wenn CTkToolTip verfügbar."""
+        if _HAS_TOOLTIP:
+            _Tip(widget, message=self.t(key), delay=600)
+
     def de_label(self, de):
         return de_label_text(de, self.lang)
+
+    def _load_settings(self):
+        if os.path.exists(self.settings_file):
+            try:
+                with open(self.settings_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {}
+
+    def _save_settings(self):
+        self.settings["lang"] = self.lang
+        self.settings["layer_height"] = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.2"
+        try:
+            with open(self.settings_file, "w", encoding="utf-8") as f:
+                json.dump(self.settings, f, indent=2)
+        except IOError:
+            pass
 
     def _save_slot_values(self):
         return [{"brand": s["brand"].get(), "hex": s["hex"].get(),
@@ -490,6 +610,7 @@ class U1FullSpectrumApp(ctk.CTk):
                 s["td"].delete(0, "end"); s["td"].insert(0, v["td"])
 
     def toggle_lang(self):
+        self._save_settings()
         slot_vals = self._save_slot_values()
         target    = getattr(self, "target", None)
         self.lang = "en" if self.lang == "de" else "de"
@@ -500,6 +621,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self._restore_slot_values(slot_vals)
         if target:
             self._apply_target(target)
+        self._save_settings()
 
     # ── DATENBANK ──────────────────────────────────────────────────────────────
 
@@ -589,9 +711,11 @@ class U1FullSpectrumApp(ctk.CTk):
         # Sprach-Toggle
         lang_row = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         lang_row.pack(fill="x", padx=12, pady=(6, 0))
-        ctk.CTkButton(lang_row, text=self.t("lang_btn"), width=70, height=26,
+        lang_btn = ctk.CTkButton(lang_row, text=self.t("lang_btn"), width=70, height=26,
                       fg_color="#1e3a5f", font=("Segoe UI", 10),
-                      command=self.toggle_lang).pack(side="right")
+                      command=self.toggle_lang)
+        lang_btn.pack(side="right")
+        self.tip(lang_btn, "tip_lang")
 
         ctk.CTkLabel(self.sidebar, text=self.t("phys_heads_title"),
                      font=("Segoe UI", 18, "bold"), text_color="#38bdf8").pack(pady=(8, 4))
@@ -778,23 +902,61 @@ class U1FullSpectrumApp(ctk.CTk):
         self.auto_thresh_entry.insert(0, "2.0")
         self.auto_thresh_entry.grid(row=0, column=4, padx=(2, 14))
 
+        # Zielfarbe: Random + Bild-Picker Buttons
+        rnd_btn = ctk.CTkButton(top, text=self.t("btn_random"), width=85, height=46,
+                      fg_color="#374151", font=("Segoe UI", 11),
+                      command=self.pick_random_color)
+        rnd_btn.grid(row=0, column=3, padx=(4, 0))
+        self.tip(rnd_btn, "tip_random")
+
+        img_btn = ctk.CTkButton(top, text=self.t("btn_img_pick"), width=100, height=46,
+                      fg_color="#374151", font=("Segoe UI", 11),
+                      command=self.pick_color_from_image)
+        img_btn.grid(row=0, column=4, padx=(4, 0))
+        self.tip(img_btn, "tip_img_pick")
+
+        # Farbinfo-Label (RGB + Lab)
+        self.colorinfo_label = ctk.CTkLabel(sec1, text="",
+                                             font=("Segoe UI", 9), text_color="#475569")
+        self.colorinfo_label.grid(row=2, column=0, padx=20, pady=(0, 2), sticky="w")
+
         # Steuerleiste
         bl = ctk.CTkFrame(sec1, fg_color="transparent")
         bl.grid(row=8, column=0, padx=40, pady=(4, 16), sticky="ew")
         bl.grid_columnconfigure(0, weight=1)
-        ctk.CTkButton(bl, text=self.t("btn_calculate"), fg_color="#2563eb",
+        calc_btn = ctk.CTkButton(bl, text=self.t("btn_calculate"), fg_color="#2563eb",
                       command=self.calc, height=46,
-                      font=("Segoe UI", 14, "bold")).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+                      font=("Segoe UI", 14, "bold"))
+        calc_btn.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self.tip(calc_btn, "tip_calculate")
+
         self.optimizer_var = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(bl, text=self.t("optimizer_check"), variable=self.optimizer_var,
-                        font=("Segoe UI", 9)).grid(row=0, column=1, padx=(0, 6))
-        ctk.CTkButton(bl, text=self.t("btn_add_virtual"),
+        opt_cb = ctk.CTkCheckBox(bl, text=self.t("optimizer_check"), variable=self.optimizer_var,
+                        font=("Segoe UI", 9))
+        opt_cb.grid(row=0, column=1, padx=(0, 6))
+        self.tip(opt_cb, "tip_optimizer")
+
+        add_btn = ctk.CTkButton(bl, text=self.t("btn_add_virtual"),
                       fg_color="#15803d", hover_color="#166534",
                       command=self.add_to_virtual, height=46,
-                      font=("Segoe UI", 11, "bold")).grid(row=0, column=2, padx=(0, 6))
-        ctk.CTkButton(bl, text="EXPORT", fg_color="#7c3aed",
+                      font=("Segoe UI", 11, "bold"))
+        add_btn.grid(row=0, column=2, padx=(0, 6))
+        self.tip(add_btn, "tip_add_virtual")
+
+        copy_btn = ctk.CTkButton(bl, text=self.t("btn_copy"), fg_color="#374151",
+                      command=self.copy_sequence, height=46, width=110,
+                      font=("Segoe UI", 11))
+        copy_btn.grid(row=0, column=3, padx=(0, 6))
+        self.tip(copy_btn, "tip_copy")
+
+        exp_btn = ctk.CTkButton(bl, text="EXPORT", fg_color="#7c3aed",
                       command=self.open_export_dialog, height=46, width=90,
-                      font=("Segoe UI", 12, "bold")).grid(row=0, column=3)
+                      font=("Segoe UI", 12, "bold"))
+        exp_btn.grid(row=0, column=4)
+        self.tip(exp_btn, "tip_export")
+
+        # Keyboard shortcut: Enter = Berechnen
+        self.bind("<Return>", lambda e: self.calc())
 
         # ── ABSCHNITT 2: VIRTUELLE DRUCKKÖPFE ────────────────────────────────
         sec2_hdr = ctk.CTkFrame(self.main, fg_color="transparent")
@@ -812,10 +974,24 @@ class U1FullSpectrumApp(ctk.CTk):
 
         btn_row2 = ctk.CTkFrame(sec2_hdr, fg_color="transparent")
         btn_row2.grid(row=0, column=1, sticky="e", padx=(10, 0))
-        ctk.CTkButton(btn_row2, text=self.t("btn_3mf"), fg_color="#0f4c81",
+        tmf_btn = ctk.CTkButton(btn_row2, text=self.t("btn_3mf"), fg_color="#0f4c81",
                       hover_color="#1e3a5f", height=40, width=160,
                       font=("Segoe UI", 12, "bold"),
-                      command=self.open_3mf_assistant).pack(side="left", padx=(0, 6))
+                      command=self.open_3mf_assistant)
+        tmf_btn.pack(side="left", padx=(0, 6))
+        self.tip(tmf_btn, "tip_3mf")
+
+        bat_btn = ctk.CTkButton(btn_row2, text=self.t("btn_batch"), fg_color="#4338ca",
+                      hover_color="#3730a3", height=40, width=140,
+                      font=("Segoe UI", 11, "bold"),
+                      command=self.open_batch_dialog)
+        bat_btn.pack(side="left", padx=(0, 6))
+        self.tip(bat_btn, "tip_batch")
+        undo_btn = ctk.CTkButton(btn_row2, text=self.t("btn_undo"), fg_color="#374151",
+                      height=40, width=110, command=self.undo_virtual)
+        undo_btn.pack(side="left", padx=(0, 6))
+        self.tip(undo_btn, "tip_calculate")  # reuse
+
         ctk.CTkButton(btn_row2, text=self.t("btn_del_all"), fg_color="#7f1d1d",
                       hover_color="#991b1b", height=40, width=120,
                       command=self.clear_virtual).pack(side="left", padx=(0, 6))
@@ -863,9 +1039,8 @@ class U1FullSpectrumApp(ctk.CTk):
 
     def pick_slot_color(self, idx):
         cur = self.slots[idx]["hex"].get().strip() or "#808080"
-        r = colorchooser.askcolor(color=cur, title=f"Farbe für T{idx+1}")
-        if r[1] is None: return
-        h = r[1].upper()
+        h = self._ask_color(initial=cur, title=self.t("color_picker_title", i=idx+1))
+        if h is None: return
         self.slots[idx]["hex"].delete(0, "end"); self.slots[idx]["hex"].insert(0, h)
         self.slots[idx]["preview"].configure(fg_color=h)
         cur_vals = [f["name"] for f in self.library.get(self.slots[idx]["brand"].get(), [])]
@@ -914,9 +1089,20 @@ class U1FullSpectrumApp(ctk.CTk):
 
     # ── ZIELFARBE ──────────────────────────────────────────────────────────────
 
+    def _ask_color(self, initial="#808080", title="Pick Color"):
+        """Unified color picker: CTkColorPicker wenn verfügbar, sonst tkinter Fallback."""
+        if _HAS_CTKPICKER:
+            picker = _AskColor(width=350, initial_color=initial,
+                               title=title, text="OK")
+            result = picker.get()
+            return result.upper() if result else None
+        else:
+            result = colorchooser.askcolor(color=initial, title=title)
+            return result[1].upper() if result[1] else None
+
     def pick(self):
-        c = colorchooser.askcolor()[1]
-        if c: self._apply_target(c.upper())
+        c = self._ask_color(title=self.t("target_picker_title"))
+        if c: self._apply_target(c)
 
     def _on_hex_target_enter(self, event=None):
         raw = self.hex_target_entry.get().strip()
@@ -929,6 +1115,13 @@ class U1FullSpectrumApp(ctk.CTk):
         self.target_circle.configure(fg_color=hex_str)
         self.hex_target_entry.delete(0, "end")
         self.hex_target_entry.insert(0, hex_str)
+        # Farbinfo aktualisieren
+        rgb = hex_to_rgb(hex_str)
+        lab = rgb_to_lab(rgb)
+        info = self.t("colorinfo_label", r=rgb[0], g=rgb[1], b=rgb[2],
+                      L=lab[0], a=lab[1], b_=lab[2])
+        if hasattr(self, "colorinfo_label"):
+            self.colorinfo_label.configure(text=info)
         self.calc()
 
     def _on_len_slider(self, val):
@@ -1096,6 +1289,7 @@ class U1FullSpectrumApp(ctk.CTk):
             result = self.last_result
         if not result:
             messagebox.showinfo(self.t("dlg_note"), self.t("dlg_no_seq")); return
+        self.virtual_undo.append(copy.deepcopy(self.virtual_fils))
         vid = 5 + len(self.virtual_fils)
         self.virtual_fils.append({
             "vid":        vid,
@@ -1110,8 +1304,175 @@ class U1FullSpectrumApp(ctk.CTk):
     def clear_virtual(self):
         if self.virtual_fils and messagebox.askyesno(
                 self.t("dlg_del_title"), self.t("dlg_del_virtual")):
+            self.virtual_undo.append(copy.deepcopy(self.virtual_fils))
             self.virtual_fils.clear()
             self._refresh_virtual_grid()
+
+    def undo_virtual(self):
+        if not self.virtual_undo:
+            messagebox.showinfo(self.t("dlg_note"), self.t("undo_empty")); return
+        self.virtual_fils = self.virtual_undo.pop()
+        self._refresh_virtual_grid()
+
+    def pick_color_from_image(self):
+        """Farbe aus Bilddatei wählen (Pillow)."""
+        if not _HAS_PIL:
+            messagebox.showinfo(self.t("dlg_note"), "Pillow not installed."); return
+        path = filedialog.askopenfilename(
+            filetypes=[(self.t("img_filetypes"), "*.png *.jpg *.jpeg *.bmp *.webp *.gif"),
+                       ("*", "*.*")],
+            title=self.t("img_pick_title"))
+        if not path: return
+
+        img = _PILImage.open(path).convert("RGB")
+        # Bild auf max 600px skalieren für schnelles Anzeigen
+        max_size = 600
+        w, h = img.size
+        scale = min(max_size / w, max_size / h, 1.0)
+        disp_w, disp_h = int(w * scale), int(h * scale)
+        img_disp = img.resize((disp_w, disp_h), _PILImage.LANCZOS)
+
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("img_pick_title"))
+        win.geometry(f"{disp_w + 40}x{disp_h + 100}")
+        win.grab_set()
+        win.resizable(False, False)
+
+        ctk.CTkLabel(win, text=self.t("img_instruction"),
+                     font=("Segoe UI", 11), text_color="#94a3b8").pack(pady=(10, 4))
+
+        import tkinter as tk
+        from PIL import ImageTk
+        tk_img = ImageTk.PhotoImage(img_disp)
+
+        canvas = tk.Canvas(win, width=disp_w, height=disp_h,
+                           highlightthickness=0, bg="#0f172a", cursor="crosshair")
+        canvas.pack(padx=20)
+        canvas.create_image(0, 0, anchor="nw", image=tk_img)
+        canvas._img = tk_img  # reference to avoid GC
+
+        preview_frame = ctk.CTkFrame(win, fg_color="transparent")
+        preview_frame.pack(pady=6)
+        preview_dot = ctk.CTkLabel(preview_frame, text="", width=32, height=32,
+                                   fg_color="#808080", corner_radius=16)
+        preview_dot.pack(side="left", padx=6)
+        preview_hex = ctk.CTkLabel(preview_frame, text="—",
+                                   font=("Courier New", 13), text_color="#94a3b8")
+        preview_hex.pack(side="left")
+
+        chosen = [None]
+
+        def on_move(event):
+            px = int(event.x / scale)
+            py = int(event.y / scale)
+            px = max(0, min(px, w - 1))
+            py = max(0, min(py, h - 1))
+            r, g, b = img.getpixel((px, py))
+            h_str = f"#{r:02X}{g:02X}{b:02X}"
+            preview_dot.configure(fg_color=h_str)
+            preview_hex.configure(text=h_str)
+            chosen[0] = h_str
+
+        def on_click(event):
+            if chosen[0]:
+                win.destroy()
+                self._apply_target(chosen[0])
+
+        canvas.bind("<Motion>", on_move)
+        canvas.bind("<Button-1>", on_click)
+        win.mainloop()
+
+    def copy_sequence(self):
+        """Aktuelle Sequenz in die Zwischenablage kopieren."""
+        seq = self.res.cget("text") if hasattr(self, "res") else ""
+        if not seq or seq == "----------": return
+        self.clipboard_clear()
+        self.clipboard_append(seq)
+        messagebox.showinfo(self.t("dlg_note"), self.t("copied_msg"))
+
+    def pick_random_color(self):
+        """Zufällige Farbe wählen und berechnen."""
+        import random
+        r = random.randint(0, 255)
+        g = random.randint(0, 255)
+        b = random.randint(0, 255)
+        h = f"#{r:02X}{g:02X}{b:02X}"
+        self._apply_target(h)
+
+    def open_batch_dialog(self):
+        """Batch-Eingabe: Mehrere Hex-Codes auf einmal berechnen und als virtuelle Köpfe hinzufügen."""
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("batch_title"))
+        win.geometry("480x460")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text=self.t("batch_title"),
+                     font=("Segoe UI", 14, "bold")).pack(pady=(16, 4))
+        ctk.CTkLabel(win, text=self.t("batch_desc"),
+                     font=("Segoe UI", 10), text_color="#64748b",
+                     wraplength=420).pack(pady=(0, 8))
+
+        # Farbvorschau-Reihe
+        preview_row = ctk.CTkFrame(win, fg_color="transparent")
+        preview_row.pack(fill="x", padx=20, pady=(0, 4))
+
+        txt = ctk.CTkTextbox(win, height=200, font=("Courier New", 12))
+        txt.pack(fill="both", expand=True, padx=20, pady=(0, 8))
+
+        # Vorschau aktualisieren beim Tippen
+        preview_labels = []
+        def update_preview(event=None):
+            for w in preview_row.winfo_children(): w.destroy()
+            preview_labels.clear()
+            lines = txt.get("1.0", "end").strip().splitlines()
+            for line in lines[:20]:
+                h = line.strip()
+                if not h.startswith("#"): h = "#" + h
+                if re.match(r'^#[0-9A-Fa-f]{6}$', h):
+                    lbl = ctk.CTkLabel(preview_row, text="", width=24, height=24,
+                                       fg_color=h, corner_radius=4)
+                    lbl.pack(side="left", padx=2)
+                    preview_labels.append(lbl)
+        txt.bind("<KeyRelease>", update_preview)
+
+        prog = ctk.CTkLabel(win, text="", font=("Segoe UI", 10), text_color="#94a3b8")
+        prog.pack()
+
+        def do_batch():
+            lines = txt.get("1.0", "end").strip().splitlines()
+            hexes = []
+            for line in lines:
+                h = line.strip()
+                if not h: continue
+                if not h.startswith("#"): h = "#" + h
+                if re.match(r'^#[0-9A-Fa-f]{6}$', h):
+                    hexes.append(h.upper())
+            added = 0
+            for i, h in enumerate(hexes):
+                if len(self.virtual_fils) >= MAX_VIRTUAL:
+                    messagebox.showwarning(self.t("dlg_max_virtual"),
+                                           self.t("batch_warn_max", max_v=MAX_VIRTUAL))
+                    break
+                prog.configure(text=f"{i+1}/{len(hexes)}  {h}")
+                win.update_idletasks()
+                r = self._calc_for_color(h,
+                    optimizer=self.optimizer_var.get(),
+                    seq_len=int(self.len_slider.get()) if not self.auto_len_var.get() else None,
+                    auto=self.auto_len_var.get(),
+                    auto_threshold=safe_td(self.auto_thresh_entry.get()))
+                if r:
+                    self.add_to_virtual(r)
+                    added += 1
+            win.destroy()
+            messagebox.showinfo(self.t("dlg_3mf_title"), self.t("batch_done", n=added))
+
+        btm = ctk.CTkFrame(win, fg_color="transparent")
+        btm.pack(fill="x", padx=20, pady=(0, 14))
+        ctk.CTkButton(btm, text=self.t("batch_btn_calc"), fg_color="#2563eb",
+                      command=do_batch, height=40,
+                      font=("Segoe UI", 12, "bold")).pack(side="left", padx=(0, 6))
+        ctk.CTkButton(btm, text=self.t("batch_btn_cancel"), fg_color="#374151",
+                      command=win.destroy, height=40).pack(side="right")
 
     def _refresh_virtual_grid(self):
         for w in self.vgrid.winfo_children():
@@ -1197,8 +1558,8 @@ class U1FullSpectrumApp(ctk.CTk):
                      font=("Segoe UI", 9), text_color=hint_color).pack(side="left", padx=4)
 
     def _remove_virtual(self, vid):
+        self.virtual_undo.append(copy.deepcopy(self.virtual_fils))
         self.virtual_fils = [v for v in self.virtual_fils if v["vid"] != vid]
-        # Renumber
         for i, v in enumerate(self.virtual_fils):
             v["vid"] = 5 + i
         self._refresh_virtual_grid()
