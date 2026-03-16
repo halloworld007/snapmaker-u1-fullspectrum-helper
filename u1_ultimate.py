@@ -1441,10 +1441,17 @@ class U1FullSpectrumApp(ctk.CTk):
             fg_color="#7c2d12", corner_radius=6, text_color="#fcd34d",
             font=("Segoe UI", 10))
 
-        # Sequenz-Ergebnis
-        self.res = ctk.CTkLabel(sec1, text="----------",
+        # Sequenz-Ergebnis + Kopier-Button
+        res_frame = ctk.CTkFrame(sec1, fg_color="transparent")
+        res_frame.grid(row=3, column=0, pady=(4, 2))
+        self.res = ctk.CTkLabel(res_frame, text="----------",
                                  font=("Courier New", 58, "bold"), text_color="#4ade80")
-        self.res.grid(row=3, column=0, pady=(4, 2))
+        self.res.pack(side="left")
+        self._res_copy_btn = ctk.CTkButton(
+            res_frame, text="📋", width=32, height=32,
+            fg_color="#1e293b", hover_color="#334155",
+            command=self._copy_sequence)
+        self._res_copy_btn.pack(side="left", padx=(6, 0), anchor="s", pady=(0, 8))
 
         # 10 Segmente
         sf = ctk.CTkFrame(sec1, fg_color="transparent")
@@ -1496,8 +1503,11 @@ class U1FullSpectrumApp(ctk.CTk):
                                            fg_color="#1e293b", corner_radius=32)
         self.target_circle.pack(pady=(4, 2))
         self.target_hex_lbl = ctk.CTkLabel(tgt_col, text="—", font=("Courier New", 9),
-                                            text_color="#475569")
+                                            text_color="#475569", cursor="hand2")
         self.target_hex_lbl.pack()
+        self.target_hex_lbl.bind("<Button-1>", lambda e: (
+            self.clipboard_clear(),
+            self.clipboard_append(self.target_hex_lbl.cget("text"))))
 
         # ΔE Mitte
         de_col = ctk.CTkFrame(mf, fg_color="transparent")
@@ -1518,8 +1528,11 @@ class U1FullSpectrumApp(ctk.CTk):
                                         fg_color="#1e293b", corner_radius=32)
         self.sim_circle.pack(pady=(4, 2))
         self.sim_hex_lbl = ctk.CTkLabel(sim_col, text="—", font=("Courier New", 9),
-                                         text_color="#475569")
+                                         text_color="#475569", cursor="hand2")
         self.sim_hex_lbl.pack()
+        self.sim_hex_lbl.bind("<Button-1>", lambda e: (
+            self.clipboard_clear(),
+            self.clipboard_append(self.sim_hex_lbl.cget("text"))))
 
         # Sequenzlänge + Auto-Modus
         lr = ctk.CTkFrame(sec1, fg_color="#1a2535", corner_radius=8)
@@ -2150,6 +2163,12 @@ class U1FullSpectrumApp(ctk.CTk):
 
     # ── VIRTUELLE DRUCKKÖPFE ───────────────────────────────────────────────────
 
+    def _copy_sequence(self):
+        seq = self.res.cget("text").strip()
+        if seq and seq != "----------":
+            self.clipboard_clear()
+            self.clipboard_append(seq)
+
     def add_to_virtual(self, result=None):
         if len(self.virtual_fils) >= self._max_virtual:
             messagebox.showwarning(self.t("dlg_max_virtual"), self.t("dlg_max_virtual_msg", max_v=self._max_virtual))
@@ -2705,8 +2724,23 @@ class U1FullSpectrumApp(ctk.CTk):
             hint = self.t("hint_pattern", p=pattern_str)
             hint_color = "#a78bfa"
 
-        ctk.CTkLabel(info_row, text=hint,
-                     font=("Segoe UI", 9), text_color=hint_color).pack(side="left", padx=4)
+        import tkinter as _tk
+        _hint_entry = _tk.Entry(
+            info_row, font=("Segoe UI", 9), fg=hint_color,
+            bg="#0f172a", readonlybackground="#0f172a",
+            relief="flat", bd=0, highlightthickness=0,
+            state="readonly", width=max(len(hint), 10))
+        _hint_entry.configure(state="normal")
+        _hint_entry.delete(0, "end")
+        _hint_entry.insert(0, hint)
+        _hint_entry.configure(state="readonly")
+        _hint_entry.pack(side="left", padx=4)
+        # 📋 Kopier-Button
+        def _copy_hint(h=hint):
+            self.clipboard_clear(); self.clipboard_append(h)
+        ctk.CTkButton(info_row, text="📋", width=24, height=20,
+                      fg_color="#1e293b", hover_color="#334155",
+                      command=_copy_hint).pack(side="left", padx=(0, 4))
 
     def _remove_virtual(self, vid):
         self.virtual_undo.append(copy.deepcopy(self.virtual_fils))
