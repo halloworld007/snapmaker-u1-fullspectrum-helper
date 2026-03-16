@@ -3440,7 +3440,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self._opt_best = None
 
         def run_optimizer():
-            import itertools, threading
+            import threading
 
             # Alle Filamente flach aus der Library
             all_fils = []
@@ -3465,36 +3465,78 @@ class U1FullSpectrumApp(ctk.CTk):
                     "#00FFFF","#0000FF","#FF00FF","#FFFFFF",
                     "#808080","#000000"]]
 
-            combos = list(itertools.combinations(range(len(all_fils)), 4))
-            total  = len(combos)
-            best_score = float("inf")
-            best_combo = None
+            n = len(all_fils)
+            k = len(targets)
 
             def worker():
-                nonlocal best_score, best_combo
-                for i, combo in enumerate(combos):
-                    fils = [all_fils[j] for j in combo]
-                    # Score: mittleres ΔE zu allen Zielfarben (niedrig = besser)
-                    total_de = 0
-                    for tgt in targets:
-                        min_de = min(delta_e(tgt, f["lab"]) for f in fils)
-                        total_de += min_de
-                    score = total_de / len(targets)
-                    if score < best_score:
-                        best_score = score
-                        best_combo = fils
-                    if i % 500 == 0:
-                        frac = i / total
-                        def _upd(f=frac, ii=i):
-                            try:
-                                if win.winfo_exists():
-                                    pb.set(f)
-                                    progress_lbl.configure(
-                                        text=self.t("slot_opt_running", i=ii, total=total))
-                            except Exception:
-                                pass
-                        win.after(0, _upd)
-                self._opt_best = (best_combo, best_score)
+                # --- Phase 1: Pre-compute distance matrix (n × k) ---
+                dist = [[delta_e(targets[t], all_fils[i]["lab"])
+                         for t in range(k)]
+                        for i in range(n)]
+
+                def _upd_ui(frac, msg):
+                    def _cb():
+                        try:
+                            if win.winfo_exists():
+                                pb.set(frac)
+                                progress_lbl.configure(text=msg)
+                        except Exception:
+                            pass
+                    win.after(0, _cb)
+
+                _upd_ui(0.15, "Phase 1: Distanzmatrix …")
+
+                def combo_score(chosen_idx):
+                    total = 0.0
+                    for t in range(k):
+                        total += min(dist[i][t] for i in chosen_idx)
+                    return total / k
+
+                # --- Phase 2: Greedy selection ---
+                chosen = []
+                remaining = list(range(n))
+                for step in range(4):
+                    _upd_ui(0.15 + step * 0.15,
+                            f"Phase 2: Greedy Schritt {step+1}/4 …")
+                    # current best coverage for each target
+                    if chosen:
+                        cur_best = [min(dist[i][t] for i in chosen) for t in range(k)]
+                    else:
+                        cur_best = [float("inf")] * k
+
+                    best_i, best_sc = None, float("inf")
+                    for i in remaining:
+                        sc = sum(min(cur_best[t], dist[i][t]) for t in range(k)) / k
+                        if sc < best_sc:
+                            best_sc, best_i = sc, i
+                    chosen.append(best_i)
+                    remaining.remove(best_i)
+
+                _upd_ui(0.75, "Phase 3: Local Search …")
+
+                # --- Phase 3: Local search (swap improvements) ---
+                improved = True
+                cur_score = combo_score(chosen)
+                while improved:
+                    improved = False
+                    for ci in range(4):
+                        old_c = chosen[ci]
+                        for r in remaining:
+                            chosen[ci] = r
+                            sc = combo_score(chosen)
+                            if sc < cur_score - 1e-9:
+                                cur_score = sc
+                                remaining.remove(r)
+                                remaining.append(old_c)
+                                old_c = r
+                                improved = True
+                                break
+                            else:
+                                chosen[ci] = old_c
+                        if improved:
+                            break
+
+                self._opt_best = ([all_fils[i] for i in chosen], cur_score)
                 def _done():
                     try:
                         if win.winfo_exists():
