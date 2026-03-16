@@ -243,6 +243,16 @@ STRINGS = {
     # Slicer-Guide
     "btn_slicer_guide": "📖 Slicer-Guide",
     "slicer_guide_title": "Export → OrcaSlicer FullSpectrum",
+    # Gradient-Generator
+    "btn_gradient": "🌈 Gradient",
+    "tip_gradient": "Farbverlauf zwischen zwei Farben berechnen",
+    "gradient_title": "Gradient-Generator",
+    "gradient_from": "Von:",
+    "gradient_to": "Bis:",
+    "gradient_steps": "Schritte:",
+    "gradient_btn_calc": "⚙  Berechnen & Hinzufügen",
+    "gradient_done": "{n} Gradient-Schritte als virtuelle Köpfe hinzugefügt.",
+    "gradient_warn_max": "Maximal {n} weitere Schritte passen hinzu.",
     # Web-Update
     "btn_web_update": "🌐 Online-Update",
     "tip_web_update": "Neue Filament-Farben aus der Community-Datenbank laden",
@@ -472,6 +482,16 @@ STRINGS = {
     "swatch_saved": "Swatch saved:\n{path}",
     "btn_slicer_guide": "📖 Slicer Guide",
     "slicer_guide_title": "Export → OrcaSlicer FullSpectrum",
+    # Gradient generator
+    "btn_gradient": "🌈 Gradient",
+    "tip_gradient": "Calculate color gradient between two colors",
+    "gradient_title": "Gradient Generator",
+    "gradient_from": "From:",
+    "gradient_to": "To:",
+    "gradient_steps": "Steps:",
+    "gradient_btn_calc": "⚙  Calculate & Add",
+    "gradient_done": "{n} gradient steps added as virtual heads.",
+    "gradient_warn_max": "Max {n} more steps fit.",
     # Web update
     "btn_web_update": "🌐 Online Update",
     "tip_web_update": "Load new filament colors from the community database",
@@ -1243,7 +1263,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Gewichtungshinweis
         wh = ctk.CTkFrame(sec1, fg_color="transparent")
-        wh.grid(row=5, column=0, padx=40, pady=(0, 6), sticky="ew")
+        wh.grid(row=5, column=0, padx=40, pady=(0, 2), sticky="ew")
         ctk.CTkLabel(wh, text=self.t("weight_bottom"), font=("Segoe UI", 8),
                      text_color="#475569").pack(side="left")
         ctk.CTkLabel(wh, text=self.t("weight_arrow"), font=("Segoe UI", 8),
@@ -1251,23 +1271,59 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkLabel(wh, text=self.t("weight_top"), font=("Segoe UI", 8),
                      text_color="#475569").pack(side="right")
 
+        # Gamut-Vorschau
+        gf = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=6)
+        gf.grid(row=5, column=0, padx=40, pady=(28, 4), sticky="ew")
+        ctk.CTkLabel(gf, text="Gamut:", font=("Segoe UI", 8),
+                     text_color="#475569").pack(side="left", padx=(8, 4), pady=3)
+        self.gamut_strip = ctk.CTkFrame(gf, fg_color="transparent", height=16)
+        self.gamut_strip.pack(side="left", fill="x", expand=True, padx=4, pady=3)
+        self._gamut_cells = []
+        for _ in range(40):
+            c = ctk.CTkLabel(self.gamut_strip, text="", width=0, height=16,
+                              fg_color="#1e293b", corner_radius=0)
+            c.pack(side="left", fill="x", expand=True)
+            self._gamut_cells.append(c)
+        self.after(200, self._update_gamut_strip)
+
         # Mix-Vorschau + ΔE
         mf = ctk.CTkFrame(sec1, fg_color="#1e293b", corner_radius=8)
         mf.grid(row=6, column=0, padx=40, pady=6, sticky="ew")
-        mf.grid_columnconfigure(2, weight=1)
-        ctk.CTkLabel(mf, text=self.t("label_target"), font=("Segoe UI", 10),
-                     text_color="#64748b").grid(row=0, column=0, padx=(14, 4), pady=10)
-        self.target_circle = ctk.CTkLabel(mf, text="", width=42, height=42,
-                                           fg_color="#1e293b", corner_radius=21)
-        self.target_circle.grid(row=0, column=1, padx=4)
-        self.de_disp = ctk.CTkLabel(mf, text="ΔE  —",
-                                     font=("Segoe UI", 16, "bold"), text_color="#475569")
-        self.de_disp.grid(row=0, column=2, padx=14)
-        self.sim_circle = ctk.CTkLabel(mf, text="", width=42, height=42,
-                                        fg_color="#1e293b", corner_radius=21)
-        self.sim_circle.grid(row=0, column=3, padx=4)
-        ctk.CTkLabel(mf, text=self.t("label_simulated"), font=("Segoe UI", 10),
-                     text_color="#64748b").grid(row=0, column=4, padx=(4, 14))
+        mf.grid_columnconfigure(1, weight=1)
+
+        # Ziel-Seite
+        tgt_col = ctk.CTkFrame(mf, fg_color="transparent")
+        tgt_col.grid(row=0, column=0, padx=(20, 8), pady=12)
+        ctk.CTkLabel(tgt_col, text=self.t("label_target"), font=("Segoe UI", 10),
+                     text_color="#64748b").pack()
+        self.target_circle = ctk.CTkLabel(tgt_col, text="", width=64, height=64,
+                                           fg_color="#1e293b", corner_radius=32)
+        self.target_circle.pack(pady=(4, 2))
+        self.target_hex_lbl = ctk.CTkLabel(tgt_col, text="—", font=("Courier New", 9),
+                                            text_color="#475569")
+        self.target_hex_lbl.pack()
+
+        # ΔE Mitte
+        de_col = ctk.CTkFrame(mf, fg_color="transparent")
+        de_col.grid(row=0, column=1, padx=20)
+        self.de_disp = ctk.CTkLabel(de_col, text="ΔE  —",
+                                     font=("Segoe UI", 18, "bold"), text_color="#475569")
+        self.de_disp.pack()
+        self.de_quality_lbl = ctk.CTkLabel(de_col, text="", font=("Segoe UI", 9),
+                                            text_color="#475569")
+        self.de_quality_lbl.pack()
+
+        # Simuliert-Seite
+        sim_col = ctk.CTkFrame(mf, fg_color="transparent")
+        sim_col.grid(row=0, column=2, padx=(8, 20), pady=12)
+        ctk.CTkLabel(sim_col, text=self.t("label_simulated"), font=("Segoe UI", 10),
+                     text_color="#64748b").pack()
+        self.sim_circle = ctk.CTkLabel(sim_col, text="", width=64, height=64,
+                                        fg_color="#1e293b", corner_radius=32)
+        self.sim_circle.pack(pady=(4, 2))
+        self.sim_hex_lbl = ctk.CTkLabel(sim_col, text="—", font=("Courier New", 9),
+                                         text_color="#475569")
+        self.sim_hex_lbl.pack()
 
         # Sequenzlänge + Auto-Modus
         lr = ctk.CTkFrame(sec1, fg_color="#1a2535", corner_radius=8)
@@ -1390,7 +1446,12 @@ class U1FullSpectrumApp(ctk.CTk):
         self.tip(sw_btn, "tip_swatch")
         guide_btn = ctk.CTkButton(extra_row, text=self.t("btn_slicer_guide"), fg_color="#7c3aed",
                                   height=32, font=("Segoe UI", 11), command=self.open_slicer_guide)
-        guide_btn.pack(side="left")
+        guide_btn.pack(side="left", padx=(0, 6))
+        grad_btn = ctk.CTkButton(extra_row, text=self.t("btn_gradient"), fg_color="#0e7490",
+                                 height=32, font=("Segoe UI", 11),
+                                 command=self.open_gradient_dialog)
+        grad_btn.pack(side="left")
+        self.tip(grad_btn, "tip_gradient")
 
         # ── ABSCHNITT 2: VIRTUELLE DRUCKKÖPFE ────────────────────────────────
         sec2_hdr = ctk.CTkFrame(self.main, fg_color="transparent")
@@ -1476,6 +1537,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self.slots[idx]["hex"].delete(0, "end"); self.slots[idx]["hex"].insert(0, f["hex"])
         self.slots[idx]["td"].delete(0, "end");  self.slots[idx]["td"].insert(0, str(f["td"]))
         self.slots[idx]["preview"].configure(fg_color=f["hex"])
+        self.after(100, self._update_gamut_strip)
 
     def pick_slot_color(self, idx):
         cur = self.slots[idx]["hex"].get().strip() or "#808080"
@@ -1487,6 +1549,7 @@ class U1FullSpectrumApp(ctk.CTk):
         manual = self.t("manual_color")
         self.slots[idx]["color"].configure(values=[manual] + cur_vals)
         self.slots[idx]["color"].set(manual)
+        self.after(100, self._update_gamut_strip)
 
     def save_current(self, idx):
         n = ctk.CTkInputDialog(text=self.t("inp_fil_name"), title=self.t("inp_save_fav")).get_input()
@@ -1684,6 +1747,43 @@ class U1FullSpectrumApp(ctk.CTk):
             "seq_len":    len(chosen_seq),
         }
 
+    def _update_gamut_strip(self):
+        """Füllt die Gamut-Strip-Zellen mit erreichbaren Mischfarben."""
+        if not hasattr(self, "_gamut_cells"):
+            return
+        fils = self._get_fils()
+        if not fils or len(fils) < 2:
+            return
+        import itertools
+        samples = []
+        for f in fils:
+            samples.append(f["hex"])
+        for f1, f2 in itertools.combinations(fils, 2):
+            for w in [0.15, 0.3, 0.45, 0.55, 0.7, 0.85]:
+                lab1, lab2 = f1["lab"], f2["lab"]
+                mix = tuple(lab1[k] * (1-w) + lab2[k] * w for k in range(3))
+                samples.append(lab_to_hex(mix))
+        if len(fils) >= 3:
+            for combo in itertools.combinations(fils, 3):
+                for w in [(0.33,0.33,0.34),(0.5,0.25,0.25),(0.25,0.5,0.25),(0.25,0.25,0.5)]:
+                    mix = tuple(sum(combo[j]["lab"][k]*w[j] for j in range(3))
+                                 for k in range(3))
+                    samples.append(lab_to_hex(mix))
+        if len(fils) >= 4:
+            mix4 = tuple(sum(f["lab"][k] for f in fils)/4 for k in range(3))
+            samples.append(lab_to_hex(mix4))
+
+        def hue_key(h):
+            r, g, b = hex_to_rgb(h)
+            hue, s, v = self._rgb_to_hsv(r, g, b)
+            return (0 if s < 10 else 1, hue)
+        samples.sort(key=hue_key)
+
+        n = len(self._gamut_cells)
+        for i, cell in enumerate(self._gamut_cells):
+            idx = int(i * len(samples) / n)
+            cell.configure(fg_color=samples[min(idx, len(samples)-1)])
+
     def calc(self):
         if not hasattr(self, "target"):
             messagebox.showinfo(self.t("dlg_note"), self.t("dlg_select_color")); return
@@ -1720,7 +1820,13 @@ class U1FullSpectrumApp(ctk.CTk):
         fils_hex = {f["id"]: f["hex"] for f in fils}
         for i, seg in enumerate(self.segs):
             if i < n:
-                seg.configure(fg_color=fils_hex.get(int(seq[i]), "#1e293b"), text="")
+                fid = int(seq[i])
+                bg  = fils_hex.get(fid, "#1e293b")
+                r_, g_, b_ = hex_to_rgb(bg)
+                lum = 0.299*r_ + 0.587*g_ + 0.114*b_
+                txt_col = "#111111" if lum > 140 else "#eeeeee"
+                seg.configure(fg_color=bg, text=f"T{fid}", text_color=txt_col,
+                               font=("Segoe UI", 10, "bold"))
                 seg.pack(side="left", expand=True, padx=2)
             else:
                 seg.pack_forget()
@@ -1735,7 +1841,16 @@ class U1FullSpectrumApp(ctk.CTk):
         tgt_display = self._simulate_colorblind(self.target, mode)
         self.sim_circle.configure(fg_color=sim_display)
         self.target_circle.configure(fg_color=tgt_display)
-        self.de_disp.configure(text=self.de_label(dv), text_color=de_color(dv))
+        self.de_disp.configure(text=f"ΔE  {dv:.1f}", text_color=de_color(dv))
+        if hasattr(self, "target_hex_lbl"):
+            self.target_hex_lbl.configure(text=self.target.upper())
+        if hasattr(self, "sim_hex_lbl"):
+            self.sim_hex_lbl.configure(text=result["sim_hex"].upper())
+        if hasattr(self, "de_quality_lbl"):
+            quality = "ausgezeichnet ✓" if dv < 3.0 else "gut" if dv < 6.0 else "sichtbar"
+            if self.lang == "en":
+                quality = "excellent ✓" if dv < 3.0 else "good" if dv < 6.0 else "visible"
+            self.de_quality_lbl.configure(text=quality, text_color=de_color(dv))
 
         self.last_result = result
 
@@ -2889,6 +3004,123 @@ class U1FullSpectrumApp(ctk.CTk):
                       font=("Segoe UI", 14, "bold")).pack(pady=(16, 4), padx=40, fill="x")
         ctk.CTkButton(win, text=self.t("orca_btn_cancel"), fg_color="#334155",
                       command=win.destroy, height=36).pack(padx=40, fill="x")
+
+    # ── GRADIENT-GENERATOR ─────────────────────────────────────────────────────
+
+    def open_gradient_dialog(self):
+        """Farbverlauf zwischen zwei Farben berechnen und als virtuelle Köpfe hinzufügen."""
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("gradient_title"))
+        win.geometry("480x420")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text=self.t("gradient_title"),
+                     font=("Segoe UI", 14, "bold")).pack(pady=(16, 10))
+
+        from_var = ctk.StringVar(value=getattr(self, "target", "#FF2020"))
+        to_var   = ctk.StringVar(value="#2020FF")
+
+        def make_color_row(label_key, var):
+            f = ctk.CTkFrame(win, fg_color="transparent")
+            f.pack(fill="x", padx=24, pady=3)
+            ctk.CTkLabel(f, text=self.t(label_key), width=50).pack(side="left")
+            sw = ctk.CTkLabel(f, text="", width=36, height=36,
+                               fg_color=var.get() if len(var.get())==7 else "#888888",
+                               corner_radius=8)
+            sw.pack(side="left", padx=6)
+            entry = ctk.CTkEntry(f, textvariable=var, width=100)
+            entry.pack(side="left", padx=4)
+            def pick(v=var, s=sw):
+                from tkinter import colorchooser as _cc
+                col = _cc.askcolor(color=v.get(), title="Farbe")[1]
+                if col: v.set(col.upper()); s.configure(fg_color=col)
+            def on_change(*a, v=var, s=sw):
+                h = v.get().strip()
+                if len(h) == 7 and h.startswith("#"):
+                    try: s.configure(fg_color=h)
+                    except: pass
+            var.trace_add("write", on_change)
+            ctk.CTkButton(f, text="🎨", width=34, height=34,
+                          fg_color="#374151", command=pick).pack(side="left", padx=2)
+
+        make_color_row("gradient_from", from_var)
+        make_color_row("gradient_to",   to_var)
+
+        sf = ctk.CTkFrame(win, fg_color="transparent")
+        sf.pack(pady=8)
+        ctk.CTkLabel(sf, text=self.t("gradient_steps")).pack(side="left", padx=6)
+        steps_var = ctk.IntVar(value=6)
+        steps_lbl = ctk.CTkLabel(sf, text="6", width=30, font=("Segoe UI", 12, "bold"))
+        def on_steps(v):
+            steps_lbl.configure(text=str(int(float(v))))
+            update_preview()
+        ctk.CTkSlider(sf, from_=2, to=min(16, self._max_virtual),
+                       number_of_steps=14, variable=steps_var,
+                       command=on_steps).pack(side="left", padx=6)
+        steps_lbl.pack(side="left")
+
+        # Preview strip
+        pf = ctk.CTkFrame(win, fg_color="#0f172a", corner_radius=6, height=28)
+        pf.pack(fill="x", padx=24, pady=8)
+        pcells = []
+        for _ in range(16):
+            c = ctk.CTkLabel(pf, text="", width=0, height=28,
+                              fg_color="#1e293b", corner_radius=0)
+            c.pack(side="left", fill="x", expand=True)
+            pcells.append(c)
+
+        def update_preview(*a):
+            try:
+                h1, h2 = from_var.get().strip(), to_var.get().strip()
+                if len(h1) != 7 or len(h2) != 7: return
+                l1 = rgb_to_lab(hex_to_rgb(h1))
+                l2 = rgb_to_lab(hex_to_rgb(h2))
+                for i, cell in enumerate(pcells):
+                    t = i / (len(pcells) - 1)
+                    mix = tuple(l1[k] + t*(l2[k]-l1[k]) for k in range(3))
+                    cell.configure(fg_color=lab_to_hex(mix))
+            except: pass
+
+        from_var.trace_add("write", update_preview)
+        to_var.trace_add("write", update_preview)
+        update_preview()
+
+        def do_gradient():
+            h1, h2 = from_var.get().strip(), to_var.get().strip()
+            n = int(steps_var.get())
+            if len(h1) != 7 or len(h2) != 7: return
+            slots_left = self._max_virtual - len(self.virtual_fils)
+            if slots_left <= 0:
+                messagebox.showwarning(self.t("dlg_max_virtual"),
+                    self.t("batch_warn_max", max_v=self._max_virtual)); return
+            n = min(n, slots_left)
+            l1 = rgb_to_lab(hex_to_rgb(h1))
+            l2 = rgb_to_lab(hex_to_rgb(h2))
+            self.virtual_undo.append(copy.deepcopy(self.virtual_fils))
+            added = 0
+            for step in range(n):
+                t = step / max(n - 1, 1)
+                target_hex = lab_to_hex(tuple(l1[k] + t*(l2[k]-l1[k]) for k in range(3)))
+                res = self._calc_for_color(target_hex, False,
+                                            seq_len=None, auto=True, auto_threshold=3.0)
+                if res is None or len(self.virtual_fils) >= self._max_virtual:
+                    break
+                vid = 5 + len(self.virtual_fils)
+                self.virtual_fils.append({
+                    "vid": vid, "target_hex": target_hex,
+                    "sequence": res["sequence"], "sim_hex": res["sim_hex"],
+                    "de": res["de"], "label": f"Grad {step+1}/{n}",
+                })
+                added += 1
+            self._refresh_virtual_grid()
+            messagebox.showinfo(self.t("dlg_saved"), self.t("gradient_done", n=added))
+            win.destroy()
+
+        ctk.CTkButton(win, text=self.t("gradient_btn_calc"), fg_color="#0e7490",
+                      command=do_gradient, height=42,
+                      font=("Segoe UI", 13, "bold")).pack(pady=(4, 4), padx=24, fill="x")
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
+                      command=win.destroy, height=36).pack(padx=24, fill="x")
 
     # ── WEB-UPDATE ─────────────────────────────────────────────────────────────
 
