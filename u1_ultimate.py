@@ -52,6 +52,7 @@ STRINGS = {
     "btn_library": "📚  Bibliothek verwalten",
     "layer_height_label": "Schichthöhe (mm):",
     "dithering_step": "= Dithering Step Size",
+    "lh_hint": "⚠ 0.08 mm empfohlen — Farbschichten werden unsichtbar",
     "sec1_title": "EINZELFARBEN-RECHNER",
     "btn_target_color": "ZIELFARBE  🎨",
     "hex_placeholder": "#RRGGBB eingeben…",
@@ -355,6 +356,7 @@ STRINGS = {
     "btn_library": "📚  Manage Library",
     "layer_height_label": "Layer Height (mm):",
     "dithering_step": "= Dithering Step Size",
+    "lh_hint": "⚠ 0.08 mm recommended — color layers become invisible",
     "sec1_title": "SINGLE COLOR CALCULATOR",
     "btn_target_color": "TARGET COLOR  🎨",
     "hex_placeholder": "Enter #RRGGBB…",
@@ -1071,7 +1073,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self.load_presets()
         self.setup_ui()
         # Einstellungen wiederherstellen
-        lh = self.settings.get("layer_height", "0.2")
+        lh = self.settings.get("layer_height", "0.08")
         self.layer_height_entry.delete(0, "end")
         self.layer_height_entry.insert(0, lh)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -1104,7 +1106,7 @@ class U1FullSpectrumApp(ctk.CTk):
     def _save_settings(self):
         self.settings["lang"]         = self.lang
         self.settings["max_virtual"]  = self._max_virtual
-        self.settings["layer_height"] = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.2"
+        self.settings["layer_height"] = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.08"
         try:
             with open(self.settings_file, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f, indent=2)
@@ -1168,7 +1170,7 @@ class U1FullSpectrumApp(ctk.CTk):
             filetypes=[(self.t("proj_filetypes"), "*.u1proj"), ("JSON", "*.json")],
             title=self.t("btn_proj_save"))
         if not path: return
-        lh = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.2"
+        lh = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.08"
         project = {
             "version": 1,
             "layer_height": lh,
@@ -1394,11 +1396,13 @@ class U1FullSpectrumApp(ctk.CTk):
         lh_inner.pack(fill="x", padx=10, pady=8)
         ctk.CTkLabel(lh_inner, text=self.t("layer_height_label"),
                      font=("Segoe UI", 11)).pack(side="left")
-        self.layer_height_entry = ctk.CTkEntry(lh_inner, width=60, placeholder_text="0.2")
-        self.layer_height_entry.insert(0, "0.2")
+        self.layer_height_entry = ctk.CTkEntry(lh_inner, width=60, placeholder_text="0.08")
+        self.layer_height_entry.insert(0, "0.08")
         self.layer_height_entry.pack(side="left", padx=(6, 0))
         ctk.CTkLabel(lh_inner, text=self.t("dithering_step"),
                      font=("Segoe UI", 9), text_color="#475569").pack(side="left", padx=6)
+        ctk.CTkLabel(lh_inner, text=self.t("lh_hint"),
+                     font=("Segoe UI", 8), text_color="#f59e0b").pack(side="left", padx=(8, 0))
 
         # ── HAUPTBEREICH ─────────────────────────────────────────────────────
         self.main = ctk.CTkScrollableFrame(self)
@@ -2670,7 +2674,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         runs = seq_to_runs(vf["sequence"])
         n_fils = seq_filament_count(vf["sequence"])
-        lh = safe_td(self.layer_height_entry.get()) if hasattr(self, "layer_height_entry") else 0.2
+        lh = safe_td(self.layer_height_entry.get()) if hasattr(self, "layer_height_entry") else 0.08
 
         # Farbige Run-Blöcke
         fils_hex = {s["id"]: s["hex"] for s in [
@@ -2860,7 +2864,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         lhf = ctk.CTkFrame(win, fg_color="transparent"); lhf.pack()
         ctk.CTkLabel(lhf, text=self.t("exp_lh_label")).pack(side="left", padx=6)
-        lh_val = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.2"
+        lh_val = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.08"
         lh_exp = ctk.CTkEntry(lhf, width=60); lh_exp.insert(0, lh_val)
         lh_exp.pack(side="left", padx=4)
         ctk.CTkLabel(lhf, text=self.t("exp_lh_unit")).pack(side="left", padx=4)
@@ -3196,7 +3200,7 @@ class U1FullSpectrumApp(ctk.CTk):
         # Layer height for dithering step
         lhf = ctk.CTkFrame(win, fg_color="transparent"); lhf.pack(pady=(6, 0))
         ctk.CTkLabel(lhf, text=self.t("exp_lh_label")).pack(side="left", padx=6)
-        lh_val = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.2"
+        lh_val = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.08"
         lh_entry = ctk.CTkEntry(lhf, width=60); lh_entry.insert(0, lh_val)
         lh_entry.pack(side="left", padx=4)
         ctk.CTkLabel(lhf, text="mm").pack(side="left")
@@ -3209,7 +3213,7 @@ class U1FullSpectrumApp(ctk.CTk):
             scope   = scope_var.get()
             prefix  = px_entry.get().strip() or "U1"
             ftype   = ftype_var.get()
-            lh      = safe_td(lh_entry.get()) if lh_entry.get().strip() else 0.2
+            lh      = safe_td(lh_entry.get()) if lh_entry.get().strip() else 0.08
 
             profiles_to_write = []  # list of (filename, dict)
 
@@ -3692,7 +3696,7 @@ class U1FullSpectrumApp(ctk.CTk):
                 purge_vol = float(purge_entry.get())
             except ValueError: return
 
-            lh = safe_td(self.layer_height_entry.get()) if hasattr(self, "layer_height_entry") else 0.2
+            lh = safe_td(self.layer_height_entry.get()) if hasattr(self, "layer_height_entry") else 0.08
             # Gesamte Wechsel: pro Virtual-Kopf = Werkzeugwechsel pro Schicht in der Sequenz
             total_changes = 0
             for vf in self.virtual_fils:
