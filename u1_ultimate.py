@@ -342,6 +342,17 @@ STRINGS = {
     "harm_analogous": "Analog",
     "harm_split": "Split-Komplementär",
     "harm_add_all": "Alle berechnen & hinzufügen",
+    # Farbmodell
+    "model_label": "Farbmodell:",
+    "model_linear": "Additiv — FullSpectrum-kompatibel",
+    "model_td": "TD-gewichtet (physikalisch)",
+    "model_subtractive": "Subtraktiv (Pigment-Modell)",
+    # Alle Cadence-Werte kopieren
+    "btn_copy_all_cad": "📋 Alle Cadence-Werte",
+    "copy_all_title": "Alle Dithering-Werte",
+    "copy_all_btn": "Alles in Zwischenablage",
+    # Gamut-Plot
+    "btn_gamut_plot": "🎯 Gamut-Plot",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
@@ -641,6 +652,17 @@ STRINGS = {
     "harm_analogous": "Analogous",
     "harm_split": "Split-Complement",
     "harm_add_all": "Calculate all & add",
+    # Color model
+    "model_label": "Color model:",
+    "model_linear": "Additive — FullSpectrum compatible",
+    "model_td": "TD-weighted (physical)",
+    "model_subtractive": "Subtractive (pigment model)",
+    # Copy all cadence values
+    "btn_copy_all_cad": "📋 All Cadence Values",
+    "copy_all_title": "All Dithering Values",
+    "copy_all_btn": "Copy All to Clipboard",
+    # Gamut plot
+    "btn_gamut_plot": "🎯 Gamut Plot",
 },
 }
 
@@ -1401,10 +1423,25 @@ class U1FullSpectrumApp(ctk.CTk):
         self.layer_height_entry = ctk.CTkEntry(lh_inner, width=60, placeholder_text="0.08")
         self.layer_height_entry.insert(0, "0.08")
         self.layer_height_entry.pack(side="left", padx=(6, 0))
+        self.layer_height_entry.bind("<KeyRelease>",
+            lambda e: self.after(400, self._refresh_virtual_grid))
+        self.layer_height_entry.bind("<FocusOut>",
+            lambda e: self._refresh_virtual_grid())
         ctk.CTkLabel(lh_inner, text=self.t("dithering_step"),
                      font=("Segoe UI", 9), text_color="#475569").pack(side="left", padx=6)
         ctk.CTkLabel(lh_inner, text=self.t("lh_hint"),
                      font=("Segoe UI", 8), text_color="#f59e0b").pack(side="left", padx=(8, 0))
+
+        model_frame = ctk.CTkFrame(self.sidebar, fg_color="#0f172a", corner_radius=8)
+        model_frame.pack(fill="x", padx=10, pady=(6,0))
+        ctk.CTkLabel(model_frame, text=self.t("model_label"),
+                     font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=8, pady=(6,2))
+        self.color_model_var = ctk.StringVar(value="linear")
+        for val, key in [("linear","model_linear"),("td","model_td"),("subtractive","model_subtractive")]:
+            ctk.CTkRadioButton(model_frame, text=self.t(key),
+                               variable=self.color_model_var, value=val,
+                               command=self._on_model_change).pack(anchor="w", padx=16, pady=1)
+        ctk.CTkLabel(model_frame, text="", height=4).pack()
 
         # ── HAUPTBEREICH ─────────────────────────────────────────────────────
         self.main = ctk.CTkScrollableFrame(self)
@@ -1682,7 +1719,11 @@ class U1FullSpectrumApp(ctk.CTk):
         tc_btn = ctk.CTkButton(extra_row, text=self.t("btn_tc_est"), fg_color="#374151",
                                height=32, font=("Segoe UI", 11),
                                command=self.open_tc_estimator)
-        tc_btn.pack(side="left")
+        tc_btn.pack(side="left", padx=(0, 6))
+
+        gamut_btn = ctk.CTkButton(extra_row, text=self.t("btn_gamut_plot"), fg_color="#0f4c81",
+                                   height=32, command=self.open_gamut_plot)
+        gamut_btn.pack(side="left", padx=3)
 
         # ── ABSCHNITT 2: VIRTUELLE DRUCKKÖPFE ────────────────────────────────
         sec2_hdr = ctk.CTkFrame(self.main, fg_color="transparent")
@@ -1746,7 +1787,10 @@ class U1FullSpectrumApp(ctk.CTk):
 
         ctk.CTkButton(btn_row2, text=self.t("btn_td_cal"), fg_color="#0f4c81",
                       height=36, width=130,
-                      command=self.open_td_calibration).pack(side="left")
+                      command=self.open_td_calibration).pack(side="left", padx=(0, 4))
+
+        ctk.CTkButton(btn_row2, text=self.t("btn_copy_all_cad"), fg_color="#0e7490",
+                      command=self.open_copy_all_cadence, height=36).pack(side="left", padx=3)
 
         # Virtual Filament Grid Header
         gh = ctk.CTkFrame(self.main, fg_color="#1e293b", corner_radius=6)
@@ -1914,27 +1958,33 @@ class U1FullSpectrumApp(ctk.CTk):
         return fils
 
     def _simulate_mix(self, sequence, fils):
-        """Linearer RGB-Durchschnitt (gamma-korrigiert) — entspricht dem visuellen Eindruck
-        bei dünnen alternierenden Schichten (wie Pixel auf einem Bildschirm / FilamentMixer-Modell).
-        Jedes Vorkommen in der Sequenz zählt gleich — kein progressives Gewicht."""
+        """Farbmodell umschaltbar: linear (Standard), TD-gewichtet, subtraktiv."""
         by_id = {f["id"]: f for f in fils}
         counts = {}
         for fid in sequence:
             counts[fid] = counts.get(fid, 0) + 1
         total = len(sequence)
-        r_lin = g_lin = b_lin = 0.0
+        model = getattr(self, "color_model_var", None)
+        model = model.get() if model else "linear"
+        r_acc = g_acc = b_acc = 0.0
+        total_w = 0.0
         for fid, cnt in counts.items():
             r, g, b = hex_to_rgb(by_id[fid]["hex"])
-            w = cnt / total
-            # in linearen Lichtraum umrechnen (sRGB-Gamma entfernen)
-            r_lin += ((r / 255) ** 2.2) * w
-            g_lin += ((g / 255) ** 2.2) * w
-            b_lin += ((b / 255) ** 2.2) * w
-        # zurück in sRGB (Gamma anwenden)
-        r_out = round(min(255, max(0, r_lin ** (1 / 2.2) * 255)))
-        g_out = round(min(255, max(0, g_lin ** (1 / 2.2) * 255)))
-        b_out = round(min(255, max(0, b_lin ** (1 / 2.2) * 255)))
-        return rgb_to_lab((r_out, g_out, b_out))
+            td = max(0.1, float(by_id[fid].get("td", 5.0)))
+            base_w = cnt / total
+            w = (base_w / td) if model == "td" else base_w
+            total_w += w
+            rl = (r/255)**2.2; gl = (g/255)**2.2; bl = (b/255)**2.2
+            if model == "subtractive":
+                r_acc += (1-rl)*w; g_acc += (1-gl)*w; b_acc += (1-bl)*w
+            else:
+                r_acc += rl*w; g_acc += gl*w; b_acc += bl*w
+        if total_w > 0:
+            r_acc /= total_w; g_acc /= total_w; b_acc /= total_w
+        if model == "subtractive":
+            r_acc = 1-r_acc; g_acc = 1-g_acc; b_acc = 1-b_acc
+        def tog(v): return round(min(255, max(0, v**(1/2.2)*255)))
+        return rgb_to_lab((tog(r_acc), tog(g_acc), tog(b_acc)))
 
     def _build_sequence(self, ordered, tot, n):
         """Baut eine n-Layer-Sequenz (1–10). Höchster Score → oberste Positionen."""
@@ -2178,6 +2228,11 @@ class U1FullSpectrumApp(ctk.CTk):
         if seq and seq != "----------":
             self.clipboard_clear()
             self.clipboard_append(seq)
+
+    def _on_model_change(self):
+        if hasattr(self, "target") and self.target:
+            self.calculate()
+        self._refresh_virtual_grid()
 
     def add_to_virtual(self, result=None):
         if len(self.virtual_fils) >= self._max_virtual:
@@ -3671,58 +3726,113 @@ class U1FullSpectrumApp(ctk.CTk):
     # ── 3MF ZURÜCKSCHREIBEN ────────────────────────────────────────────────────
 
     def write_3mf_colors(self):
-        """Schreibt die simulierten Farben der virtuellen Köpfe in eine 3MF-Datei."""
+        """Schreibt simulierte Farben + Dithering-Notizen in alle filament_settings_X.config
+        und aktualisiert extruder-Zuweisungen in model_settings.config."""
         if not self.virtual_fils:
             messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
-
         path = filedialog.askopenfilename(
-            filetypes=[("3MF", "*.3mf"), ("*", "*.*")],
-            title=self.t("3mf_write_title"))
+            filetypes=[("3MF","*.3mf"),("*","*.*")], title=self.t("3mf_write_title"))
         if not path: return
-
         save_path = filedialog.asksaveasfilename(
-            defaultextension=".3mf",
-            filetypes=[("3MF", "*.3mf")],
-            initialfile=os.path.splitext(os.path.basename(path))[0] + "_colored.3mf",
+            defaultextension=".3mf", filetypes=[("3MF","*.3mf")],
+            initialfile=os.path.splitext(os.path.basename(path))[0]+"_colored.3mf",
             title="Speichern als")
         if not save_path: return
-
         try:
-            import shutil, tempfile
-            # 3MF kopieren und modifizieren
-            with zipfile.ZipFile(path, "r") as zin:
+            import shutil, tempfile, xml.etree.ElementTree as ET
+            lh = safe_td(self.layer_height_entry.get()) if hasattr(self,"layer_height_entry") else 0.08
+
+            with zipfile.ZipFile(path,"r") as zin:
+                names = zin.namelist()
+                fil_cfgs = sorted([n for n in names
+                                   if re.match(r"Metadata/filament_settings_\d+\.config", n)])
+
                 with tempfile.NamedTemporaryFile(suffix=".3mf", delete=False) as tmp:
                     tmp_path = tmp.name
-                with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zout:
+
+                with zipfile.ZipFile(tmp_path,"w", zipfile.ZIP_DEFLATED) as zout:
                     for item in zin.infolist():
                         data = zin.read(item.filename)
-                        # In der Slicer-Konfigurationsdatei Farben ersetzen
-                        if item.filename.endswith(".config") or "config" in item.filename:
+                        fname = item.filename
+
+                        # filament_settings_X.config → V-Kopf-Farbe + Dithering-Notiz
+                        if fname in fil_cfgs:
+                            idx = fil_cfgs.index(fname)
+                            if idx < len(self.virtual_fils):
+                                try:
+                                    cfg = json.loads(data.decode("utf-8"))
+                                    vf = self.virtual_fils[idx]
+                                    sim_hex = vf.get("sim_hex", vf.get("target_hex","#888888"))
+                                    if not sim_hex.startswith("#"):
+                                        sim_hex = "#" + sim_hex
+                                    cfg["default_filament_colour"] = [sim_hex]
+                                    seq = vf["sequence"]
+                                    n_f = seq_filament_count(seq)
+                                    cad = calc_cadence(seq, lh)
+                                    ids_s = sorted(cad.keys())
+                                    if n_f == 1:
+                                        note = f"U1 FullSpectrum | Reine Farbe T{seq[0]} | ΔE={vf.get('de',0):.1f}"
+                                    elif n_f == 2:
+                                        a = round(cad.get(ids_s[0], lh), 3)
+                                        b = round(cad.get(ids_s[1], lh) if len(ids_s)>1 else lh, 3)
+                                        note = (f"U1 FullSpectrum | Seq:{''.join(seq)} | "
+                                                f"Cadence A={a}mm B={b}mm | Step={lh}mm | ΔE={vf.get('de',0):.1f}")
+                                    else:
+                                        note = (f"U1 FullSpectrum | Seq:{''.join(seq)} | "
+                                                f"Pattern={''.join(seq)} | Step={lh}mm | ΔE={vf.get('de',0):.1f}")
+                                    cfg["filament_notes"] = [note]
+                                    cfg["filament_vendor"] = ["U1 FullSpectrum"]
+                                    cfg["filament_settings_id"] = [f"U1-V{vf['vid']}"]
+                                    data = json.dumps(cfg, indent=4, ensure_ascii=False).encode("utf-8")
+                                except Exception:
+                                    pass
+
+                        # model_settings.config (XML) — extruder-Zuweisung
+                        elif fname == "Metadata/model_settings.config":
                             try:
                                 content = data.decode("utf-8")
-                                # Filamentfarben in der Config ersetzen
+                                root = ET.fromstring(content)
+                                objects = root.findall("object")
+                                for oi, obj in enumerate(objects):
+                                    if oi < len(self.virtual_fils):
+                                        new_ext = str(self.virtual_fils[oi]["vid"])
+                                        updated = False
+                                        for meta in obj.findall("metadata"):
+                                            if meta.get("key") == "extruder":
+                                                meta.set("value", new_ext)
+                                                updated = True
+                                        if not updated:
+                                            meta_el = ET.SubElement(obj, "metadata")
+                                            meta_el.set("key", "extruder")
+                                            meta_el.set("value", new_ext)
+                                data = ET.tostring(root, encoding="unicode").encode("utf-8")
+                            except Exception:
+                                pass
+
+                        # Sonstige .config-Dateien: filament_colour regex
+                        elif fname.endswith(".config") or fname.endswith(".json"):
+                            try:
+                                content = data.decode("utf-8")
                                 for idx, vf in enumerate(self.virtual_fils):
-                                    sim_hex = vf["sim_hex"].lstrip("#")
-                                    # OrcaSlicer config format: value="#RRGGBB"
+                                    sim_hex = vf.get("sim_hex", vf.get("target_hex","#888888")).lstrip("#")
                                     old_pat = re.compile(
-                                        r'(key="filament_colour"[^>]*value=")([^"]*?)(")',
-                                        re.IGNORECASE)
-                                    # Nur den idx-ten Match ersetzen
+                                        r'(key="filament_colour"[^>]*value=")([^"]*?)(")', re.IGNORECASE)
                                     matches = list(old_pat.finditer(content))
                                     if idx < len(matches):
                                         m = matches[idx]
-                                        content = content[:m.start(2)] + f"#{sim_hex.upper()}" + content[m.end(2):]
+                                        content = (content[:m.start(2)]
+                                                   + f"#{sim_hex.upper()}"
+                                                   + content[m.end(2):])
                                 data = content.encode("utf-8")
                             except Exception:
                                 pass
+
                         zout.writestr(item, data)
 
             shutil.move(tmp_path, save_path)
-            messagebox.showinfo(self.t("dlg_saved"),
-                self.t("3mf_write_ok", path=save_path))
+            messagebox.showinfo(self.t("dlg_saved"), self.t("3mf_write_ok", path=save_path))
         except Exception as e:
-            messagebox.showerror(self.t("dlg_error"),
-                self.t("3mf_write_err", e=e))
+            messagebox.showerror(self.t("dlg_error"), self.t("3mf_write_err", e=e))
 
     # ── WERKZEUGWECHSEL-SCHÄTZUNG ─────────────────────────────────────────────
 
@@ -3790,6 +3900,49 @@ class U1FullSpectrumApp(ctk.CTk):
                       command=calculate, height=40).pack(pady=(0,6), padx=30, fill="x")
         ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
                       command=win.destroy, height=34).pack(padx=30, fill="x")
+
+    # ── ALLE CADENCE-WERTE KOPIEREN ────────────────────────────────────────────
+
+    def open_copy_all_cadence(self):
+        if not self.virtual_fils:
+            messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
+        lh = safe_td(self.layer_height_entry.get()) if hasattr(self,"layer_height_entry") else 0.08
+        lines = []
+        for vf in self.virtual_fils:
+            seq = vf["sequence"]
+            n_f = seq_filament_count(seq)
+            raw = "".join(seq)
+            cad = calc_cadence(seq, lh)
+            ids = sorted(cad.keys())
+            label = vf.get("label", f"V{vf['vid']}")
+            if n_f == 1:
+                hint = f"Reine Farbe T{seq[0]}"
+            elif n_f == 2:
+                a = round(cad.get(ids[0], lh), 3)
+                b = round(cad.get(ids[1], lh) if len(ids) > 1 else lh, 3)
+                hint = f"Cadence A={a}mm  B={b}mm  |  Step={lh}mm"
+            else:
+                hint = f"Pattern: {raw}  |  Step={lh}mm"
+            de = vf.get("de", 0.0)
+            lines.append(f"V{vf['vid']} [{label}]  Seq:{raw}  ΔE:{de:.1f}  →  {hint}")
+
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("copy_all_title"))
+        win.geometry("720x380")
+        win.grab_set()
+        ctk.CTkLabel(win, text=self.t("copy_all_title"),
+                     font=("Segoe UI",13,"bold")).pack(pady=(14,6))
+        import tkinter as _tk2
+        txt = _tk2.Text(win, bg="#0f172a", fg="#e2e8f0", font=("Courier New",10),
+                        relief="flat", bd=0, wrap="none", padx=10, pady=6)
+        txt.pack(fill="both", expand=True, padx=16, pady=4)
+        full = "\n".join(lines)
+        txt.insert("1.0", full)
+        txt.configure(state="disabled")
+        def _copy_all():
+            self.clipboard_clear(); self.clipboard_append(full)
+        ctk.CTkButton(win, text=self.t("copy_all_btn"), fg_color="#0f766e",
+                      command=_copy_all, height=36).pack(pady=8, padx=20, fill="x")
 
     # ── PALETTEN-IMPORT ────────────────────────────────────────────────────────
 
@@ -3955,6 +4108,87 @@ class U1FullSpectrumApp(ctk.CTk):
                       command=add_all, height=38).pack(pady=(8, 4), padx=20, fill="x")
         ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
                       command=win.destroy, height=34).pack(padx=20, fill="x")
+
+    # ── GAMUT-PLOT ─────────────────────────────────────────────────────────────
+
+    def open_gamut_plot(self):
+        if not _HAS_MPL:
+            messagebox.showinfo(self.t("dlg_note"),
+                "matplotlib nicht installiert.\npip install matplotlib"); return
+        fils = self._get_fils()
+        if not fils:
+            messagebox.showinfo(self.t("dlg_note"), "Keine Filamente geladen"); return
+
+        fig, ax = _plt.subplots(figsize=(7, 7))
+        ax.set_facecolor("#0f172a"); fig.patch.set_facecolor("#1e293b")
+        ax.set_xlabel("a* (Grün ← → Rot)", color="#94a3b8")
+        ax.set_ylabel("b* (Blau ← → Gelb)", color="#94a3b8")
+        ax.set_title("Erreichbarer Gamut — CIE a*b*", color="#e2e8f0", fontsize=13, fontweight="bold")
+        ax.tick_params(colors="#64748b")
+        for spine in ax.spines.values(): spine.set_color("#334155")
+        ax.axhline(0, color="#334155", lw=0.5)
+        ax.axvline(0, color="#334155", lw=0.5)
+
+        # Gamut-Wolke: alle Kombinationen 2–5 Schichten
+        import itertools
+        cloud_a, cloud_b = [], []
+        fil_ids = [str(f["id"]) for f in fils]
+        for length in range(2, 6):
+            for combo in itertools.product(fil_ids, repeat=length):
+                if len(set(combo)) < 2: continue
+                try:
+                    lab = self._simulate_mix(list(combo), fils)
+                    cloud_a.append(lab[1]); cloud_b.append(lab[2])
+                except Exception: pass
+        if cloud_a:
+            ax.scatter(cloud_a, cloud_b, s=6, alpha=0.12, color="#38bdf8", zorder=1)
+            try:
+                from scipy.spatial import ConvexHull
+                import numpy as np
+                pts = np.array(list(zip(cloud_a, cloud_b)))
+                hull = ConvexHull(pts)
+                verts = pts[hull.vertices]
+                verts = list(verts) + [verts[0]]
+                ax.fill([p[0] for p in verts], [p[1] for p in verts],
+                        alpha=0.06, color="#38bdf8", zorder=2)
+                ax.plot([p[0] for p in verts], [p[1] for p in verts],
+                        color="#38bdf8", lw=1, alpha=0.35, zorder=2)
+            except Exception: pass
+
+        # Physische Filamente
+        for f in fils:
+            lab = f["lab"]
+            ax.scatter(lab[1], lab[2], s=200, color=f["hex"],
+                       edgecolors="#ffffff", lw=1.5, zorder=5)
+            ax.annotate(f"T{f['id']}", (lab[1], lab[2]),
+                        textcoords="offset points", xytext=(7, 4),
+                        color="#e2e8f0", fontsize=10, fontweight="bold")
+
+        # Virtuelle Köpfe
+        for vf in self.virtual_fils:
+            sh = vf.get("sim_hex", "#888888")
+            try:
+                lab = rgb_to_lab(hex_to_rgb(sh))
+                ax.scatter(lab[1], lab[2], s=90, marker="D", color=sh,
+                           edgecolors="#fbbf24", lw=1.2, zorder=5)
+                ax.annotate(f"V{vf['vid']}", (lab[1], lab[2]),
+                            textcoords="offset points", xytext=(5, 3),
+                            color="#fbbf24", fontsize=8)
+            except Exception: pass
+
+        # Zielfarbe
+        if hasattr(self, "target") and self.target:
+            try:
+                t_lab = rgb_to_lab(hex_to_rgb(self.target))
+                ax.scatter(t_lab[1], t_lab[2], s=250, marker="*",
+                           color=self.target, edgecolors="#f87171", lw=2, zorder=6)
+                ax.annotate("Ziel", (t_lab[1], t_lab[2]),
+                            textcoords="offset points", xytext=(7, 4),
+                            color="#f87171", fontsize=10)
+            except Exception: pass
+
+        _plt.tight_layout()
+        _plt.show()
 
     # ── TD-KALIBRIERUNG ────────────────────────────────────────────────────────
 
