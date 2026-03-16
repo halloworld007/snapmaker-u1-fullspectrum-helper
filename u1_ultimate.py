@@ -2735,9 +2735,10 @@ class U1FullSpectrumApp(ctk.CTk):
         _hint_entry.insert(0, hint)
         _hint_entry.configure(state="readonly")
         _hint_entry.pack(side="left", padx=4)
-        # 📋 Kopier-Button
-        def _copy_hint(h=hint):
-            self.clipboard_clear(); self.clipboard_append(h)
+        # 📋 Kopier-Button — kopiert nur die reine Ziffernkette (z.B. "1121")
+        raw_seq = "".join(vf["sequence"])
+        def _copy_hint(s=raw_seq):
+            self.clipboard_clear(); self.clipboard_append(s)
         ctk.CTkButton(info_row, text="📋", width=24, height=20,
                       fg_color="#1e293b", hover_color="#334155",
                       command=_copy_hint).pack(side="left", padx=(0, 4))
