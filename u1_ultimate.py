@@ -3485,13 +3485,23 @@ class U1FullSpectrumApp(ctk.CTk):
                         best_combo = fils
                     if i % 500 == 0:
                         frac = i / total
-                        win.after(0, lambda f=frac, ii=i: (
-                            pb.set(f),
-                            progress_lbl.configure(
-                                text=self.t("slot_opt_running", i=ii, total=total))
-                        ))
+                        def _upd(f=frac, ii=i):
+                            try:
+                                if win.winfo_exists():
+                                    pb.set(f)
+                                    progress_lbl.configure(
+                                        text=self.t("slot_opt_running", i=ii, total=total))
+                            except Exception:
+                                pass
+                        win.after(0, _upd)
                 self._opt_best = (best_combo, best_score)
-                win.after(0, show_result)
+                def _done():
+                    try:
+                        if win.winfo_exists():
+                            show_result()
+                    except Exception:
+                        pass
+                win.after(0, _done)
 
             def show_result():
                 pb.set(1.0)
