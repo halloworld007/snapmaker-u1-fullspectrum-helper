@@ -282,6 +282,64 @@ STRINGS = {
     "orca_overwrite_confirm": "{n} Profile werden ggf. überschrieben. Fortfahren?",
     "orca_filament_notes_t": "U1 FullSpectrum — T{i} | {brand} {name} | TD={td}",
     "orca_filament_notes_v": "U1 FullSpectrum Sequenz: {seq} | ΔE={de:.1f} | {hint}",
+    # Projekt
+    "btn_proj_save": "💾 Projekt speichern",
+    "btn_proj_load": "📂 Projekt laden",
+    "proj_saved": "Projekt gespeichert:\n{path}",
+    "proj_loaded": "Projekt geladen:\n{path}",
+    "proj_filetypes": "U1-Projekt",
+    "proj_err": "Fehler beim Laden:\n{e}",
+    # TD-Kalibrierung
+    "btn_td_cal": "🔬 TD kalibrieren",
+    "td_cal_title": "TD-Kalibrierungsassistent",
+    "td_cal_desc": "Drucke T{a} und T{b} abwechselnd (z.B. 5+5 Layer) und miss die Mischfarbe.",
+    "td_cal_measured": "Gemessene Hex-Farbe des Testdrucks:",
+    "td_cal_result": "Empfohlene TD-Werte:  T{a} = {ta:.1f}    T{b} = {tb:.1f}",
+    "td_cal_apply": "Übernehmen",
+    "td_cal_slot": "Slot:",
+    # Top-3
+    "top3_title": "Top-3 Sequenzen",
+    "top3_rank": "#{r}",
+    "top3_add": "+ Hinzufügen",
+    # Slot-Optimizer
+    "btn_slot_opt": "🎯 Slot-Optimizer",
+    "slot_opt_title": "Slot-Optimizer — Besten 4 Filamente finden",
+    "slot_opt_desc": "Berechnet welche 4 Filamente aus der Bibliothek den größten Farbraum abdecken.",
+    "slot_opt_targets": "Zielfarben (aus virtuellen Köpfen oder manuell):",
+    "slot_opt_use_virtual": "Virtuelle Köpfe als Ziele verwenden",
+    "slot_opt_running": "Berechne … {i}/{total}",
+    "slot_opt_done": "Fertig! Bestes Set gefunden.",
+    "slot_opt_apply": "Als T1–T4 übernehmen",
+    "slot_opt_result": "Bestes Set (ΔE Ø {de:.1f}):",
+    # Paletten-Import
+    "btn_palette": "🖼 Palette aus Bild",
+    "tip_palette": "Dominante Farben aus Bild extrahieren und als Batch hinzufügen",
+    "palette_title": "Palette aus Bild importieren",
+    "palette_colors": "Farben:",
+    "palette_btn_add": "Alle berechnen & hinzufügen",
+    # 3MF zurückschreiben
+    "btn_3mf_write": "✏️ 3MF schreiben",
+    "tip_3mf_write": "Filament-Farben der virtuellen Köpfe in eine 3MF-Datei schreiben",
+    "3mf_write_title": "Filamentfarben in 3MF schreiben",
+    "3mf_write_desc": "Wähle eine 3MF-Datei. Die Filament-Farben werden mit den simulierten Farben der virtuellen Köpfe aktualisiert.",
+    "3mf_write_ok": "3MF erfolgreich aktualisiert:\n{path}",
+    "3mf_write_err": "Fehler beim Schreiben:\n{e}",
+    # Werkzeugwechsel
+    "btn_tc_est": "🔄 Werkzeugwechsel",
+    "tc_title": "Werkzeugwechsel-Schätzung",
+    "tc_layers": "Druckschichten gesamt:",
+    "tc_result": "Geschätzte Werkzeugwechsel: {n}",
+    "tc_time": "Geschätzte Zusatzzeit: ~{min:.0f} min  (bei {sec}s/Wechsel)",
+    "tc_purge": "Geschätzter Purge-Verbrauch: ~{g:.0f}g",
+    # Farbharmonien
+    "btn_harmonies": "🎨 Harmonien",
+    "tip_harmonies": "Komplementär-, Triad- und Analogfarben zur Zielfarbe",
+    "harm_title": "Farbharmonien",
+    "harm_complement": "Komplementär",
+    "harm_triadic": "Triade",
+    "harm_analogous": "Analog",
+    "harm_split": "Split-Komplementär",
+    "harm_add_all": "Alle berechnen & hinzufügen",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
@@ -521,6 +579,64 @@ STRINGS = {
     "orca_overwrite_confirm": "{n} profiles may be overwritten. Continue?",
     "orca_filament_notes_t": "U1 FullSpectrum — T{i} | {brand} {name} | TD={td}",
     "orca_filament_notes_v": "U1 FullSpectrum sequence: {seq} | ΔE={de:.1f} | {hint}",
+    # Project
+    "btn_proj_save": "💾 Save Project",
+    "btn_proj_load": "📂 Load Project",
+    "proj_saved": "Project saved:\n{path}",
+    "proj_loaded": "Project loaded:\n{path}",
+    "proj_filetypes": "U1 Project",
+    "proj_err": "Load error:\n{e}",
+    # TD calibration
+    "btn_td_cal": "🔬 Calibrate TD",
+    "td_cal_title": "TD Calibration Assistant",
+    "td_cal_desc": "Print T{a} and T{b} alternating (e.g. 5+5 layers) and measure the mix color.",
+    "td_cal_measured": "Measured hex color of the test print:",
+    "td_cal_result": "Recommended TD values:  T{a} = {ta:.1f}    T{b} = {tb:.1f}",
+    "td_cal_apply": "Apply",
+    "td_cal_slot": "Slot:",
+    # Top-3
+    "top3_title": "Top-3 Sequences",
+    "top3_rank": "#{r}",
+    "top3_add": "+ Add",
+    # Slot optimizer
+    "btn_slot_opt": "🎯 Slot Optimizer",
+    "slot_opt_title": "Slot Optimizer — Find Best 4 Filaments",
+    "slot_opt_desc": "Finds which 4 filaments from the library cover the largest color gamut.",
+    "slot_opt_targets": "Target colors (from virtual heads or manual):",
+    "slot_opt_use_virtual": "Use virtual heads as targets",
+    "slot_opt_running": "Calculating … {i}/{total}",
+    "slot_opt_done": "Done! Best set found.",
+    "slot_opt_apply": "Apply as T1–T4",
+    "slot_opt_result": "Best set (avg ΔE {de:.1f}):",
+    # Palette import
+    "btn_palette": "🖼 Palette from Image",
+    "tip_palette": "Extract dominant colors from image and add as batch",
+    "palette_title": "Import Palette from Image",
+    "palette_colors": "Colors:",
+    "palette_btn_add": "Calculate all & add",
+    # 3MF write-back
+    "btn_3mf_write": "✏️ Write 3MF",
+    "tip_3mf_write": "Write virtual head colors into a 3MF file",
+    "3mf_write_title": "Write Filament Colors to 3MF",
+    "3mf_write_desc": "Select a 3MF file. Filament colors will be updated with the simulated colors of the virtual heads.",
+    "3mf_write_ok": "3MF updated successfully:\n{path}",
+    "3mf_write_err": "Write error:\n{e}",
+    # Tool changes
+    "btn_tc_est": "🔄 Tool Changes",
+    "tc_title": "Tool Change Estimator",
+    "tc_layers": "Total print layers:",
+    "tc_result": "Estimated tool changes: {n}",
+    "tc_time": "Estimated extra time: ~{min:.0f} min  (at {sec}s/change)",
+    "tc_purge": "Estimated purge waste: ~{g:.0f}g",
+    # Color harmonies
+    "btn_harmonies": "🎨 Harmonies",
+    "tip_harmonies": "Complementary, triadic and analogous colors for the target",
+    "harm_title": "Color Harmonies",
+    "harm_complement": "Complement",
+    "harm_triadic": "Triadic",
+    "harm_analogous": "Analogous",
+    "harm_split": "Split-Complement",
+    "harm_add_all": "Calculate all & add",
 },
 }
 
@@ -1044,6 +1160,69 @@ class U1FullSpectrumApp(ctk.CTk):
             messagebox.showwarning(self.t("dlg_db_err_title"),
                 self.t("dlg_db_err_msg", e=e))
 
+    # ── PROJEKT SPEICHERN/LADEN ────────────────────────────────────────────────
+
+    def save_project(self):
+        path = filedialog.asksaveasfilename(
+            defaultextension=".u1proj",
+            filetypes=[(self.t("proj_filetypes"), "*.u1proj"), ("JSON", "*.json")],
+            title=self.t("btn_proj_save"))
+        if not path: return
+        lh = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.2"
+        project = {
+            "version": 1,
+            "layer_height": lh,
+            "slots": [
+                {"brand": s["brand"].get(), "color": s["color"].get(),
+                 "hex": s["hex"].get(), "td": s["td"].get()}
+                for s in self.slots
+            ],
+            "virtual_fils": self.virtual_fils,
+        }
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(project, f, indent=2, ensure_ascii=False)
+            messagebox.showinfo(self.t("dlg_saved"), self.t("proj_saved", path=path))
+        except IOError as e:
+            messagebox.showerror(self.t("dlg_error"), str(e))
+
+    def load_project(self):
+        path = filedialog.askopenfilename(
+            filetypes=[(self.t("proj_filetypes"), "*.u1proj"), ("JSON", "*.json")],
+            title=self.t("btn_proj_load"))
+        if not path: return
+        try:
+            with open(path, encoding="utf-8") as f:
+                project = json.load(f)
+        except Exception as e:
+            messagebox.showerror(self.t("dlg_error"), self.t("proj_err", e=e)); return
+        # Schichthöhe
+        if hasattr(self, "layer_height_entry") and "layer_height" in project:
+            self.layer_height_entry.delete(0, "end")
+            self.layer_height_entry.insert(0, project["layer_height"])
+        # Slots
+        for i, s_data in enumerate(project.get("slots", [])[:4]):
+            s = self.slots[i]
+            if s_data.get("brand") and s_data["brand"] in self.library:
+                s["brand"].set(s_data["brand"])
+                self.update_menu(i)
+            if s_data.get("color"):
+                try: s["color"].set(s_data["color"])
+                except: pass
+            if s_data.get("hex"):
+                s["hex"].delete(0, "end")
+                s["hex"].insert(0, s_data["hex"])
+                try: s["preview"].configure(fg_color=s_data["hex"])
+                except: pass
+            if s_data.get("td"):
+                s["td"].delete(0, "end")
+                s["td"].insert(0, s_data["td"])
+        # Virtuelle Köpfe
+        self.virtual_fils = project.get("virtual_fils", [])
+        self._refresh_virtual_grid()
+        self.after(100, self._update_gamut_strip)
+        messagebox.showinfo(self.t("dlg_saved"), self.t("proj_loaded", path=path))
+
     def save_db(self):
         try:
             with open(self.db_file, "w", encoding="utf-8") as f:
@@ -1185,6 +1364,17 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkButton(pb, text=self.t("btn_save"), fg_color="#1e3a5f",
                       command=self.save_preset).grid(row=0, column=1, sticky="ew", padx=(3, 0))
         self._refresh_preset_dropdown()
+
+        # Projekt speichern/laden
+        proj_frame = ctk.CTkFrame(self.sidebar, fg_color="#0f172a", corner_radius=8)
+        proj_frame.pack(fill="x", padx=12, pady=(4, 8))
+        proj_frame.grid_columnconfigure((0,1), weight=1)
+        ctk.CTkButton(proj_frame, text=self.t("btn_proj_save"), fg_color="#1e3a5f",
+                      height=32, command=self.save_project).grid(
+            row=0, column=0, sticky="ew", padx=(6,3), pady=6)
+        ctk.CTkButton(proj_frame, text=self.t("btn_proj_load"), fg_color="#1e3a5f",
+                      height=32, command=self.load_project).grid(
+            row=0, column=1, sticky="ew", padx=(3,6), pady=6)
 
         # Sidebar-Tools
         ctk.CTkButton(self.sidebar, text=self.t("btn_new_brand"), fg_color="#1e3a5f",
@@ -1403,12 +1593,17 @@ class U1FullSpectrumApp(ctk.CTk):
         exp_btn.grid(row=0, column=4)
         self.tip(exp_btn, "tip_export")
 
+        # Top-3 Sequenzen (nach Optimizer)
+        self.top3_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
+        self.top3_frame.grid(row=8, column=0, padx=40, pady=(0, 4), sticky="ew")
+        self.top3_frame.grid_remove()  # initially hidden
+
         # Keyboard shortcut: Enter = Berechnen
         self.bind("<Return>", lambda e: self.calc())
 
         # ── Dithering-Profile ─────────────────────────────────────────────────
         dp_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
-        dp_frame.grid(row=9, column=0, padx=40, pady=(0, 6), sticky="ew")
+        dp_frame.grid(row=10, column=0, padx=40, pady=(0, 6), sticky="ew")
         ctk.CTkLabel(dp_frame, text=self.t("dither_profiles"),
                      font=("Segoe UI", 10), text_color="#64748b").pack(side="left", padx=(12, 8))
         for key, fn in [("dither_fine", lambda: self._apply_dither_profile(2, False)),
@@ -1423,7 +1618,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # ── Farbsehschwäche-Simulation + Extras ──────────────────────────────
         sim_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
-        sim_frame.grid(row=10, column=0, padx=40, pady=(0, 12), sticky="ew")
+        sim_frame.grid(row=11, column=0, padx=40, pady=(0, 12), sticky="ew")
         ctk.CTkLabel(sim_frame, text=self.t("colorblind_label"),
                      font=("Segoe UI", 10), text_color="#64748b").pack(side="left", padx=(12, 6))
         self.colorblind_var = ctk.StringVar(value="normal")
@@ -1435,7 +1630,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Extra-Buttons (Lab-Plot, Swatch, Slicer-Guide)
         extra_row = ctk.CTkFrame(sec1, fg_color="transparent")
-        extra_row.grid(row=11, column=0, padx=40, pady=(0, 14), sticky="ew")
+        extra_row.grid(row=12, column=0, padx=40, pady=(0, 14), sticky="ew")
         lab_btn = ctk.CTkButton(extra_row, text=self.t("btn_lab_plot"), fg_color="#0f4c81",
                                 height=32, font=("Segoe UI", 11), command=self.show_lab_plot)
         lab_btn.pack(side="left", padx=(0, 6))
@@ -1450,8 +1645,25 @@ class U1FullSpectrumApp(ctk.CTk):
         grad_btn = ctk.CTkButton(extra_row, text=self.t("btn_gradient"), fg_color="#0e7490",
                                  height=32, font=("Segoe UI", 11),
                                  command=self.open_gradient_dialog)
-        grad_btn.pack(side="left")
+        grad_btn.pack(side="left", padx=(0, 6))
         self.tip(grad_btn, "tip_gradient")
+
+        harm_btn = ctk.CTkButton(extra_row, text=self.t("btn_harmonies"), fg_color="#7c3aed",
+                                 height=32, font=("Segoe UI", 11),
+                                 command=self.open_harmonies_dialog)
+        harm_btn.pack(side="left", padx=(0, 6))
+        self.tip(harm_btn, "tip_harmonies")
+
+        pal_btn = ctk.CTkButton(extra_row, text=self.t("btn_palette"), fg_color="#374151",
+                                height=32, font=("Segoe UI", 11),
+                                command=self.import_palette_from_image)
+        pal_btn.pack(side="left", padx=(0, 6))
+        self.tip(pal_btn, "tip_palette")
+
+        tc_btn = ctk.CTkButton(extra_row, text=self.t("btn_tc_est"), fg_color="#374151",
+                               height=32, font=("Segoe UI", 11),
+                               command=self.open_tc_estimator)
+        tc_btn.pack(side="left")
 
         # ── ABSCHNITT 2: VIRTUELLE DRUCKKÖPFE ────────────────────────────────
         sec2_hdr = ctk.CTkFrame(self.main, fg_color="transparent")
@@ -1502,8 +1714,20 @@ class U1FullSpectrumApp(ctk.CTk):
                       hover_color="#0d6660", height=36, width=140,
                       font=("Segoe UI", 11, "bold"),
                       command=self.open_orca_export_dialog)
-        orca_btn.pack(side="left")
+        orca_btn.pack(side="left", padx=(0, 4))
         self.tip(orca_btn, "tip_orca_export")
+
+        ctk.CTkButton(btn_row2, text=self.t("btn_3mf_write"), fg_color="#374151",
+                      height=36, width=130,
+                      command=self.write_3mf_colors).pack(side="left", padx=(0, 4))
+
+        ctk.CTkButton(btn_row2, text=self.t("btn_slot_opt"), fg_color="#7c3aed",
+                      height=36, width=140,
+                      command=self.open_slot_optimizer).pack(side="left", padx=(0, 4))
+
+        ctk.CTkButton(btn_row2, text=self.t("btn_td_cal"), fg_color="#0f4c81",
+                      height=36, width=130,
+                      command=self.open_td_calibration).pack(side="left")
 
         # Virtual Filament Grid Header
         gh = ctk.CTkFrame(self.main, fg_color="#1e293b", corner_radius=6)
@@ -1717,12 +1941,22 @@ class U1FullSpectrumApp(ctk.CTk):
         tot = sum(s["w"] for s in scores)
         if tot == 0: return None
 
+        all_opt_results = []  # collect all permutation results for top-3
+
         def best_seq_for_n(n):
             if optimizer:
                 best, best_dv = None, float("inf")
                 for perm in iter_permutations(scores):
                     seq = self._build_sequence(list(perm), tot, n)
                     dv  = delta_e(self._simulate_mix(seq, fils), t_lab)
+                    seq_str = "".join(map(str, seq))
+                    all_opt_results.append({
+                        "target_hex": target_hex,
+                        "sequence": seq_str,
+                        "sim_hex": lab_to_hex(self._simulate_mix(seq, fils)),
+                        "de": dv,
+                        "seq_len": n,
+                    })
                     if dv < best_dv: best_dv = dv; best = seq
                 return best
             return self._build_sequence(
@@ -1741,6 +1975,20 @@ class U1FullSpectrumApp(ctk.CTk):
         else:
             n = seq_len if seq_len is not None else MAX_SEQ_LEN
             chosen_seq = best_seq_for_n(n)
+
+        # Store top-3 for display (only when optimizer was run)
+        if optimizer and all_opt_results:
+            all_opt_results.sort(key=lambda x: x["de"])
+            # Deduplicate by sequence string
+            seen_seqs = set()
+            unique_results = []
+            for r in all_opt_results:
+                if r["sequence"] not in seen_seqs:
+                    seen_seqs.add(r["sequence"])
+                    unique_results.append(r)
+            self._top3_results = unique_results[:3]
+        else:
+            self._top3_results = []
 
         sim_lab = self._simulate_mix(chosen_seq, fils)
         dv      = delta_e(sim_lab, t_lab)
@@ -1788,6 +2036,40 @@ class U1FullSpectrumApp(ctk.CTk):
         for i, cell in enumerate(self._gamut_cells):
             idx = int(i * len(samples) / n)
             cell.configure(fg_color=samples[min(idx, len(samples)-1)])
+
+    def _show_top3(self):
+        """Zeigt Top-3 Sequenzen nach Optimizer in einem kompakten Frame."""
+        for w in self.top3_frame.winfo_children():
+            w.destroy()
+        results = getattr(self, "_top3_results", [])
+        if len(results) < 2:
+            self.top3_frame.grid_remove()
+            return
+        self.top3_frame.grid()
+        ctk.CTkLabel(self.top3_frame, text=self.t("top3_title"),
+                     font=("Segoe UI", 10, "bold"), text_color="#64748b").pack(
+            side="left", padx=(10, 8), pady=6)
+        for idx, r in enumerate(results[:3]):
+            card = ctk.CTkFrame(self.top3_frame, fg_color="#1e293b", corner_radius=6)
+            card.pack(side="left", padx=3, pady=6, fill="y")
+            ctk.CTkLabel(card, text=self.t("top3_rank", r=idx+1),
+                         font=("Segoe UI", 9, "bold"),
+                         text_color="#64748b").pack(side="left", padx=(6, 2))
+            ctk.CTkLabel(card, text=" ".join(r["sequence"]),
+                         font=("Courier New", 10, "bold"),
+                         text_color="#4ade80").pack(side="left", padx=2)
+            ctk.CTkLabel(card, text=f"  ΔE {r['de']:.1f}",
+                         font=("Segoe UI", 9),
+                         text_color=de_color(r["de"])).pack(side="left", padx=2)
+            sim_c = ctk.CTkLabel(card, text="", width=20, height=20,
+                                  fg_color=r["sim_hex"], corner_radius=4)
+            sim_c.pack(side="left", padx=4)
+            def add_this(res=r):
+                self.last_result = res
+                self.add_to_virtual(res)
+            ctk.CTkButton(card, text=self.t("top3_add"), width=70, height=24,
+                          fg_color="#15803d", command=add_this).pack(
+                side="left", padx=(2, 6))
 
     def calc(self):
         if not hasattr(self, "target"):
@@ -1858,6 +2140,7 @@ class U1FullSpectrumApp(ctk.CTk):
             self.de_quality_lbl.configure(text=quality, text_color=de_color(dv))
 
         self.last_result = result
+        self._show_top3()
 
     # ── VIRTUELLE DRUCKKÖPFE ───────────────────────────────────────────────────
 
@@ -3126,6 +3409,556 @@ class U1FullSpectrumApp(ctk.CTk):
                       font=("Segoe UI", 13, "bold")).pack(pady=(4, 4), padx=24, fill="x")
         ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
                       command=win.destroy, height=36).pack(padx=24, fill="x")
+
+    # ── SLOT-OPTIMIZER ────────────────────────────────────────────────────────
+
+    def open_slot_optimizer(self):
+        """Findet die 4 Filamente aus der Bibliothek mit dem größten Farbraum."""
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("slot_opt_title"))
+        win.geometry("520x480")
+        win.grab_set()
+        ctk.CTkLabel(win, text=self.t("slot_opt_title"),
+                     font=("Segoe UI", 13, "bold")).pack(pady=(14, 4))
+        ctk.CTkLabel(win, text=self.t("slot_opt_desc"),
+                     font=("Segoe UI", 10), text_color="#64748b",
+                     wraplength=460).pack(pady=(0, 8))
+
+        # Zielfarben-Option
+        use_virtual_var = ctk.BooleanVar(value=bool(self.virtual_fils))
+        ctk.CTkCheckBox(win, text=self.t("slot_opt_use_virtual"),
+                        variable=use_virtual_var).pack(anchor="w", padx=24)
+
+        progress_lbl = ctk.CTkLabel(win, text="", font=("Segoe UI", 10),
+                                     text_color="#64748b")
+        progress_lbl.pack(pady=4)
+        pb = ctk.CTkProgressBar(win); pb.pack(padx=30, fill="x"); pb.set(0)
+
+        result_frame = ctk.CTkScrollableFrame(win, height=180, fg_color="#0f172a")
+        result_frame.pack(fill="x", padx=20, pady=8)
+
+        self._opt_best = None
+
+        def run_optimizer():
+            import itertools, threading
+
+            # Alle Filamente flach aus der Library
+            all_fils = []
+            for brand, entries in self.library.items():
+                if brand == "Eigene Favoriten": continue
+                for e in entries:
+                    if not e.get("hex") or len(e["hex"]) != 7: continue
+                    all_fils.append({
+                        "brand": brand, "name": e["name"],
+                        "hex": e["hex"], "td": e.get("td", 5.0),
+                        "lab": rgb_to_lab(hex_to_rgb(e["hex"]))
+                    })
+
+            # Zielfarben
+            if use_virtual_var.get() and self.virtual_fils:
+                targets = [rgb_to_lab(hex_to_rgb(vf["target_hex"]))
+                           for vf in self.virtual_fils]
+            else:
+                # Standardmäßig gut verteilte Testfarben im Farbraum
+                targets = [rgb_to_lab(hex_to_rgb(h)) for h in [
+                    "#FF0000","#FF8000","#FFFF00","#00FF00",
+                    "#00FFFF","#0000FF","#FF00FF","#FFFFFF",
+                    "#808080","#000000"]]
+
+            combos = list(itertools.combinations(range(len(all_fils)), 4))
+            total  = len(combos)
+            best_score = float("inf")
+            best_combo = None
+
+            def worker():
+                nonlocal best_score, best_combo
+                for i, combo in enumerate(combos):
+                    fils = [all_fils[j] for j in combo]
+                    # Score: mittleres ΔE zu allen Zielfarben (niedrig = besser)
+                    total_de = 0
+                    for tgt in targets:
+                        min_de = min(delta_e(tgt, f["lab"]) for f in fils)
+                        total_de += min_de
+                    score = total_de / len(targets)
+                    if score < best_score:
+                        best_score = score
+                        best_combo = fils
+                    if i % 500 == 0:
+                        frac = i / total
+                        win.after(0, lambda f=frac, ii=i: (
+                            pb.set(f),
+                            progress_lbl.configure(
+                                text=self.t("slot_opt_running", i=ii, total=total))
+                        ))
+                self._opt_best = (best_combo, best_score)
+                win.after(0, show_result)
+
+            def show_result():
+                pb.set(1.0)
+                progress_lbl.configure(text=self.t("slot_opt_done"))
+                for w in result_frame.winfo_children(): w.destroy()
+                if not self._opt_best: return
+                combo, score = self._opt_best
+                ctk.CTkLabel(result_frame,
+                              text=self.t("slot_opt_result", de=score),
+                              font=("Segoe UI", 10, "bold"),
+                              text_color="#4ade80").pack(anchor="w", padx=8, pady=4)
+                for f in combo:
+                    row = ctk.CTkFrame(result_frame, fg_color="#1e293b", corner_radius=6)
+                    row.pack(fill="x", padx=4, pady=2)
+                    ctk.CTkLabel(row, text="", width=28, height=28,
+                                  fg_color=f["hex"], corner_radius=5).pack(
+                        side="left", padx=6, pady=4)
+                    ctk.CTkLabel(row, text=f"{f['brand']} — {f['name']}  {f['hex']}  TD={f['td']}",
+                                  font=("Segoe UI", 10)).pack(side="left", padx=4)
+                apply_btn.pack(pady=(4, 2), padx=20, fill="x")
+
+            threading.Thread(target=worker, daemon=True).start()
+
+        def apply_best():
+            if not self._opt_best: return
+            combo, _ = self._opt_best
+            for i, f in enumerate(combo[:4]):
+                s = self.slots[i]
+                if f["brand"] in self.library:
+                    s["brand"].set(f["brand"])
+                    self.update_menu(i)
+                s["hex"].delete(0, "end"); s["hex"].insert(0, f["hex"])
+                s["td"].delete(0, "end");  s["td"].insert(0, str(f["td"]))
+                try: s["preview"].configure(fg_color=f["hex"])
+                except: pass
+                # Filament-Name setzen falls vorhanden
+                try: s["color"].set(f["name"])
+                except: pass
+            self.after(100, self._update_gamut_strip)
+            win.destroy()
+
+        apply_btn = ctk.CTkButton(win, text=self.t("slot_opt_apply"),
+                                   fg_color="#15803d", height=38)
+        apply_btn.configure(command=apply_best)
+
+        ctk.CTkButton(win, text="▶  " + self.t("slot_opt_title").split("—")[0].strip(),
+                      fg_color="#2563eb", height=40,
+                      font=("Segoe UI", 12, "bold"),
+                      command=run_optimizer).pack(pady=(0, 4), padx=20, fill="x")
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
+                      command=win.destroy, height=34).pack(padx=20, fill="x")
+
+    # ── 3MF ZURÜCKSCHREIBEN ────────────────────────────────────────────────────
+
+    def write_3mf_colors(self):
+        """Schreibt die simulierten Farben der virtuellen Köpfe in eine 3MF-Datei."""
+        if not self.virtual_fils:
+            messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
+
+        path = filedialog.askopenfilename(
+            filetypes=[("3MF", "*.3mf"), ("*", "*.*")],
+            title=self.t("3mf_write_title"))
+        if not path: return
+
+        save_path = filedialog.asksaveasfilename(
+            defaultextension=".3mf",
+            filetypes=[("3MF", "*.3mf")],
+            initialfile=os.path.splitext(os.path.basename(path))[0] + "_colored.3mf",
+            title="Speichern als")
+        if not save_path: return
+
+        try:
+            import shutil, tempfile
+            # 3MF kopieren und modifizieren
+            with zipfile.ZipFile(path, "r") as zin:
+                with tempfile.NamedTemporaryFile(suffix=".3mf", delete=False) as tmp:
+                    tmp_path = tmp.name
+                with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zout:
+                    for item in zin.infolist():
+                        data = zin.read(item.filename)
+                        # In der Slicer-Konfigurationsdatei Farben ersetzen
+                        if item.filename.endswith(".config") or "config" in item.filename:
+                            try:
+                                content = data.decode("utf-8")
+                                # Filamentfarben in der Config ersetzen
+                                for idx, vf in enumerate(self.virtual_fils):
+                                    sim_hex = vf["sim_hex"].lstrip("#")
+                                    # OrcaSlicer config format: value="#RRGGBB"
+                                    old_pat = re.compile(
+                                        r'(key="filament_colour"[^>]*value=")([^"]*?)(")',
+                                        re.IGNORECASE)
+                                    # Nur den idx-ten Match ersetzen
+                                    matches = list(old_pat.finditer(content))
+                                    if idx < len(matches):
+                                        m = matches[idx]
+                                        content = content[:m.start(2)] + f"#{sim_hex.upper()}" + content[m.end(2):]
+                                data = content.encode("utf-8")
+                            except Exception:
+                                pass
+                        zout.writestr(item, data)
+
+            shutil.move(tmp_path, save_path)
+            messagebox.showinfo(self.t("dlg_saved"),
+                self.t("3mf_write_ok", path=save_path))
+        except Exception as e:
+            messagebox.showerror(self.t("dlg_error"),
+                self.t("3mf_write_err", e=e))
+
+    # ── WERKZEUGWECHSEL-SCHÄTZUNG ─────────────────────────────────────────────
+
+    def open_tc_estimator(self):
+        """Schätzt Werkzeugwechsel, Zusatzzeit und Purge-Material."""
+        if not self.virtual_fils:
+            messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("tc_title"))
+        win.geometry("440x340")
+        win.grab_set()
+        ctk.CTkLabel(win, text=self.t("tc_title"),
+                     font=("Segoe UI", 14, "bold")).pack(pady=(16, 10))
+
+        # Eingaben
+        in_frame = ctk.CTkFrame(win, fg_color="transparent"); in_frame.pack(padx=30, fill="x")
+        ctk.CTkLabel(in_frame, text=self.t("tc_layers"), width=200).grid(row=0, column=0, sticky="w", pady=4)
+        layers_entry = ctk.CTkEntry(in_frame, width=100, placeholder_text="200")
+        layers_entry.insert(0, "200"); layers_entry.grid(row=0, column=1, padx=6)
+
+        ctk.CTkLabel(in_frame, text="Sekunden/Werkzeugwechsel:", width=200).grid(row=1, column=0, sticky="w", pady=4)
+        secs_entry = ctk.CTkEntry(in_frame, width=100, placeholder_text="30")
+        secs_entry.insert(0, "30"); secs_entry.grid(row=1, column=1, padx=6)
+
+        ctk.CTkLabel(in_frame, text="Purge-Menge (mm³/Wechsel):", width=200).grid(row=2, column=0, sticky="w", pady=4)
+        purge_entry = ctk.CTkEntry(in_frame, width=100, placeholder_text="120")
+        purge_entry.insert(0, "120"); purge_entry.grid(row=2, column=1, padx=6)
+
+        result_frame = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=8)
+        result_frame.pack(fill="x", padx=30, pady=12)
+        res_lbl = ctk.CTkLabel(result_frame, text="", font=("Segoe UI", 11),
+                                text_color="#4ade80", wraplength=360, justify="left")
+        res_lbl.pack(pady=12, padx=14)
+
+        def calculate():
+            try:
+                n_layers  = int(layers_entry.get())
+                secs      = float(secs_entry.get())
+                purge_vol = float(purge_entry.get())
+            except ValueError: return
+
+            lh = safe_td(self.layer_height_entry.get()) if hasattr(self, "layer_height_entry") else 0.2
+            # Gesamte Wechsel: pro Virtual-Kopf = Werkzeugwechsel pro Schicht in der Sequenz
+            total_changes = 0
+            for vf in self.virtual_fils:
+                seq = vf["sequence"]
+                # Wechsel in der Sequenz = Anzahl aufeinanderfolgend verschiedener Tools
+                changes_per_cycle = sum(1 for i in range(len(seq)-1) if seq[i] != seq[i+1])
+                cycle_len = len(seq)
+                cycles = n_layers / max(cycle_len, 1)
+                total_changes += int(cycles * changes_per_cycle)
+
+            extra_min = total_changes * secs / 60
+            # Purge in Gramm (PLA Dichte ~1.24 g/cm³, 1.75mm Filament)
+            # mm³ → cm³ → g
+            purge_g = total_changes * purge_vol * 1.24 / 1000
+
+            res_lbl.configure(text=(
+                f"{self.t('tc_result', n=total_changes)}\n"
+                f"{self.t('tc_time', min=extra_min, sec=int(secs))}\n"
+                f"{self.t('tc_purge', g=purge_g)}"
+            ))
+
+        ctk.CTkButton(win, text="Berechnen", fg_color="#2563eb",
+                      command=calculate, height=40).pack(pady=(0,6), padx=30, fill="x")
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
+                      command=win.destroy, height=34).pack(padx=30, fill="x")
+
+    # ── PALETTEN-IMPORT ────────────────────────────────────────────────────────
+
+    def import_palette_from_image(self):
+        """Dominante Farben aus Bild extrahieren und als virtuelle Köpfe hinzufügen."""
+        if not _HAS_PIL:
+            messagebox.showinfo(self.t("dlg_note"), "Pillow not installed."); return
+        path = filedialog.askopenfilename(
+            filetypes=[(self.t("img_filetypes"), "*.png *.jpg *.jpeg *.bmp *.webp"),
+                       ("*", "*.*")],
+            title=self.t("palette_title"))
+        if not path: return
+
+        try:
+            img = _PILImage.open(path).convert("RGB")
+            img.thumbnail((200, 200))
+        except Exception as e:
+            messagebox.showerror(self.t("dlg_error"), str(e)); return
+
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("palette_title"))
+        win.geometry("480x380")
+        win.grab_set()
+        ctk.CTkLabel(win, text=self.t("palette_title"),
+                     font=("Segoe UI", 14, "bold")).pack(pady=(14, 6))
+
+        # Simple Quantisierung: Farbraum in 6-Bucket-Raster aufteilen
+        from collections import Counter
+        pixels = list(img.getdata())
+        def quantize(px, levels=6):
+            step = 256 // levels
+            return tuple((c // step) * step + step//2 for c in px[:3])
+        counts = Counter(quantize(p) for p in pixels)
+        # Top-Farben nach Häufigkeit
+        top = [rgb for rgb, _ in counts.most_common(50)]
+        # Nur Farben mit Mindestabstand auswählen
+        selected = []
+        for rgb in top:
+            hx = "#{:02X}{:02X}{:02X}".format(*rgb)
+            lab = rgb_to_lab(rgb)
+            if all(delta_e(lab, rgb_to_lab(hex_to_rgb(s))) > 12 for s in selected):
+                selected.append(hx)
+            if len(selected) >= 8:
+                break
+
+        ctk.CTkLabel(win, text=self.t("palette_colors"),
+                     font=("Segoe UI", 10), text_color="#64748b").pack(pady=(0, 4))
+
+        check_vars = []
+        swatch_frame = ctk.CTkScrollableFrame(win, height=180)
+        swatch_frame.pack(fill="x", padx=20, pady=4)
+        for hx in selected:
+            row = ctk.CTkFrame(swatch_frame, fg_color="#1e293b", corner_radius=6)
+            row.pack(fill="x", pady=2)
+            var = ctk.BooleanVar(value=True)
+            check_vars.append((var, hx))
+            ctk.CTkCheckBox(row, text="", variable=var, width=30).pack(side="left", padx=4)
+            ctk.CTkLabel(row, text="", width=36, height=28,
+                          fg_color=hx, corner_radius=6).pack(side="left", padx=4, pady=4)
+            ctk.CTkLabel(row, text=hx, font=("Courier New", 10)).pack(side="left", padx=4)
+
+        def add_selected():
+            selected_colors = [hx for var, hx in check_vars if var.get()]
+            if not selected_colors: return
+            self.virtual_undo.append(copy.deepcopy(self.virtual_fils))
+            added = 0
+            for hx in selected_colors:
+                if len(self.virtual_fils) >= self._max_virtual: break
+                res = self._calc_for_color(hx, False, seq_len=None,
+                                            auto=True, auto_threshold=3.0)
+                if res is None: continue
+                vid = 5 + len(self.virtual_fils)
+                self.virtual_fils.append({
+                    "vid": vid, "target_hex": hx,
+                    "sequence": res["sequence"], "sim_hex": res["sim_hex"],
+                    "de": res["de"], "label": f"Pal {added+1}",
+                })
+                added += 1
+            self._refresh_virtual_grid()
+            messagebox.showinfo(self.t("dlg_saved"),
+                self.t("batch_done", n=added))
+            win.destroy()
+
+        ctk.CTkButton(win, text=self.t("palette_btn_add"), fg_color="#0e7490",
+                      command=add_selected, height=40).pack(pady=(8,4), padx=20, fill="x")
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
+                      command=win.destroy, height=34).pack(padx=20, fill="x")
+
+    # ── FARBHARMONIEN ─────────────────────────────────────────────────────────
+
+    def open_harmonies_dialog(self):
+        """Zeigt Komplementär, Triad, Analog und Split-Komplementär zur Zielfarbe."""
+        if not hasattr(self, "target"):
+            messagebox.showinfo(self.t("dlg_note"), self.t("dlg_select_color")); return
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("harm_title"))
+        win.geometry("520x360")
+        win.grab_set()
+        ctk.CTkLabel(win, text=self.t("harm_title"),
+                     font=("Segoe UI", 14, "bold")).pack(pady=(14, 8))
+
+        r, g, b = hex_to_rgb(self.target)
+        h, s, v = self._rgb_to_hsv(r, g, b)
+
+        def hsv_to_hex(hue, sat, val):
+            hue = hue % 360
+            h_i = int(hue / 60) % 6
+            f   = hue / 60 - int(hue / 60)
+            p   = val * (1 - sat / 100)
+            q   = val * (1 - f * sat / 100)
+            t   = val * (1 - (1 - f) * sat / 100)
+            v2  = val / 100
+            p2, q2, t2 = p/100, q/100, t/100
+            rgb_map = [(v2,t2,p2),(q2,v2,p2),(p2,v2,t2),(p2,q2,v2),(t2,p2,v2),(v2,p2,q2)]
+            rr, gg, bb = rgb_map[h_i]
+            return "#{:02X}{:02X}{:02X}".format(int(rr*255), int(gg*255), int(bb*255))
+
+        harmonies = {
+            self.t("harm_complement"):  [hsv_to_hex(h+180, s, v)],
+            self.t("harm_triadic"):     [hsv_to_hex(h+120, s, v), hsv_to_hex(h+240, s, v)],
+            self.t("harm_analogous"):   [hsv_to_hex(h-30, s, v), hsv_to_hex(h+30, s, v)],
+            self.t("harm_split"):       [hsv_to_hex(h+150, s, v), hsv_to_hex(h+210, s, v)],
+        }
+
+        all_colors = []
+        for name, colors in harmonies.items():
+            row = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=6)
+            row.pack(fill="x", padx=20, pady=3)
+            ctk.CTkLabel(row, text=name, width=160, font=("Segoe UI", 10),
+                         text_color="#94a3b8").pack(side="left", padx=10)
+            for hex_c in colors:
+                all_colors.append(hex_c)
+                swatch = ctk.CTkLabel(row, text="", width=36, height=36,
+                                       fg_color=hex_c, corner_radius=6)
+                swatch.pack(side="left", padx=4, pady=6)
+                ctk.CTkLabel(row, text=hex_c, font=("Courier New", 9),
+                              text_color="#64748b").pack(side="left", padx=2)
+                def use_this(hc=hex_c):
+                    self._apply_target(hc)
+                    win.destroy()
+                ctk.CTkButton(row, text="→ Ziel", width=60, height=26,
+                              fg_color="#374151", command=use_this).pack(side="left", padx=4)
+
+        def add_all():
+            self.virtual_undo.append(copy.deepcopy(self.virtual_fils))
+            added = 0
+            for hex_c in all_colors:
+                if len(self.virtual_fils) >= self._max_virtual: break
+                res = self._calc_for_color(hex_c, False, seq_len=None,
+                                            auto=True, auto_threshold=3.0)
+                if res is None: continue
+                vid = 5 + len(self.virtual_fils)
+                self.virtual_fils.append({
+                    "vid": vid, "target_hex": hex_c,
+                    "sequence": res["sequence"], "sim_hex": res["sim_hex"],
+                    "de": res["de"], "label": f"Harm {added+1}",
+                })
+                added += 1
+            self._refresh_virtual_grid()
+            win.destroy()
+
+        ctk.CTkButton(win, text=self.t("harm_add_all"), fg_color="#0e7490",
+                      command=add_all, height=38).pack(pady=(8, 4), padx=20, fill="x")
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
+                      command=win.destroy, height=34).pack(padx=20, fill="x")
+
+    # ── TD-KALIBRIERUNG ────────────────────────────────────────────────────────
+
+    def open_td_calibration(self):
+        """TD-Werte anhand eines Testdrucks kalibrieren."""
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("td_cal_title"))
+        win.geometry("500x420")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text=self.t("td_cal_title"),
+                     font=("Segoe UI", 14, "bold")).pack(pady=(16, 6))
+
+        # Slot-Auswahl A und B
+        sel_frame = ctk.CTkFrame(win, fg_color="transparent"); sel_frame.pack(pady=6)
+        ctk.CTkLabel(sel_frame, text=self.t("td_cal_slot")).pack(side="left", padx=6)
+        slot_a = ctk.IntVar(value=1)
+        slot_b = ctk.IntVar(value=2)
+        ctk.CTkLabel(sel_frame, text="A:").pack(side="left", padx=(8, 2))
+        ctk.CTkOptionMenu(sel_frame, variable=slot_a, values=["1","2","3","4"],
+                          width=60, command=lambda x: update_desc()).pack(side="left")
+        ctk.CTkLabel(sel_frame, text="  B:").pack(side="left", padx=(8, 2))
+        ctk.CTkOptionMenu(sel_frame, variable=slot_b, values=["1","2","3","4"],
+                          width=60, command=lambda x: update_desc()).pack(side="left")
+
+        desc_lbl = ctk.CTkLabel(win, text="", font=("Segoe UI", 10),
+                                 text_color="#64748b", wraplength=440)
+        desc_lbl.pack(pady=4)
+
+        def update_desc(*a):
+            desc_lbl.configure(text=self.t("td_cal_desc", a=slot_a.get(), b=slot_b.get()))
+        update_desc()
+
+        # Vorschau: aktuelle Slot-Farben
+        pf = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=8); pf.pack(pady=8, padx=30, fill="x")
+        pf.grid_columnconfigure((0,1,2,3,4), weight=1)
+        for col, (txt, key) in enumerate([("T{a} Farbe","a"),("",""),("50/50 Mix",""),("",""),("T{b} Farbe","b")]):
+            if col in (1,3): continue
+            label = txt.format(a=slot_a.get(), b=slot_b.get()) if "{" in txt else txt
+            ctk.CTkLabel(pf, text=label, font=("Segoe UI", 9), text_color="#64748b").grid(
+                row=0, column=col, pady=(6,2))
+        hex_a_lbl = ctk.CTkLabel(pf, text="", width=50, height=50,
+                                  fg_color=self.slots[0]["hex"].get() or "#888888",
+                                  corner_radius=8)
+        hex_a_lbl.grid(row=1, column=0, padx=10, pady=(0,8))
+        ctk.CTkLabel(pf, text="⟷", font=("Segoe UI", 14), text_color="#64748b").grid(row=1, column=1)
+        self._td_mix_preview = ctk.CTkLabel(pf, text="", width=50, height=50,
+                                             fg_color="#888888", corner_radius=8)
+        self._td_mix_preview.grid(row=1, column=2, padx=10, pady=(0,8))
+        ctk.CTkLabel(pf, text="⟷", font=("Segoe UI", 14), text_color="#64748b").grid(row=1, column=3)
+        hex_b_lbl = ctk.CTkLabel(pf, text="", width=50, height=50,
+                                  fg_color=self.slots[1]["hex"].get() or "#888888",
+                                  corner_radius=8)
+        hex_b_lbl.grid(row=1, column=4, padx=10, pady=(0,8))
+
+        # Gemessene Farbe
+        ctk.CTkLabel(win, text=self.t("td_cal_measured"),
+                     font=("Segoe UI", 10)).pack(pady=(8, 2))
+        mf = ctk.CTkFrame(win, fg_color="transparent"); mf.pack()
+        measured_var = ctk.StringVar(value="#888888")
+        meas_swatch = ctk.CTkLabel(mf, text="", width=32, height=32,
+                                    fg_color="#888888", corner_radius=6)
+        meas_swatch.pack(side="left", padx=6)
+        meas_entry = ctk.CTkEntry(mf, textvariable=measured_var, width=100)
+        meas_entry.pack(side="left", padx=4)
+        def on_measured(*a):
+            h = measured_var.get().strip()
+            if len(h) == 7 and h.startswith("#"):
+                try: meas_swatch.configure(fg_color=h)
+                except: pass
+        measured_var.trace_add("write", on_measured)
+        def pick_measured():
+            from tkinter import colorchooser as _cc
+            col = _cc.askcolor(title="Gemessene Farbe")[1]
+            if col: measured_var.set(col.upper())
+        ctk.CTkButton(mf, text="🎨", width=32, height=32, fg_color="#374151",
+                      command=pick_measured).pack(side="left", padx=2)
+
+        result_lbl = ctk.CTkLabel(win, text="", font=("Segoe UI", 11, "bold"),
+                                   text_color="#4ade80")
+        result_lbl.pack(pady=8)
+
+        def calc_td():
+            a_idx = int(slot_a.get()) - 1
+            b_idx = int(slot_b.get()) - 1
+            hex_a = self.slots[a_idx]["hex"].get().strip()
+            hex_b = self.slots[b_idx]["hex"].get().strip()
+            meas  = measured_var.get().strip()
+            if not all(len(h) == 7 for h in [hex_a, hex_b, meas]):
+                return
+            lab_a    = rgb_to_lab(hex_to_rgb(hex_a))
+            lab_b    = rgb_to_lab(hex_to_rgb(hex_b))
+            lab_meas = rgb_to_lab(hex_to_rgb(meas))
+            # Bestimme Mischgewicht aus gemessener Farbe (Projektion auf A-B-Linie)
+            de_total = delta_e(lab_a, lab_b)
+            if de_total < 1e-3: return
+            de_a = delta_e(lab_meas, lab_a)
+            de_b = delta_e(lab_meas, lab_b)
+            w_b = de_a / (de_a + de_b + 1e-9)  # Gewicht B
+            # Empfohlenes TD-Verhältnis: w_b/w_a = td_a/td_b (FullSpectrum-Formel)
+            td_old_a = safe_td(self.slots[a_idx]["td"].get())
+            td_old_b = safe_td(self.slots[b_idx]["td"].get())
+            # Skaliere so dass Summe erhalten bleibt
+            ratio = w_b / max(1 - w_b, 0.01)
+            td_new_a = round(td_old_a * 2 / (1 + ratio), 1)
+            td_new_b = round(td_old_b * 2 * ratio / (1 + ratio), 1)
+            td_new_a = max(0.1, min(10.0, td_new_a))
+            td_new_b = max(0.1, min(10.0, td_new_b))
+            # Vorschau der vorhergesagten Mischfarbe
+            mix_lab = tuple((lab_a[k]*(1-w_b) + lab_b[k]*w_b) for k in range(3))
+            self._td_mix_preview.configure(fg_color=lab_to_hex(mix_lab))
+            result_lbl.configure(
+                text=self.t("td_cal_result", a=slot_a.get(), b=slot_b.get(),
+                             ta=td_new_a, tb=td_new_b))
+            # Apply-Button aktivieren
+            def apply():
+                self.slots[a_idx]["td"].delete(0, "end")
+                self.slots[a_idx]["td"].insert(0, str(td_new_a))
+                self.slots[b_idx]["td"].delete(0, "end")
+                self.slots[b_idx]["td"].insert(0, str(td_new_b))
+                win.destroy()
+            apply_btn.configure(command=apply)
+
+        ctk.CTkButton(win, text="Berechnen", fg_color="#2563eb",
+                      command=calc_td, height=36).pack(pady=(4, 2), padx=30, fill="x")
+        apply_btn = ctk.CTkButton(win, text=self.t("td_cal_apply"), fg_color="#15803d",
+                                   height=36)
+        apply_btn.pack(pady=(2, 8), padx=30, fill="x")
 
     # ── WEB-UPDATE ─────────────────────────────────────────────────────────────
 
