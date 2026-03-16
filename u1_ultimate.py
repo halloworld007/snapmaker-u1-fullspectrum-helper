@@ -243,6 +243,27 @@ STRINGS = {
     # Slicer-Guide
     "btn_slicer_guide": "📖 Slicer-Guide",
     "slicer_guide_title": "Export → OrcaSlicer FullSpectrum",
+    # OrcaSlicer Direkt-Export
+    "btn_orca_export": "🚀 → OrcaSlicer",
+    "tip_orca_export": "Filament-Profile direkt in OrcaSlicer importieren",
+    "orca_title": "Direkt-Export → OrcaSlicer",
+    "orca_header": "Filament-Profile in OrcaSlicer schreiben",
+    "orca_path_label": "OrcaSlicer Profil-Ordner:",
+    "orca_path_auto": "(wird automatisch erkannt)",
+    "orca_path_browse": "📂 Ändern",
+    "orca_scope_phys": "Physische Slots T1–T4 (Farbe + TD-Info)",
+    "orca_scope_virt": "Virtuelle Köpfe V5+ (simulierte Farben + Dithering-Notiz)",
+    "orca_scope_both": "Beides",
+    "orca_prefix_label": "Profil-Prefix:",
+    "orca_prefix_hint": "z.B. 'U1' → U1-T1, U1-V5 …",
+    "orca_btn_export": "PROFILE SCHREIBEN",
+    "orca_btn_cancel": "Abbrechen",
+    "orca_success": "✅  {n} Profile erfolgreich nach OrcaSlicer geschrieben!\n\nOrcaSlicer neu starten, um die Profile zu laden.",
+    "orca_no_path": "OrcaSlicer-Profilordner nicht gefunden.\nBitte Pfad manuell auswählen.",
+    "orca_no_virtual": "Keine virtuellen Druckköpfe vorhanden.",
+    "orca_overwrite_confirm": "{n} Profile werden ggf. überschrieben. Fortfahren?",
+    "orca_filament_notes_t": "U1 FullSpectrum — T{i} | {brand} {name} | TD={td}",
+    "orca_filament_notes_v": "U1 FullSpectrum Sequenz: {seq} | ΔE={de:.1f} | {hint}",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
@@ -443,6 +464,27 @@ STRINGS = {
     "swatch_saved": "Swatch saved:\n{path}",
     "btn_slicer_guide": "📖 Slicer Guide",
     "slicer_guide_title": "Export → OrcaSlicer FullSpectrum",
+    # OrcaSlicer direct export
+    "btn_orca_export": "🚀 → OrcaSlicer",
+    "tip_orca_export": "Import filament profiles directly into OrcaSlicer",
+    "orca_title": "Direct Export → OrcaSlicer",
+    "orca_header": "Write Filament Profiles to OrcaSlicer",
+    "orca_path_label": "OrcaSlicer profile folder:",
+    "orca_path_auto": "(auto-detected)",
+    "orca_path_browse": "📂 Browse",
+    "orca_scope_phys": "Physical slots T1–T4 (color + TD info)",
+    "orca_scope_virt": "Virtual heads V5+ (simulated colors + dithering note)",
+    "orca_scope_both": "Both",
+    "orca_prefix_label": "Profile prefix:",
+    "orca_prefix_hint": "e.g. 'U1' → U1-T1, U1-V5 …",
+    "orca_btn_export": "WRITE PROFILES",
+    "orca_btn_cancel": "Cancel",
+    "orca_success": "✅  {n} profiles written to OrcaSlicer!\n\nRestart OrcaSlicer to load the profiles.",
+    "orca_no_path": "OrcaSlicer profile folder not found.\nPlease select the path manually.",
+    "orca_no_virtual": "No virtual print heads defined.",
+    "orca_overwrite_confirm": "{n} profiles may be overwritten. Continue?",
+    "orca_filament_notes_t": "U1 FullSpectrum — T{i} | {brand} {name} | TD={td}",
+    "orca_filament_notes_v": "U1 FullSpectrum sequence: {seq} | ΔE={de:.1f} | {hint}",
 },
 }
 
@@ -1124,7 +1166,13 @@ class U1FullSpectrumApp(ctk.CTk):
                       command=self.clear_virtual).pack(side="left", padx=(0, 6))
         ctk.CTkButton(btn_row2, text=self.t("btn_export_all"), fg_color="#374151",
                       height=40, width=140,
-                      command=self.open_export_dialog).pack(side="left")
+                      command=self.open_export_dialog).pack(side="left", padx=(0, 6))
+        orca_btn = ctk.CTkButton(btn_row2, text=self.t("btn_orca_export"), fg_color="#0f766e",
+                      hover_color="#0d6660", height=40, width=140,
+                      font=("Segoe UI", 11, "bold"),
+                      command=self.open_orca_export_dialog)
+        orca_btn.pack(side="left")
+        self.tip(orca_btn, "tip_orca_export")
 
         # Virtual Filament Grid Header
         gh = ctk.CTkFrame(self.main, fg_color="#1e293b", corner_radius=6)
@@ -2276,8 +2324,217 @@ class U1FullSpectrumApp(ctk.CTk):
 
         ctk.CTkButton(win, text=self.t("exp_btn"), fg_color="#7c3aed",
                       command=do_export, height=44,
-                      font=("Segoe UI", 14, "bold")).pack(pady=(18, 6), padx=40, fill="x")
+                      font=("Segoe UI", 14, "bold")).pack(pady=(18, 4), padx=40, fill="x")
+        ctk.CTkButton(win, text=self.t("btn_orca_export"), fg_color="#0f766e",
+                      command=lambda: [win.destroy(), self.open_orca_export_dialog()],
+                      height=40, font=("Segoe UI", 13, "bold")).pack(pady=(0, 4), padx=40, fill="x")
         ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
+                      command=win.destroy, height=36).pack(padx=40, fill="x")
+
+    # ── ORCASLICER DIREKT-EXPORT ───────────────────────────────────────────────
+
+    @staticmethod
+    def _detect_orca_filament_path() -> str:
+        """Sucht den OrcaSlicer-User-Filament-Ordner auf Windows/Mac/Linux."""
+        import platform
+        candidates = []
+        if platform.system() == "Windows":
+            appdata = os.environ.get("APPDATA", "")
+            candidates = [
+                os.path.join(appdata, "OrcaSlicer", "user", "default", "filament"),
+                os.path.join(appdata, "OrcaSlicer", "user", "filament"),
+                os.path.join(os.path.expanduser("~"), "AppData", "Roaming",
+                             "OrcaSlicer", "user", "default", "filament"),
+            ]
+        elif platform.system() == "Darwin":
+            base = os.path.expanduser("~/Library/Application Support/OrcaSlicer")
+            candidates = [
+                os.path.join(base, "user", "default", "filament"),
+                os.path.join(base, "user", "filament"),
+            ]
+        else:  # Linux
+            base = os.path.expanduser("~/.config/OrcaSlicer")
+            candidates = [
+                os.path.join(base, "user", "default", "filament"),
+                os.path.join(base, "user", "filament"),
+            ]
+        for p in candidates:
+            if os.path.isdir(p):
+                return p
+        # Verzeichnis existiert noch nicht — erster Kandidat als Ziel zurückgeben
+        return candidates[0] if candidates else ""
+
+    def _build_orca_filament_json(self, name: str, hex_color: str, notes: str,
+                                   filament_type: str = "PLA") -> dict:
+        """Erstellt ein minimales OrcaSlicer-Filament-Profil-JSON."""
+        hex_clean = hex_color if hex_color.startswith("#") else f"#{hex_color}"
+        return {
+            "type": "filament",
+            "name": name,
+            "inherits": f"fdm_filament_{filament_type.lower()}",
+            "from": "user",
+            "instantiation": "true",
+            "filament_vendor": ["U1 FullSpectrum"],
+            "filament_notes": [notes],
+            "default_filament_colour": [hex_clean],
+            "compatible_printers": [],
+        }
+
+    def open_orca_export_dialog(self):
+        detected = self._detect_orca_filament_path()
+        path_var = ctk.StringVar(value=detected)
+
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("orca_title"))
+        win.geometry("560x500")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text=self.t("orca_header"),
+                     font=("Segoe UI", 14, "bold")).pack(pady=(18, 10))
+
+        # Pfad-Zeile
+        pf = ctk.CTkFrame(win, fg_color="transparent"); pf.pack(fill="x", padx=20, pady=(0, 4))
+        ctk.CTkLabel(pf, text=self.t("orca_path_label"),
+                     font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        pe = ctk.CTkEntry(pf, textvariable=path_var, width=440)
+        pe.pack(side="left", fill="x", expand=True, pady=2)
+        def browse_path():
+            p = filedialog.askdirectory(title=self.t("orca_path_label"))
+            if p: path_var.set(p)
+        ctk.CTkButton(pf, text=self.t("orca_path_browse"), width=90,
+                      command=browse_path).pack(side="left", padx=(6, 0))
+
+        if not detected:
+            ctk.CTkLabel(win, text=self.t("orca_no_path"),
+                         text_color="#f87171", font=("Segoe UI", 10)).pack(pady=(0, 4))
+
+        # Scope
+        ctk.CTkLabel(win, text="Exportieren:", font=("Segoe UI", 11, "bold")).pack(
+            pady=(10, 2))
+        scope_var = ctk.StringVar(value="both")
+        sf = ctk.CTkFrame(win, fg_color="transparent"); sf.pack()
+        ctk.CTkRadioButton(sf, text=self.t("orca_scope_phys"),
+                           variable=scope_var, value="phys").pack(anchor="w", padx=20, pady=1)
+        ctk.CTkRadioButton(sf, text=self.t("orca_scope_virt"),
+                           variable=scope_var, value="virt").pack(anchor="w", padx=20, pady=1)
+        ctk.CTkRadioButton(sf, text=self.t("orca_scope_both"),
+                           variable=scope_var, value="both").pack(anchor="w", padx=20, pady=1)
+
+        # Filament-Typ
+        ctk.CTkLabel(win, text="Basis-Filamenttyp:", font=("Segoe UI", 11, "bold")).pack(
+            pady=(10, 2))
+        ftype_var = ctk.StringVar(value="PLA")
+        ft = ctk.CTkFrame(win, fg_color="transparent"); ft.pack()
+        for ft_name in ["PLA", "PETG", "ABS", "TPU"]:
+            ctk.CTkRadioButton(ft, text=ft_name, variable=ftype_var,
+                               value=ft_name).pack(side="left", padx=10)
+
+        # Prefix
+        pxf = ctk.CTkFrame(win, fg_color="transparent"); pxf.pack(pady=(10, 0))
+        ctk.CTkLabel(pxf, text=self.t("orca_prefix_label")).pack(side="left", padx=6)
+        px_entry = ctk.CTkEntry(pxf, width=80, placeholder_text="U1"); px_entry.insert(0, "U1")
+        px_entry.pack(side="left", padx=4)
+        ctk.CTkLabel(pxf, text=self.t("orca_prefix_hint"),
+                     text_color="#64748b", font=("Segoe UI", 9)).pack(side="left", padx=4)
+
+        # Layer height for dithering step
+        lhf = ctk.CTkFrame(win, fg_color="transparent"); lhf.pack(pady=(6, 0))
+        ctk.CTkLabel(lhf, text=self.t("exp_lh_label")).pack(side="left", padx=6)
+        lh_val = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.2"
+        lh_entry = ctk.CTkEntry(lhf, width=60); lh_entry.insert(0, lh_val)
+        lh_entry.pack(side="left", padx=4)
+        ctk.CTkLabel(lhf, text="mm").pack(side="left")
+
+        def do_orca_export():
+            folder = path_var.get().strip()
+            if not folder:
+                messagebox.showerror(self.t("dlg_error"), self.t("orca_no_path"))
+                return
+            scope   = scope_var.get()
+            prefix  = px_entry.get().strip() or "U1"
+            ftype   = ftype_var.get()
+            lh      = safe_td(lh_entry.get()) if lh_entry.get().strip() else 0.2
+
+            profiles_to_write = []  # list of (filename, dict)
+
+            # Physische Slots
+            if scope in ("phys", "both"):
+                for i, s in enumerate(self.slots):
+                    hex_c  = s["hex"].get().strip() or "#888888"
+                    brand  = s["brand"].get().strip()
+                    name   = s["color"].get().strip()
+                    td     = s["td"].get().strip()
+                    pname  = f"{prefix}-T{i+1} {name}" if name and name not in _SLOT_SKIP else f"{prefix}-T{i+1}"
+                    notes  = self.t("orca_filament_notes_t", i=i+1, brand=brand, name=name, td=td)
+                    data   = self._build_orca_filament_json(pname, hex_c, notes, ftype)
+                    safe_fn = re.sub(r'[\\/:*?"<>|]', "_", pname) + ".json"
+                    profiles_to_write.append((safe_fn, data))
+
+            # Virtuelle Köpfe
+            if scope in ("virt", "both"):
+                if not self.virtual_fils:
+                    messagebox.showwarning(self.t("dlg_saved"), self.t("orca_no_virtual"))
+                else:
+                    for v in self.virtual_fils:
+                        sim_hex = v.get("sim_hex", v.get("target_hex", "#888888"))
+                        seq     = v["sequence"]
+                        n_f     = seq_filament_count(seq)
+                        runs_str = "  ".join(f"T{fid}×{cnt}" for fid, cnt in seq_to_runs(seq))
+                        cad     = calc_cadence(seq, lh)
+                        ids     = sorted(cad.keys())
+                        if n_f == 1:
+                            hint = "Pure color"
+                        elif n_f == 2:
+                            a = round(cad.get(ids[0], lh), 3)
+                            b = round(cad.get(ids[1], lh) if len(ids) > 1 else lh, 3)
+                            hint = f"Cadence A={a}mm B={b}mm | Step={lh}mm"
+                        else:
+                            pat = "/".join(seq)
+                            hint = f"Pattern={pat} | Step={lh}mm"
+                        label  = v.get("label", f"V{v['vid']}")
+                        pname  = f"{prefix}-V{v['vid']} {label}"
+                        notes  = self.t("orca_filament_notes_v",
+                                        seq=runs_str, de=v.get("de", 0.0), hint=hint)
+                        data   = self._build_orca_filament_json(pname, sim_hex, notes, ftype)
+                        safe_fn = re.sub(r'[\\/:*?"<>|]', "_", pname) + ".json"
+                        profiles_to_write.append((safe_fn, data))
+
+            if not profiles_to_write:
+                return
+
+            # Überprüfen ob Dateien überschrieben werden
+            existing = [fn for fn, _ in profiles_to_write
+                        if os.path.exists(os.path.join(folder, fn))]
+            if existing:
+                if not messagebox.askyesno(self.t("orca_title"),
+                    self.t("orca_overwrite_confirm", n=len(existing))):
+                    return
+
+            # Ordner anlegen falls nötig
+            os.makedirs(folder, exist_ok=True)
+
+            written = 0
+            errors  = []
+            for fn, data in profiles_to_write:
+                try:
+                    fpath = os.path.join(folder, fn)
+                    with open(fpath, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=4, ensure_ascii=False)
+                    written += 1
+                except IOError as e:
+                    errors.append(str(e))
+
+            if errors:
+                messagebox.showerror(self.t("dlg_error"), "\n".join(errors[:3]))
+            else:
+                messagebox.showinfo(self.t("dlg_saved"),
+                    self.t("orca_success", n=written))
+                win.destroy()
+
+        ctk.CTkButton(win, text=self.t("orca_btn_export"), fg_color="#0f766e",
+                      command=do_orca_export, height=44,
+                      font=("Segoe UI", 14, "bold")).pack(pady=(16, 4), padx=40, fill="x")
+        ctk.CTkButton(win, text=self.t("orca_btn_cancel"), fg_color="#334155",
                       command=win.destroy, height=36).pack(padx=40, fill="x")
 
     # ── BIBLIOTHEK-MANAGER ─────────────────────────────────────────────────────
