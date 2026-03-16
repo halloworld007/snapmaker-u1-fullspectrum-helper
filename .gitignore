@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+filament_db.json
+presets.json
