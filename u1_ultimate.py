@@ -9,6 +9,283 @@ from tkinter import colorchooser, messagebox, filedialog
 import math
 from datetime import datetime
 
+# ── ÜBERSETZUNGEN ─────────────────────────────────────────────────────────────
+
+STRINGS = {
+"de": {
+    "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
+    "lang_btn": "🌐 EN",
+    "phys_heads_title": "Physische Druckköpfe  T1–T4",
+    "phys_heads_desc": "Diese 4 Filamente sind real im Drucker geladen.",
+    "tool_header": "T{i} — WERKZEUG {i}",
+    "slot_presets": "SLOT-PRESETS",
+    "no_presets": "(keine Presets)",
+    "btn_load": "LADEN",
+    "btn_save": "SPEICHERN",
+    "btn_new_brand": "＋  Neue Marke",
+    "btn_library": "📚  Bibliothek verwalten",
+    "layer_height_label": "Schichthöhe (mm):",
+    "dithering_step": "= Dithering Step Size",
+    "sec1_title": "EINZELFARBEN-RECHNER",
+    "btn_target_color": "ZIELFARBE  🎨",
+    "hex_placeholder": "#RRGGBB eingeben…",
+    "gamut_warning": "⚠  Zielfarbe möglicherweise nicht erreichbar (ΔE > 25 zu allen Filamenten)",
+    "label_target": "Ziel",
+    "label_simulated": "Simuliert",
+    "length_label": "Länge: {n}",
+    "auto_check": "Auto\n(kürzeste)",
+    "btn_calculate": "SEQUENZ BERECHNEN",
+    "optimizer_check": "Optimizer\n(24 Combos)",
+    "btn_add_virtual": "➕  Als virtuellen\nDruckkopf hinzufügen",
+    "weight_bottom": "L1 unten  1.0",
+    "weight_arrow": "— progressive Gewichtung →",
+    "weight_top": "L10 oben  1.5",
+    "sec2_title": "VIRTUELLE DRUCKKÖPFE  V5 – V24",
+    "sec2_desc": "Jeder virtuelle Kopf = FullSpectrum-Sequenz (1–10 Layer) aus T1–T4  ·  max. {max_v}",
+    "btn_3mf": "🔬  3MF Assistent",
+    "btn_del_all": "🗑  Alle löschen",
+    "btn_export_all": "📤  Alle exportieren",
+    "grid_target": "Ziel",
+    "grid_sequence": "Sequenz",
+    "grid_simulated": "Simuliert",
+    "grid_quality": "ΔE / Qualität",
+    "grid_label": "Label",
+    "empty_virtual": "Noch keine virtuellen Druckköpfe — Einzelfarbe berechnen und '➕ Hinzufügen' klicken, oder '🔬 3MF Assistent' öffnen.",
+    "hint_pure": "  →  Reine Farbe — kein Mix nötig",
+    "hint_cadence": "  →  Cadence A={a}mm / B={b}mm  oder Pattern: {p}",
+    "hint_pattern": "  →  Pattern Mode: {p}",
+    "de_good": "✓ gut",
+    "de_ok": "~ ok",
+    "de_far": "✗ weit",
+    "dlg_db_err_title": "DB-Fehler",
+    "dlg_db_err_msg": "filament_db.json Ladefehler:\n{e}\nStandardwerte aktiv.",
+    "dlg_save_err": "Speicherfehler",
+    "dlg_error": "Fehler",
+    "dlg_saved": "Gespeichert",
+    "dlg_preset_saved": 'Preset "{name}" gespeichert.',
+    "dlg_fil_saved": '"{n}" gespeichert.',
+    "dlg_exists": "Vorhanden",
+    "dlg_exists_msg": '"{name}" existiert bereits.',
+    "dlg_note": "Hinweis",
+    "dlg_select_color": "Bitte zuerst eine Zielfarbe auswählen.",
+    "dlg_max_virtual": "Maximum",
+    "dlg_max_virtual_msg": "Bereits {max_v} virtuelle Druckköpfe definiert.",
+    "dlg_no_seq": "Bitte zuerst eine Sequenz berechnen.",
+    "dlg_del_title": "Löschen",
+    "dlg_del_virtual": "Alle virtuellen Druckköpfe löschen?",
+    "dlg_3mf_title": "3MF Assistent",
+    "dlg_3mf_no_colors_fallback": "Keine verwertbaren Farben im Modell.",
+    "dlg_3mf_added": "{n} virtuelle Druckköpfe wurden hinzugefügt.",
+    "dlg_export_saved": "Gespeichert:\n{path}",
+    "inp_preset_name": "Preset-Name:",
+    "inp_preset_title": "Preset speichern",
+    "inp_fil_name": "Filament-Name:",
+    "inp_save_fav": "In Favoriten speichern",
+    "inp_name": "Name:",
+    "inp_add_fil_title": "Filament zu '{b}'",
+    "inp_hex": "Hex (#RRGGBB):",
+    "inp_color_title": "Farbe",
+    "inp_td": "TD-Wert (Standard {td}):",
+    "inp_td_title": "TD",
+    "inp_brand_name": "Marken-Name:",
+    "inp_brand_title": "Neue Marke",
+    "inp_add_title": "Hinzufügen",
+    "inp_td2": "TD (Standard {td}):",
+    "exp_title": "Export — Snapmaker U1 FullSpectrum",
+    "exp_header": "Export — U1 FullSpectrum",
+    "exp_dither_title": "Dithering-Einstellungen (OrcaSlicer FullSpectrum)",
+    "exp_dither_desc": "Schichthöhe = Dithering Step Size  ·  Cadence A/B aus Sequenz auto-berechnet",
+    "exp_lh_label": "Schichthöhe:",
+    "exp_lh_unit": "mm  (= Dithering Step Size)",
+    "exp_cadence_a": "Cadence A:",
+    "exp_cadence_sep": "mm     B:",
+    "exp_cadence_auto": "mm  (leer = auto)",
+    "exp_scope_single": "Aktuelle Einzelsequenz",
+    "exp_scope_virtual": "Alle {n} virtuellen Druckköpfe",
+    "exp_btn": "EXPORTIEREN",
+    "exp_cancel": "Abbrechen",
+    "3mf_analysis_title": "3MF Farbanalyse  ·  {n} Farbe(n) gefunden",
+    "3mf_basis": "Physische Basis: T1={t1}  T2={t2}  T3={t3}  T4={t4}",
+    "3mf_optimizer": "Optimizer aktivieren (langsamer, aber genauer)",
+    "3mf_ready": "Bereit — 'Alle berechnen' drücken.",
+    "3mf_col_target": "Zielfarbe",
+    "3mf_col_seq": "Sequenz",
+    "3mf_col_sim": "Simuliert",
+    "3mf_col_quality": "ΔE / Qualität",
+    "3mf_not_calc": "—  noch nicht berechnet",
+    "3mf_include": "übernehmen",
+    "3mf_progress": "Berechne {i}/{total}  ({c}) …",
+    "3mf_done": "Fertig — {n} Farben berechnet.",
+    "3mf_btn_calc": "⚙  Alle berechnen",
+    "3mf_btn_apply": "✅  Ausgewählte übernehmen",
+    "3mf_btn_cancel": "Abbrechen",
+    "lib_title": "Filament-Bibliothek",
+    "lib_brand": "Marke:",
+    "lib_del_brand": "Marke löschen",
+    "lib_no_fils": "Keine Filamente.",
+    "lib_del_fil": '"{n}" löschen?',
+    "lib_protected": "Geschützt",
+    "lib_protected_msg": "Standard-Marken können nicht gelöscht werden.",
+    "lib_del_brand_msg": 'Marke "{b}" löschen?',
+    "lib_add_fil": "+ Filament hinzufügen",
+    "lib_close": "Schließen",
+    "txt_date": "Datum:",
+    "txt_layer_height": "Schichthöhe:",
+    "txt_physical_heads": "Physische Druckköpfe:",
+    "txt_virtual_heads": "Virtuelle Druckköpfe (OrcaSlicer: Others → Dithering):",
+    "txt_pure": "Reine Farbe — kein Mix",
+    "txt_cadence": "Cadence A={a}mm / B={b}mm  oder Pattern: {p}",
+    "txt_pattern": "Pattern Mode: {p}",
+    "txt_sequence": "Sequenz:",
+    "txt_target": "Ziel:",
+    "txt_cadence2": "Cadence:",
+    "txt_runs": "Runs:",
+    "empty_slot": "(leer)",
+    "manual_color": "(manuell)",
+    "virtual_label_default": "Virtuell {vid}",
+    "save_dialog_title": "Speichern",
+    "open_3mf_title": "3MF-Datei für Farbanalyse öffnen",
+    "3mf_filetypes": "3MF-Dateien",
+},
+"en": {
+    "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
+    "lang_btn": "🌐 DE",
+    "phys_heads_title": "Physical Print Heads  T1–T4",
+    "phys_heads_desc": "These 4 filaments are physically loaded in the printer.",
+    "tool_header": "T{i} — TOOL {i}",
+    "slot_presets": "SLOT PRESETS",
+    "no_presets": "(no presets)",
+    "btn_load": "LOAD",
+    "btn_save": "SAVE",
+    "btn_new_brand": "＋  New Brand",
+    "btn_library": "📚  Manage Library",
+    "layer_height_label": "Layer Height (mm):",
+    "dithering_step": "= Dithering Step Size",
+    "sec1_title": "SINGLE COLOR CALCULATOR",
+    "btn_target_color": "TARGET COLOR  🎨",
+    "hex_placeholder": "Enter #RRGGBB…",
+    "gamut_warning": "⚠  Target color may be out of gamut (ΔE > 25 to all filaments)",
+    "label_target": "Target",
+    "label_simulated": "Simulated",
+    "length_label": "Length: {n}",
+    "auto_check": "Auto\n(shortest)",
+    "btn_calculate": "CALCULATE SEQUENCE",
+    "optimizer_check": "Optimizer\n(24 Combos)",
+    "btn_add_virtual": "➕  Add as Virtual\nPrint Head",
+    "weight_bottom": "L1 bottom  1.0",
+    "weight_arrow": "— progressive weighting →",
+    "weight_top": "L10 top  1.5",
+    "sec2_title": "VIRTUAL PRINT HEADS  V5 – V24",
+    "sec2_desc": "Each virtual head = FullSpectrum sequence (1–10 layers) from T1–T4  ·  max. {max_v}",
+    "btn_3mf": "🔬  3MF Assistant",
+    "btn_del_all": "🗑  Delete All",
+    "btn_export_all": "📤  Export All",
+    "grid_target": "Target",
+    "grid_sequence": "Sequence",
+    "grid_simulated": "Simulated",
+    "grid_quality": "ΔE / Quality",
+    "grid_label": "Label",
+    "empty_virtual": "No virtual print heads yet — calculate a single color and click '➕ Add', or open the '🔬 3MF Assistant'.",
+    "hint_pure": "  →  Pure color — no mix needed",
+    "hint_cadence": "  →  Cadence A={a}mm / B={b}mm  or Pattern: {p}",
+    "hint_pattern": "  →  Pattern Mode: {p}",
+    "de_good": "✓ good",
+    "de_ok": "~ ok",
+    "de_far": "✗ far",
+    "dlg_db_err_title": "DB Error",
+    "dlg_db_err_msg": "filament_db.json load error:\n{e}\nUsing defaults.",
+    "dlg_save_err": "Save Error",
+    "dlg_error": "Error",
+    "dlg_saved": "Saved",
+    "dlg_preset_saved": 'Preset "{name}" saved.',
+    "dlg_fil_saved": '"{n}" saved.',
+    "dlg_exists": "Exists",
+    "dlg_exists_msg": '"{name}" already exists.',
+    "dlg_note": "Note",
+    "dlg_select_color": "Please select a target color first.",
+    "dlg_max_virtual": "Maximum",
+    "dlg_max_virtual_msg": "Already {max_v} virtual print heads defined.",
+    "dlg_no_seq": "Please calculate a sequence first.",
+    "dlg_del_title": "Delete",
+    "dlg_del_virtual": "Delete all virtual print heads?",
+    "dlg_3mf_title": "3MF Assistant",
+    "dlg_3mf_no_colors_fallback": "No usable colors in the model.",
+    "dlg_3mf_added": "{n} virtual print heads added.",
+    "dlg_export_saved": "Saved:\n{path}",
+    "inp_preset_name": "Preset name:",
+    "inp_preset_title": "Save Preset",
+    "inp_fil_name": "Filament name:",
+    "inp_save_fav": "Save to Favorites",
+    "inp_name": "Name:",
+    "inp_add_fil_title": "Add filament to '{b}'",
+    "inp_hex": "Hex (#RRGGBB):",
+    "inp_color_title": "Color",
+    "inp_td": "TD value (default {td}):",
+    "inp_td_title": "TD",
+    "inp_brand_name": "Brand name:",
+    "inp_brand_title": "New Brand",
+    "inp_add_title": "Add",
+    "inp_td2": "TD (default {td}):",
+    "exp_title": "Export — Snapmaker U1 FullSpectrum",
+    "exp_header": "Export — U1 FullSpectrum",
+    "exp_dither_title": "Dithering Settings (OrcaSlicer FullSpectrum)",
+    "exp_dither_desc": "Layer Height = Dithering Step Size  ·  Cadence A/B auto-calculated from sequence",
+    "exp_lh_label": "Layer Height:",
+    "exp_lh_unit": "mm  (= Dithering Step Size)",
+    "exp_cadence_a": "Cadence A:",
+    "exp_cadence_sep": "mm     B:",
+    "exp_cadence_auto": "mm  (empty = auto)",
+    "exp_scope_single": "Current Single Sequence",
+    "exp_scope_virtual": "All {n} virtual print heads",
+    "exp_btn": "EXPORT",
+    "exp_cancel": "Cancel",
+    "3mf_analysis_title": "3MF Color Analysis  ·  {n} color(s) found",
+    "3mf_basis": "Physical basis: T1={t1}  T2={t2}  T3={t3}  T4={t4}",
+    "3mf_optimizer": "Enable optimizer (slower but more accurate)",
+    "3mf_ready": "Ready — click 'Calculate All'.",
+    "3mf_col_target": "Target Color",
+    "3mf_col_seq": "Sequence",
+    "3mf_col_sim": "Simulated",
+    "3mf_col_quality": "ΔE / Quality",
+    "3mf_not_calc": "—  not yet calculated",
+    "3mf_include": "include",
+    "3mf_progress": "Calculating {i}/{total}  ({c}) …",
+    "3mf_done": "Done — {n} colors calculated.",
+    "3mf_btn_calc": "⚙  Calculate All",
+    "3mf_btn_apply": "✅  Add Selected",
+    "3mf_btn_cancel": "Cancel",
+    "lib_title": "Filament Library",
+    "lib_brand": "Brand:",
+    "lib_del_brand": "Delete Brand",
+    "lib_no_fils": "No filaments.",
+    "lib_del_fil": 'Delete "{n}"?',
+    "lib_protected": "Protected",
+    "lib_protected_msg": "Default brands cannot be deleted.",
+    "lib_del_brand_msg": 'Delete brand "{b}"?',
+    "lib_add_fil": "+ Add Filament",
+    "lib_close": "Close",
+    "txt_date": "Date:",
+    "txt_layer_height": "Layer height:",
+    "txt_physical_heads": "Physical Print Heads:",
+    "txt_virtual_heads": "Virtual Print Heads (OrcaSlicer: Others → Dithering):",
+    "txt_pure": "Pure color — no mix",
+    "txt_cadence": "Cadence A={a}mm / B={b}mm  or Pattern: {p}",
+    "txt_pattern": "Pattern Mode: {p}",
+    "txt_sequence": "Sequence:",
+    "txt_target": "Target:",
+    "txt_cadence2": "Cadence:",
+    "txt_runs": "Runs:",
+    "empty_slot": "(empty)",
+    "manual_color": "(manual)",
+    "virtual_label_default": "Virtual {vid}",
+    "save_dialog_title": "Save",
+    "open_3mf_title": "Open 3MF file for color analysis",
+    "3mf_filetypes": "3MF Files",
+},
+}
+
+_SLOT_SKIP = {"(leer)", "(empty)", "(manuell)", "(manual)"}
+
 # ── KONSTANTEN ────────────────────────────────────────────────────────────────
 MAX_SEQ_LEN     = 10
 DEFAULT_TD      = 5.0
@@ -127,8 +404,9 @@ def calc_cadence(sequence, layer_height):
 def seq_filament_count(sequence):
     return len(set(sequence))
 
-def de_label_text(de):
-    q = "✓ gut" if de < DE_GOOD else "~ ok" if de < DE_OK else "✗ weit"
+def de_label_text(de, lang="de"):
+    s = STRINGS[lang]
+    q = s["de_good"] if de < DE_GOOD else s["de_ok"] if de < DE_OK else s["de_far"]
     return f"ΔE {de:.1f}  {q}"
 
 # ── 3MF FARBEXTRAKTION ────────────────────────────────────────────────────────
@@ -174,7 +452,8 @@ def parse_3mf_colors(filepath):
 class U1FullSpectrumApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("U1 FullSpectrum Ultimate — Pro Edition")
+        self.lang          = "de"
+        self.title(STRINGS["de"]["app_title"])
         self.geometry("1420x1000")
         ctk.set_appearance_mode("dark")
         self.db_file       = "filament_db.json"
@@ -186,6 +465,41 @@ class U1FullSpectrumApp(ctk.CTk):
         self.load_db()
         self.load_presets()
         self.setup_ui()
+
+    def t(self, key, **kwargs):
+        s = STRINGS[self.lang].get(key, STRINGS["de"].get(key, key))
+        return s.format(**kwargs) if kwargs else s
+
+    def de_label(self, de):
+        return de_label_text(de, self.lang)
+
+    def _save_slot_values(self):
+        return [{"brand": s["brand"].get(), "hex": s["hex"].get(),
+                 "td": s["td"].get()} for s in self.slots]
+
+    def _restore_slot_values(self, vals):
+        for i, v in enumerate(vals):
+            s = self.slots[i]
+            if v["brand"] in self.library:
+                s["brand"].set(v["brand"])
+                self.update_menu(i)
+            if v["hex"]:
+                s["hex"].delete(0, "end"); s["hex"].insert(0, v["hex"])
+                s["preview"].configure(fg_color=v["hex"])
+            if v["td"]:
+                s["td"].delete(0, "end"); s["td"].insert(0, v["td"])
+
+    def toggle_lang(self):
+        slot_vals = self._save_slot_values()
+        target    = getattr(self, "target", None)
+        self.lang = "en" if self.lang == "de" else "de"
+        self.title(self.t("app_title"))
+        for w in self.winfo_children():
+            w.destroy()
+        self.setup_ui()
+        self._restore_slot_values(slot_vals)
+        if target:
+            self._apply_target(target)
 
     # ── DATENBANK ──────────────────────────────────────────────────────────────
 
@@ -203,15 +517,15 @@ class U1FullSpectrumApp(ctk.CTk):
                     for x in fils if isinstance(x, dict) and "name" in x and "hex" in x
                 ]
         except (json.JSONDecodeError, ValueError, IOError) as e:
-            messagebox.showwarning("DB-Fehler",
-                f"filament_db.json Ladefehler:\n{e}\nStandardwerte aktiv.")
+            messagebox.showwarning(self.t("dlg_db_err_title"),
+                self.t("dlg_db_err_msg", e=e))
 
     def save_db(self):
         try:
             with open(self.db_file, "w", encoding="utf-8") as f:
                 json.dump(self.library, f, indent=2, ensure_ascii=False)
         except IOError as e:
-            messagebox.showerror("Speicherfehler", str(e))
+            messagebox.showerror(self.t("dlg_save_err"), str(e))
 
     # ── PRESETS ────────────────────────────────────────────────────────────────
 
@@ -227,10 +541,10 @@ class U1FullSpectrumApp(ctk.CTk):
             with open(self.preset_file, "w", encoding="utf-8") as f:
                 json.dump(self.presets, f, indent=2, ensure_ascii=False)
         except IOError as e:
-            messagebox.showerror("Fehler", str(e))
+            messagebox.showerror(self.t("dlg_error"), str(e))
 
     def save_preset(self):
-        name = ctk.CTkInputDialog(text="Preset-Name:", title="Preset speichern").get_input()
+        name = ctk.CTkInputDialog(text=self.t("inp_preset_name"), title=self.t("inp_preset_title")).get_input()
         if not name: return
         self.presets[name.strip()] = [
             {"brand": s["brand"].get(), "filament": s["color"].get(),
@@ -239,7 +553,7 @@ class U1FullSpectrumApp(ctk.CTk):
         ]
         self.save_presets(); self._refresh_preset_dropdown()
         self.preset_var.set(name.strip())
-        messagebox.showinfo("Gespeichert", f'Preset "{name}" gespeichert.')
+        messagebox.showinfo(self.t("dlg_saved"), self.t("dlg_preset_saved", name=name))
 
     def load_preset(self):
         name = self.preset_var.get()
@@ -258,7 +572,7 @@ class U1FullSpectrumApp(ctk.CTk):
             s["preview"].configure(fg_color=h)
 
     def _refresh_preset_dropdown(self):
-        names = list(self.presets.keys()) or ["(keine Presets)"]
+        names = list(self.presets.keys()) or [self.t("no_presets")]
         self.preset_dropdown.configure(values=names)
         if self.preset_var.get() not in names: self.preset_var.set(names[0])
 
@@ -272,10 +586,17 @@ class U1FullSpectrumApp(ctk.CTk):
         self.sidebar = ctk.CTkScrollableFrame(self, width=430, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
 
-        ctk.CTkLabel(self.sidebar, text="Physische Druckköpfe  T1–T4",
-                     font=("Segoe UI", 18, "bold"), text_color="#38bdf8").pack(pady=(14, 4))
+        # Sprach-Toggle
+        lang_row = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        lang_row.pack(fill="x", padx=12, pady=(6, 0))
+        ctk.CTkButton(lang_row, text=self.t("lang_btn"), width=70, height=26,
+                      fg_color="#1e3a5f", font=("Segoe UI", 10),
+                      command=self.toggle_lang).pack(side="right")
+
+        ctk.CTkLabel(self.sidebar, text=self.t("phys_heads_title"),
+                     font=("Segoe UI", 18, "bold"), text_color="#38bdf8").pack(pady=(8, 4))
         ctk.CTkLabel(self.sidebar,
-                     text="Diese 4 Filamente sind real im Drucker geladen.",
+                     text=self.t("phys_heads_desc"),
                      font=("Segoe UI", 10), text_color="#475569").pack(pady=(0, 10))
 
         self.slots = []
@@ -285,7 +606,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
             hdr = ctk.CTkFrame(frame, fg_color="transparent")
             hdr.pack(fill="x", padx=5, pady=(6, 0))
-            ctk.CTkLabel(hdr, text=f"T{i+1} — WERKZEUG {i+1}",
+            ctk.CTkLabel(hdr, text=self.t("tool_header", i=i+1),
                          font=("Segoe UI", 12, "bold"), text_color="#94a3b8").pack(side="left", padx=5)
             ctk.CTkButton(hdr, text="+", width=26, height=20, fg_color="#15803d",
                           command=lambda idx=i: self.add_filament(idx)).pack(side="right", padx=2)
@@ -317,27 +638,27 @@ class U1FullSpectrumApp(ctk.CTk):
             self.update_menu(i)
 
         # Presets
-        ctk.CTkLabel(self.sidebar, text="SLOT-PRESETS",
+        ctk.CTkLabel(self.sidebar, text=self.t("slot_presets"),
                      font=("Segoe UI", 10, "bold"), text_color="#64748b").pack(pady=(12, 2))
         pf = ctk.CTkFrame(self.sidebar, fg_color="#0f172a", corner_radius=8)
         pf.pack(fill="x", padx=12, pady=(0, 5))
-        self.preset_var = ctk.StringVar(value="(keine Presets)")
+        self.preset_var = ctk.StringVar(value=self.t("no_presets"))
         self.preset_dropdown = ctk.CTkOptionMenu(pf, variable=self.preset_var,
-                                                  values=["(keine Presets)"])
+                                                  values=[self.t("no_presets")])
         self.preset_dropdown.pack(fill="x", padx=10, pady=(8, 4))
         pb = ctk.CTkFrame(pf, fg_color="transparent")
         pb.pack(fill="x", padx=10, pady=(0, 8))
         pb.grid_columnconfigure((0, 1), weight=1)
-        ctk.CTkButton(pb, text="LADEN", fg_color="#1e3a5f",
+        ctk.CTkButton(pb, text=self.t("btn_load"), fg_color="#1e3a5f",
                       command=self.load_preset).grid(row=0, column=0, sticky="ew", padx=(0, 3))
-        ctk.CTkButton(pb, text="SPEICHERN", fg_color="#1e3a5f",
+        ctk.CTkButton(pb, text=self.t("btn_save"), fg_color="#1e3a5f",
                       command=self.save_preset).grid(row=0, column=1, sticky="ew", padx=(3, 0))
         self._refresh_preset_dropdown()
 
         # Sidebar-Tools
-        ctk.CTkButton(self.sidebar, text="＋  Neue Marke", fg_color="#1e3a5f",
+        ctk.CTkButton(self.sidebar, text=self.t("btn_new_brand"), fg_color="#1e3a5f",
                       command=self.add_brand).pack(fill="x", padx=12, pady=(8, 3))
-        ctk.CTkButton(self.sidebar, text="📚  Bibliothek verwalten", fg_color="#374151",
+        ctk.CTkButton(self.sidebar, text=self.t("btn_library"), fg_color="#374151",
                       command=self.open_library_manager).pack(fill="x", padx=12, pady=(3, 8))
 
         # Schichthöhe — global für Cadence-Berechnung
@@ -345,12 +666,12 @@ class U1FullSpectrumApp(ctk.CTk):
         lh_frame.pack(fill="x", padx=12, pady=(0, 15))
         lh_inner = ctk.CTkFrame(lh_frame, fg_color="transparent")
         lh_inner.pack(fill="x", padx=10, pady=8)
-        ctk.CTkLabel(lh_inner, text="Schichthöhe (mm):",
+        ctk.CTkLabel(lh_inner, text=self.t("layer_height_label"),
                      font=("Segoe UI", 11)).pack(side="left")
         self.layer_height_entry = ctk.CTkEntry(lh_inner, width=60, placeholder_text="0.2")
         self.layer_height_entry.insert(0, "0.2")
         self.layer_height_entry.pack(side="left", padx=(6, 0))
-        ctk.CTkLabel(lh_inner, text="= Dithering Step Size",
+        ctk.CTkLabel(lh_inner, text=self.t("dithering_step"),
                      font=("Segoe UI", 9), text_color="#475569").pack(side="left", padx=6)
 
         # ── HAUPTBEREICH ─────────────────────────────────────────────────────
@@ -363,7 +684,7 @@ class U1FullSpectrumApp(ctk.CTk):
         sec1.grid(row=0, column=0, padx=0, pady=(0, 12), sticky="ew")
         sec1.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(sec1, text="EINZELFARBEN-RECHNER",
+        ctk.CTkLabel(sec1, text=self.t("sec1_title"),
                      font=("Segoe UI", 13, "bold"), text_color="#38bdf8").grid(
             row=0, column=0, padx=20, pady=(14, 6), sticky="w")
 
@@ -371,10 +692,10 @@ class U1FullSpectrumApp(ctk.CTk):
         top = ctk.CTkFrame(sec1, fg_color="transparent")
         top.grid(row=1, column=0, padx=20, pady=(0, 8), sticky="ew")
         top.grid_columnconfigure(1, weight=1)
-        ctk.CTkButton(top, text="ZIELFARBE  🎨", command=self.pick,
+        ctk.CTkButton(top, text=self.t("btn_target_color"), command=self.pick,
                       height=46, font=("Segoe UI", 13, "bold"), width=165).grid(
             row=0, column=0, padx=(0, 8))
-        self.hex_target_entry = ctk.CTkEntry(top, placeholder_text="#RRGGBB eingeben…",
+        self.hex_target_entry = ctk.CTkEntry(top, placeholder_text=self.t("hex_placeholder"),
                                               font=("Courier New", 13), height=46)
         self.hex_target_entry.grid(row=0, column=1, sticky="ew", padx=(0, 8))
         self.hex_target_entry.bind("<Return>", self._on_hex_target_enter)
@@ -384,7 +705,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Gamut-Warnung
         self.gamut_label = ctk.CTkLabel(
-            sec1, text="⚠  Zielfarbe möglicherweise nicht erreichbar (ΔE > 25 zu allen Filamenten)",
+            sec1, text=self.t("gamut_warning"),
             fg_color="#7c2d12", corner_radius=6, text_color="#fcd34d",
             font=("Segoe UI", 10))
 
@@ -407,18 +728,18 @@ class U1FullSpectrumApp(ctk.CTk):
         # Gewichtungshinweis
         wh = ctk.CTkFrame(sec1, fg_color="transparent")
         wh.grid(row=5, column=0, padx=40, pady=(0, 6), sticky="ew")
-        ctk.CTkLabel(wh, text="L1 unten  1.0", font=("Segoe UI", 8),
+        ctk.CTkLabel(wh, text=self.t("weight_bottom"), font=("Segoe UI", 8),
                      text_color="#475569").pack(side="left")
-        ctk.CTkLabel(wh, text="— progressive Gewichtung →", font=("Segoe UI", 8),
+        ctk.CTkLabel(wh, text=self.t("weight_arrow"), font=("Segoe UI", 8),
                      text_color="#334155").pack(side="left", expand=True)
-        ctk.CTkLabel(wh, text="L10 oben  1.5", font=("Segoe UI", 8),
+        ctk.CTkLabel(wh, text=self.t("weight_top"), font=("Segoe UI", 8),
                      text_color="#475569").pack(side="right")
 
         # Mix-Vorschau + ΔE
         mf = ctk.CTkFrame(sec1, fg_color="#1e293b", corner_radius=8)
         mf.grid(row=6, column=0, padx=40, pady=6, sticky="ew")
         mf.grid_columnconfigure(2, weight=1)
-        ctk.CTkLabel(mf, text="Ziel", font=("Segoe UI", 10),
+        ctk.CTkLabel(mf, text=self.t("label_target"), font=("Segoe UI", 10),
                      text_color="#64748b").grid(row=0, column=0, padx=(14, 4), pady=10)
         self.target_circle = ctk.CTkLabel(mf, text="", width=42, height=42,
                                            fg_color="#1e293b", corner_radius=21)
@@ -429,7 +750,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self.sim_circle = ctk.CTkLabel(mf, text="", width=42, height=42,
                                         fg_color="#1e293b", corner_radius=21)
         self.sim_circle.grid(row=0, column=3, padx=4)
-        ctk.CTkLabel(mf, text="Simuliert", font=("Segoe UI", 10),
+        ctk.CTkLabel(mf, text=self.t("label_simulated"), font=("Segoe UI", 10),
                      text_color="#64748b").grid(row=0, column=4, padx=(4, 14))
 
         # Sequenzlänge + Auto-Modus
@@ -437,7 +758,7 @@ class U1FullSpectrumApp(ctk.CTk):
         lr.grid(row=7, column=0, padx=40, pady=(4, 4), sticky="ew")
         lr.grid_columnconfigure(1, weight=1)
 
-        self.len_label = ctk.CTkLabel(lr, text="Länge: 10",
+        self.len_label = ctk.CTkLabel(lr, text=self.t("length_label", n=10),
                                        font=("Segoe UI", 11, "bold"), width=80)
         self.len_label.grid(row=0, column=0, padx=(14, 6), pady=10)
 
@@ -447,7 +768,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self.len_slider.grid(row=0, column=1, sticky="ew", padx=6)
 
         self.auto_len_var = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(lr, text="Auto\n(kürzeste)", variable=self.auto_len_var,
+        ctk.CTkCheckBox(lr, text=self.t("auto_check"), variable=self.auto_len_var,
                         font=("Segoe UI", 9),
                         command=self._on_auto_toggle).grid(row=0, column=2, padx=(8, 4))
 
@@ -461,13 +782,13 @@ class U1FullSpectrumApp(ctk.CTk):
         bl = ctk.CTkFrame(sec1, fg_color="transparent")
         bl.grid(row=8, column=0, padx=40, pady=(4, 16), sticky="ew")
         bl.grid_columnconfigure(0, weight=1)
-        ctk.CTkButton(bl, text="SEQUENZ BERECHNEN", fg_color="#2563eb",
+        ctk.CTkButton(bl, text=self.t("btn_calculate"), fg_color="#2563eb",
                       command=self.calc, height=46,
                       font=("Segoe UI", 14, "bold")).grid(row=0, column=0, sticky="ew", padx=(0, 6))
         self.optimizer_var = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(bl, text="Optimizer\n(24 Combos)", variable=self.optimizer_var,
+        ctk.CTkCheckBox(bl, text=self.t("optimizer_check"), variable=self.optimizer_var,
                         font=("Segoe UI", 9)).grid(row=0, column=1, padx=(0, 6))
-        ctk.CTkButton(bl, text="➕  Als virtuellen\nDruckkopf hinzufügen",
+        ctk.CTkButton(bl, text=self.t("btn_add_virtual"),
                       fg_color="#15803d", hover_color="#166534",
                       command=self.add_to_virtual, height=46,
                       font=("Segoe UI", 11, "bold")).grid(row=0, column=2, padx=(0, 6))
@@ -481,24 +802,24 @@ class U1FullSpectrumApp(ctk.CTk):
         sec2_hdr.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(sec2_hdr,
-                     text="VIRTUELLE DRUCKKÖPFE  V5 – V24",
+                     text=self.t("sec2_title"),
                      font=("Segoe UI", 15, "bold"), text_color="#a78bfa").grid(
             row=0, column=0, sticky="w")
         ctk.CTkLabel(sec2_hdr,
-                     text=f"Jeder virtuelle Kopf = FullSpectrum-Sequenz (1–10 Layer) aus T1–T4  ·  max. {MAX_VIRTUAL}",
+                     text=self.t("sec2_desc", max_v=MAX_VIRTUAL),
                      font=("Segoe UI", 10), text_color="#64748b").grid(
             row=1, column=0, sticky="w")
 
         btn_row2 = ctk.CTkFrame(sec2_hdr, fg_color="transparent")
         btn_row2.grid(row=0, column=1, sticky="e", padx=(10, 0))
-        ctk.CTkButton(btn_row2, text="🔬  3MF Assistent", fg_color="#0f4c81",
+        ctk.CTkButton(btn_row2, text=self.t("btn_3mf"), fg_color="#0f4c81",
                       hover_color="#1e3a5f", height=40, width=160,
                       font=("Segoe UI", 12, "bold"),
                       command=self.open_3mf_assistant).pack(side="left", padx=(0, 6))
-        ctk.CTkButton(btn_row2, text="🗑  Alle löschen", fg_color="#7f1d1d",
+        ctk.CTkButton(btn_row2, text=self.t("btn_del_all"), fg_color="#7f1d1d",
                       hover_color="#991b1b", height=40, width=120,
                       command=self.clear_virtual).pack(side="left", padx=(0, 6))
-        ctk.CTkButton(btn_row2, text="📤  Alle exportieren", fg_color="#374151",
+        ctk.CTkButton(btn_row2, text=self.t("btn_export_all"), fg_color="#374151",
                       height=40, width=140,
                       command=self.open_export_dialog).pack(side="left")
 
@@ -506,9 +827,9 @@ class U1FullSpectrumApp(ctk.CTk):
         gh = ctk.CTkFrame(self.main, fg_color="#1e293b", corner_radius=6)
         gh.grid(row=2, column=0, sticky="ew", pady=(0, 2))
         gh.grid_columnconfigure(4, weight=1)
-        for col, (txt, w) in enumerate([("ID", 55), ("Ziel", 50),
-                                         ("Sequenz", 160), ("Simuliert", 60),
-                                         ("ΔE / Qualität", 130), ("Label", 0),
+        for col, (txt, w) in enumerate([("ID", 55), (self.t("grid_target"), 50),
+                                         (self.t("grid_sequence"), 160), (self.t("grid_simulated"), 60),
+                                         (self.t("grid_quality"), 130), (self.t("grid_label"), 0),
                                          ("", 40)]):
             ctk.CTkLabel(gh, text=txt, font=("Segoe UI", 10, "bold"),
                          text_color="#64748b", width=w).grid(
@@ -525,7 +846,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
     def update_menu(self, idx):
         b = self.slots[idx]["brand"].get()
-        cols = [f["name"] for f in self.library.get(b, [])] or ["(leer)"]
+        cols = [f["name"] for f in self.library.get(b, [])] or [self.t("empty_slot")]
         self.slots[idx]["color"].configure(values=cols)
         self.slots[idx]["color"].set(cols[0])
         self.apply_f(idx)
@@ -533,7 +854,7 @@ class U1FullSpectrumApp(ctk.CTk):
     def apply_f(self, idx):
         b = self.slots[idx]["brand"].get()
         n = self.slots[idx]["color"].get()
-        if n in ("(leer)", "(manuell)"): return
+        if n in _SLOT_SKIP: return
         f = next((x for x in self.library.get(b, []) if x["name"] == n), None)
         if f is None: return
         self.slots[idx]["hex"].delete(0, "end"); self.slots[idx]["hex"].insert(0, f["hex"])
@@ -548,37 +869,38 @@ class U1FullSpectrumApp(ctk.CTk):
         self.slots[idx]["hex"].delete(0, "end"); self.slots[idx]["hex"].insert(0, h)
         self.slots[idx]["preview"].configure(fg_color=h)
         cur_vals = [f["name"] for f in self.library.get(self.slots[idx]["brand"].get(), [])]
-        self.slots[idx]["color"].configure(values=["(manuell)"] + cur_vals)
-        self.slots[idx]["color"].set("(manuell)")
+        manual = self.t("manual_color")
+        self.slots[idx]["color"].configure(values=[manual] + cur_vals)
+        self.slots[idx]["color"].set(manual)
 
     def save_current(self, idx):
-        n = ctk.CTkInputDialog(text="Filament-Name:", title="In Favoriten speichern").get_input()
+        n = ctk.CTkInputDialog(text=self.t("inp_fil_name"), title=self.t("inp_save_fav")).get_input()
         if not n: return
         self.library.setdefault("Eigene Favoriten", []).append(
             {"name": n.strip(), "hex": self.slots[idx]["hex"].get(),
              "td": safe_td(self.slots[idx]["td"].get())})
         self.save_db(); self._refresh_brand_menus()
-        messagebox.showinfo("Gespeichert", f'"{n}" gespeichert.')
+        messagebox.showinfo(self.t("dlg_saved"), self.t("dlg_fil_saved", n=n))
 
     def add_filament(self, idx):
         b = self.slots[idx]["brand"].get()
-        n = ctk.CTkInputDialog(text="Name:", title=f"Filament zu '{b}'").get_input()
+        n = ctk.CTkInputDialog(text=self.t("inp_name"), title=self.t("inp_add_fil_title", b=b)).get_input()
         if not n: return
-        h = ctk.CTkInputDialog(text="Hex (#RRGGBB):", title="Farbe").get_input()
+        h = ctk.CTkInputDialog(text=self.t("inp_hex"), title=self.t("inp_color_title")).get_input()
         if not h: return
         h = h.strip()
         if not h.startswith("#"): h = "#" + h
-        td_raw = ctk.CTkInputDialog(text=f"TD-Wert (Standard {DEFAULT_TD}):", title="TD").get_input()
+        td_raw = ctk.CTkInputDialog(text=self.t("inp_td", td=DEFAULT_TD), title=self.t("inp_td_title")).get_input()
         td_val = safe_td(td_raw) if td_raw else DEFAULT_TD
         self.library.setdefault(b, []).append({"name": n.strip(), "hex": h, "td": td_val})
         self.save_db(); self.update_menu(idx)
 
     def add_brand(self):
-        name = ctk.CTkInputDialog(text="Marken-Name:", title="Neue Marke").get_input()
+        name = ctk.CTkInputDialog(text=self.t("inp_brand_name"), title=self.t("inp_brand_title")).get_input()
         if not name: return
         name = name.strip()
         if name in self.library:
-            messagebox.showwarning("Vorhanden", f'"{name}" existiert bereits.'); return
+            messagebox.showwarning(self.t("dlg_exists"), self.t("dlg_exists_msg", name=name)); return
         self.library[name] = []
         self.save_db(); self._refresh_brand_menus()
 
@@ -611,7 +933,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
     def _on_len_slider(self, val):
         n = int(val)
-        self.len_label.configure(text=f"Länge: {n}")
+        self.len_label.configure(text=self.t("length_label", n=n))
         # Nicht genutzte Segmente ausblenden (Preview ohne Neuberechnung)
         for i, seg in enumerate(self.segs):
             if i < n: seg.pack(side="left", expand=True, padx=2)
@@ -718,7 +1040,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
     def calc(self):
         if not hasattr(self, "target"):
-            messagebox.showinfo("Hinweis", "Bitte zuerst eine Zielfarbe auswählen."); return
+            messagebox.showinfo(self.t("dlg_note"), self.t("dlg_select_color")); return
 
         t_lab = rgb_to_lab(hex_to_rgb(self.target))
         fils  = self._get_fils()
@@ -744,7 +1066,7 @@ class U1FullSpectrumApp(ctk.CTk):
         # Slider-Wert auf tatsächliche Länge setzen (bei Auto)
         if auto:
             self.len_slider.set(n)
-            self.len_label.configure(text=f"Länge: {n}")
+            self.len_label.configure(text=self.t("length_label", n=n))
 
         self.res.configure(text=seq)
 
@@ -760,7 +1082,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self.sim_circle.configure(fg_color=result["sim_hex"])
         self.target_circle.configure(fg_color=self.target)
         dv = result["de"]
-        self.de_label.configure(text=de_label_text(dv), text_color=de_color(dv))
+        self.de_label.configure(text=self.de_label(dv), text_color=de_color(dv))
 
         self.last_result = result
 
@@ -768,12 +1090,12 @@ class U1FullSpectrumApp(ctk.CTk):
 
     def add_to_virtual(self, result=None):
         if len(self.virtual_fils) >= MAX_VIRTUAL:
-            messagebox.showwarning("Maximum", f"Bereits {MAX_VIRTUAL} virtuelle Druckköpfe definiert.")
+            messagebox.showwarning(self.t("dlg_max_virtual"), self.t("dlg_max_virtual_msg", max_v=MAX_VIRTUAL))
             return
         if result is None:
             result = self.last_result
         if not result:
-            messagebox.showinfo("Hinweis", "Bitte zuerst eine Sequenz berechnen."); return
+            messagebox.showinfo(self.t("dlg_note"), self.t("dlg_no_seq")); return
         vid = 5 + len(self.virtual_fils)
         self.virtual_fils.append({
             "vid":        vid,
@@ -781,13 +1103,13 @@ class U1FullSpectrumApp(ctk.CTk):
             "sequence":   result["sequence"],
             "sim_hex":    result["sim_hex"],
             "de":         result["de"],
-            "label":      f"Virtuell {vid}",
+            "label":      self.t("virtual_label_default", vid=vid),
         })
         self._refresh_virtual_grid()
 
     def clear_virtual(self):
         if self.virtual_fils and messagebox.askyesno(
-                "Löschen", "Alle virtuellen Druckköpfe löschen?"):
+                self.t("dlg_del_title"), self.t("dlg_del_virtual")):
             self.virtual_fils.clear()
             self._refresh_virtual_grid()
 
@@ -796,9 +1118,7 @@ class U1FullSpectrumApp(ctk.CTk):
             w.destroy()
         if not self.virtual_fils:
             ctk.CTkLabel(self.vgrid,
-                         text="Noch keine virtuellen Druckköpfe — "
-                              "Einzelfarbe berechnen und '➕ Hinzufügen' klicken, "
-                              "oder '🔬 3MF Assistent' öffnen.",
+                         text=self.t("empty_virtual"),
                          text_color="#334155", font=("Segoe UI", 11),
                          wraplength=600).pack(pady=30)
             return
@@ -825,7 +1145,7 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkLabel(outer, text="", width=36, height=36,
                      fg_color=vf["sim_hex"], corner_radius=18).grid(
             row=0, column=3, padx=4, pady=(8, 2))
-        ctk.CTkLabel(outer, text=de_label_text(vf["de"]),
+        ctk.CTkLabel(outer, text=self.de_label(vf["de"]),
                      font=("Segoe UI", 11, "bold"), text_color=de_color(vf["de"])).grid(
             row=0, column=4, padx=6, sticky="w", pady=(8, 2))
         lbl_entry = ctk.CTkEntry(outer, width=155, font=("Segoe UI", 11))
@@ -862,17 +1182,15 @@ class U1FullSpectrumApp(ctk.CTk):
         pattern_str = "/".join(vf["sequence"])   # "1121" → "1/1/2/1"
 
         if n_fils == 1:
-            hint = "  →  Reine Farbe — kein Mix nötig"
+            hint = self.t("hint_pure")
             hint_color = "#94a3b8"
         elif n_fils == 2 and lh > 0:
             cad = calc_cadence(vf["sequence"], lh)
             ids = sorted(cad.keys())
-            hint = (f"  →  Cadence A={cad[ids[0]]}mm / B={cad[ids[1]]}mm  "
-                    f"oder Pattern: {pattern_str}")
+            hint = self.t("hint_cadence", a=cad[ids[0]], b=cad[ids[1]], p=pattern_str)
             hint_color = "#4ade80"
         else:
-            # 3-4 Filamente → Pattern Mode im Slicer (Others → Dithering → Pattern)
-            hint = f"  →  Pattern Mode: {pattern_str}"
+            hint = self.t("hint_pattern", p=pattern_str)
             hint_color = "#a78bfa"
 
         ctk.CTkLabel(info_row, text=hint,
@@ -889,36 +1207,35 @@ class U1FullSpectrumApp(ctk.CTk):
 
     def open_3mf_assistant(self):
         path = filedialog.askopenfilename(
-            filetypes=[("3MF-Dateien", "*.3mf"), ("Alle Dateien", "*.*")],
-            title="3MF-Datei für Farbanalyse öffnen")
+            filetypes=[(self.t("3mf_filetypes"), "*.3mf"), ("*", "*.*")],
+            title=self.t("open_3mf_title"))
         if not path: return
 
         colors, err = parse_3mf_colors(path)
         if not colors:
-            messagebox.showinfo("3MF Assistent",
-                f"Keine Farbdaten gefunden.\n{err or 'Keine verwertbaren Farben im Modell.'}"); return
+            messagebox.showinfo(self.t("dlg_3mf_title"),
+                f"{self.t('dlg_3mf_no_colors_fallback') if not err else err}"); return
 
         win = ctk.CTkToplevel(self)
-        win.title(f"3MF Assistent — {os.path.basename(path)}")
+        win.title(f"{self.t('dlg_3mf_title')} — {os.path.basename(path)}")
         win.geometry("860x680")
         win.grab_set()
 
         # Header
         ctk.CTkLabel(win,
-                     text=f"3MF Farbanalyse  ·  {len(colors)} Farbe(n) gefunden",
+                     text=self.t("3mf_analysis_title", n=len(colors)),
                      font=("Segoe UI", 15, "bold"), text_color="#38bdf8").pack(pady=(16, 2))
         ctk.CTkLabel(win,
-                     text=f"Physische Basis: T1={self.slots[0]['hex'].get()}  "
-                          f"T2={self.slots[1]['hex'].get()}  "
-                          f"T3={self.slots[2]['hex'].get()}  "
-                          f"T4={self.slots[3]['hex'].get()}",
+                     text=self.t("3mf_basis",
+                          t1=self.slots[0]['hex'].get(), t2=self.slots[1]['hex'].get(),
+                          t3=self.slots[2]['hex'].get(), t4=self.slots[3]['hex'].get()),
                      font=("Segoe UI", 10), text_color="#64748b").pack(pady=(0, 6))
 
         opt_var = ctk.BooleanVar(value=False)
-        ctk.CTkCheckBox(win, text="Optimizer aktivieren (langsamer, aber genauer)",
+        ctk.CTkCheckBox(win, text=self.t("3mf_optimizer"),
                         variable=opt_var, font=("Segoe UI", 11)).pack(pady=(0, 4))
 
-        prog_label = ctk.CTkLabel(win, text="Bereit — 'Alle berechnen' drücken.",
+        prog_label = ctk.CTkLabel(win, text=self.t("3mf_ready"),
                                    font=("Segoe UI", 11), text_color="#94a3b8")
         prog_label.pack(pady=(0, 6))
 
@@ -926,8 +1243,8 @@ class U1FullSpectrumApp(ctk.CTk):
         hdr = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=6)
         hdr.pack(fill="x", padx=14, pady=(0, 4))
         hdr.grid_columnconfigure(4, weight=1)
-        for col, txt in enumerate(["#", "Zielfarbe", "Sequenz", "Simuliert",
-                                    "ΔE / Qualität", "VID"]):
+        for col, txt in enumerate(["#", self.t("3mf_col_target"), self.t("3mf_col_seq"),
+                                    self.t("3mf_col_sim"), self.t("3mf_col_quality"), "VID"]):
             ctk.CTkLabel(hdr, text=txt, font=("Segoe UI", 10, "bold"),
                          text_color="#64748b").grid(row=0, column=col, padx=10, pady=6,
                                                      sticky="w")
@@ -958,17 +1275,17 @@ class U1FullSpectrumApp(ctk.CTk):
                                  width=145).grid(row=0, column=2, padx=6)
                     ctk.CTkLabel(row, text="", width=34, height=34,
                                  fg_color=r["sim_hex"], corner_radius=17).grid(row=0, column=3, padx=4)
-                    ctk.CTkLabel(row, text=de_label_text(r["de"]),
+                    ctk.CTkLabel(row, text=self.de_label(r["de"]),
                                  font=("Segoe UI", 11, "bold"),
                                  text_color=de_color(r["de"])).grid(
                         row=0, column=4, padx=6, sticky="w")
                 else:
-                    ctk.CTkLabel(row, text="—  noch nicht berechnet",
+                    ctk.CTkLabel(row, text=self.t("3mf_not_calc"),
                                  text_color="#334155").grid(row=0, column=2,
                                                              columnspan=3, padx=6, sticky="w")
                 sv = ctk.BooleanVar(value=True if r else False)
                 vid_vars.append(sv)
-                ctk.CTkCheckBox(row, text="übernehmen", variable=sv,
+                ctk.CTkCheckBox(row, text=self.t("3mf_include"), variable=sv,
                                 font=("Segoe UI", 9), width=100).grid(
                     row=0, column=5, padx=(4, 10))
 
@@ -980,14 +1297,14 @@ class U1FullSpectrumApp(ctk.CTk):
             to_calc = min(len(colors), free) if free < len(colors) else len(colors)
             for idx in range(min(len(colors), MAX_VIRTUAL)):
                 prog_label.configure(
-                    text=f"Berechne {idx+1}/{to_calc}  ({colors[idx]}) …")
+                    text=self.t("3mf_progress", i=idx+1, total=to_calc, c=colors[idx]))
                 win.update_idletasks()
                 r = self._calc_for_color(colors[idx], optimizer=opt,
                                         seq_len=int(self.len_slider.get()),
                                         auto=self.auto_len_var.get(),
                                         auto_threshold=safe_td(self.auto_thresh_entry.get()))
                 results[idx] = r
-            prog_label.configure(text=f"Fertig — {to_calc} Farben berechnet.")
+            prog_label.configure(text=self.t("3mf_done", n=to_calc))
             render_rows()
 
         def apply_selected():
@@ -998,29 +1315,28 @@ class U1FullSpectrumApp(ctk.CTk):
                 self.add_to_virtual(results[idx])
                 added += 1
             win.destroy()
-            messagebox.showinfo("3MF Assistent",
-                f"{added} virtuelle Druckköpfe wurden hinzugefügt.")
+            messagebox.showinfo(self.t("dlg_3mf_title"), self.t("dlg_3mf_added", n=added))
 
         btm = ctk.CTkFrame(win, fg_color="transparent")
         btm.pack(fill="x", padx=14, pady=(6, 14))
-        ctk.CTkButton(btm, text="⚙  Alle berechnen", fg_color="#2563eb",
+        ctk.CTkButton(btm, text=self.t("3mf_btn_calc"), fg_color="#2563eb",
                       command=run_all, height=42, font=("Segoe UI", 12, "bold")).pack(
             side="left", padx=(0, 6))
-        ctk.CTkButton(btm, text="✅  Ausgewählte übernehmen", fg_color="#15803d",
+        ctk.CTkButton(btm, text=self.t("3mf_btn_apply"), fg_color="#15803d",
                       command=apply_selected, height=42,
                       font=("Segoe UI", 12, "bold")).pack(side="left")
-        ctk.CTkButton(btm, text="Abbrechen", fg_color="#374151",
+        ctk.CTkButton(btm, text=self.t("3mf_btn_cancel"), fg_color="#374151",
                       command=win.destroy, height=42).pack(side="right")
 
     # ── EXPORT ─────────────────────────────────────────────────────────────────
 
     def open_export_dialog(self):
         win = ctk.CTkToplevel(self)
-        win.title("Export — Snapmaker U1 FullSpectrum")
+        win.title(self.t("exp_title"))
         win.geometry("500x440")
         win.grab_set()
 
-        ctk.CTkLabel(win, text="Export — U1 FullSpectrum",
+        ctk.CTkLabel(win, text=self.t("exp_header"),
                      font=("Segoe UI", 14, "bold")).pack(pady=(18, 10))
 
         fmt_var = ctk.StringVar(value="JSON")
@@ -1031,34 +1347,32 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkRadioButton(ff, text="Text (.txt)", variable=fmt_var,
                            value="TXT").pack(side="left", padx=12)
 
-        # Schichthöhe + auto Cadence
-        ctk.CTkLabel(win, text="Dithering-Einstellungen (OrcaSlicer FullSpectrum)",
+        ctk.CTkLabel(win, text=self.t("exp_dither_title"),
                      font=("Segoe UI", 11, "bold"), text_color="#64748b").pack(pady=(16, 4))
-        ctk.CTkLabel(win,
-                     text="Schichthöhe = Dithering Step Size  ·  Cadence A/B aus Sequenz auto-berechnet",
+        ctk.CTkLabel(win, text=self.t("exp_dither_desc"),
                      font=("Segoe UI", 9), text_color="#475569").pack(pady=(0, 6))
 
         lhf = ctk.CTkFrame(win, fg_color="transparent"); lhf.pack()
-        ctk.CTkLabel(lhf, text="Schichthöhe:").pack(side="left", padx=6)
+        ctk.CTkLabel(lhf, text=self.t("exp_lh_label")).pack(side="left", padx=6)
         lh_val = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.2"
         lh_exp = ctk.CTkEntry(lhf, width=60); lh_exp.insert(0, lh_val)
         lh_exp.pack(side="left", padx=4)
-        ctk.CTkLabel(lhf, text="mm  (= Dithering Step Size)").pack(side="left", padx=4)
+        ctk.CTkLabel(lhf, text=self.t("exp_lh_unit")).pack(side="left", padx=4)
 
         cf = ctk.CTkFrame(win, fg_color="transparent"); cf.pack(pady=(6, 0))
-        ctk.CTkLabel(cf, text="Cadence A:").pack(side="left", padx=6)
+        ctk.CTkLabel(cf, text=self.t("exp_cadence_a")).pack(side="left", padx=6)
         ca = ctk.CTkEntry(cf, width=70, placeholder_text="auto"); ca.pack(side="left", padx=4)
-        ctk.CTkLabel(cf, text="mm     B:").pack(side="left", padx=4)
+        ctk.CTkLabel(cf, text=self.t("exp_cadence_sep")).pack(side="left", padx=4)
         cb = ctk.CTkEntry(cf, width=70, placeholder_text="auto"); cb.pack(side="left", padx=4)
-        ctk.CTkLabel(cf, text="mm  (leer = auto)", font=("Segoe UI", 9),
+        ctk.CTkLabel(cf, text=self.t("exp_cadence_auto"), font=("Segoe UI", 9),
                      text_color="#475569").pack(side="left", padx=4)
 
         scope_var = ctk.StringVar(value="virtual" if self.virtual_fils else "single")
         sf = ctk.CTkFrame(win, fg_color="transparent")
         sf.pack(pady=(14, 4))
-        ctk.CTkRadioButton(sf, text="Aktuelle Einzelsequenz",
+        ctk.CTkRadioButton(sf, text=self.t("exp_scope_single"),
                            variable=scope_var, value="single").pack(side="left", padx=12)
-        ctk.CTkRadioButton(sf, text=f"Alle {len(self.virtual_fils)} virtuellen Druckköpfe",
+        ctk.CTkRadioButton(sf, text=self.t("exp_scope_virtual", n=len(self.virtual_fils)),
                            variable=scope_var, value="virtual").pack(side="left", padx=12)
 
         def do_export():
@@ -1068,7 +1382,7 @@ class U1FullSpectrumApp(ctk.CTk):
             path  = filedialog.asksaveasfilename(
                 defaultextension=ext,
                 filetypes=[(fmt, f"*{ext}")],
-                title="Speichern")
+                title=self.t("save_dialog_title"))
             if not path: return
 
             lh     = safe_td(lh_exp.get()) if lh_exp.get().strip() else 0.2
@@ -1131,67 +1445,66 @@ class U1FullSpectrumApp(ctk.CTk):
                         "=" * 56,
                         "  U1 FullSpectrum Ultimate — OrcaSlicer FullSpectrum Export",
                         "=" * 56,
-                        f"Datum:              {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                        f"Schichthöhe:        {lh} mm  (= Dithering Step Size)",
-                        "", "Physische Druckköpfe:", "-" * 36,
+                        f"{self.t('txt_date')}              {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                        f"{self.t('txt_layer_height')}        {lh} mm  (= Dithering Step Size)",
+                        "", self.t("txt_physical_heads"), "-" * 36,
                     ]
                     for p in physical:
                         lines.append(f"  T{p['id']}: {p['brand']} — {p['filament']}  ({p['hex']}, TD={p['td']})")
                     if scope == "virtual" and self.virtual_fils:
-                        lines += ["", "Virtuelle Druckköpfe (OrcaSlicer: Others → Dithering):",
-                                  "-" * 56]
+                        lines += ["", self.t("txt_virtual_heads"), "-" * 56]
                         for v in self.virtual_fils:
                             a_v, b_v = resolve_cadence(v["sequence"])
                             n_f = seq_filament_count(v["sequence"])
                             runs_str = "  ".join(f"T{fid}×{cnt}" for fid, cnt in seq_to_runs(v["sequence"]))
                             pat_str  = "/".join(v["sequence"])
                             if n_f == 1:
-                                slicer_hint = "Reine Farbe — kein Mix"
+                                slicer_hint = self.t("txt_pure")
                             elif n_f == 2:
-                                slicer_hint = f"Cadence A={a_v}mm / B={b_v}mm  oder Pattern: {pat_str}"
+                                slicer_hint = self.t("txt_cadence", a=a_v, b=b_v, p=pat_str)
                             else:
-                                slicer_hint = f"Pattern Mode: {pat_str}"
+                                slicer_hint = self.t("txt_pattern", p=pat_str)
                             lines += [
-                                f"  V{v['vid']}  [{v['label']}]  Ziel:{v['target_hex']}  ΔE={v['de']:.1f}",
-                                f"    Sequenz: {v['sequence']}",
+                                f"  V{v['vid']}  [{v['label']}]  {self.t('grid_target')}:{v['target_hex']}  ΔE={v['de']:.1f}",
+                                f"    {self.t('txt_sequence')} {v['sequence']}",
                                 f"    Runs:    {runs_str}",
                                 f"    Slicer:  {slicer_hint}",
                             ]
                     else:
                         a_v, b_v = resolve_cadence(seq_now)
-                        lines += ["", f"Sequenz:  {seq_now}",
-                                  f"Ziel:     {getattr(self, 'target', '')}",
-                                  f"Cadence:  A={a_v}mm / B={b_v}mm",
-                                  f"Runs:     {'  '.join(f'T{fid}×{cnt}' for fid,cnt in seq_to_runs(seq_now))}"]
+                        lines += ["", f"{self.t('txt_sequence')}  {seq_now}",
+                                  f"{self.t('txt_target')}     {getattr(self, 'target', '')}",
+                                  f"{self.t('txt_cadence2')}  A={a_v}mm / B={b_v}mm",
+                                  f"{self.t('txt_runs')}     {'  '.join(f'T{fid}×{cnt}' for fid,cnt in seq_to_runs(seq_now))}"]
                     lines += ["", "github.com/ratdoux/OrcaSlicer-FullSpectrum", "=" * 56]
                     with open(path, "w", encoding="utf-8") as f:
                         f.write("\n".join(lines))
-                messagebox.showinfo("Export", f"Gespeichert:\n{path}")
+                messagebox.showinfo(self.t("dlg_saved"), self.t("dlg_export_saved", path=path))
                 win.destroy()
             except IOError as e:
-                messagebox.showerror("Fehler", str(e))
+                messagebox.showerror(self.t("dlg_error"), str(e))
 
-        ctk.CTkButton(win, text="EXPORTIEREN", fg_color="#7c3aed",
+        ctk.CTkButton(win, text=self.t("exp_btn"), fg_color="#7c3aed",
                       command=do_export, height=44,
                       font=("Segoe UI", 14, "bold")).pack(pady=(18, 6), padx=40, fill="x")
-        ctk.CTkButton(win, text="Abbrechen", fg_color="#334155",
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
                       command=win.destroy, height=36).pack(padx=40, fill="x")
 
     # ── BIBLIOTHEK-MANAGER ─────────────────────────────────────────────────────
 
     def open_library_manager(self):
         win = ctk.CTkToplevel(self)
-        win.title("Filament-Bibliothek"); win.geometry("720x560"); win.grab_set()
+        win.title(self.t("lib_title")); win.geometry("720x560"); win.grab_set()
 
         top = ctk.CTkFrame(win, fg_color="transparent")
         top.pack(fill="x", padx=14, pady=10)
-        ctk.CTkLabel(top, text="Marke:").pack(side="left", padx=5)
+        ctk.CTkLabel(top, text=self.t("lib_brand")).pack(side="left", padx=5)
         bv = ctk.StringVar(value=list(self.library.keys())[0])
         bm = ctk.CTkOptionMenu(top, variable=bv,
                                 values=list(self.library.keys()),
                                 command=lambda x: refresh())
         bm.pack(side="left", padx=5, fill="x", expand=True)
-        ctk.CTkButton(top, text="Marke löschen", fg_color="#991b1b",
+        ctk.CTkButton(top, text=self.t("lib_del_brand"), fg_color="#991b1b",
                       command=lambda: del_brand()).pack(side="right", padx=5)
 
         scroll = ctk.CTkScrollableFrame(win, height=380)
@@ -1202,7 +1515,7 @@ class U1FullSpectrumApp(ctk.CTk):
             brand = bv.get()
             fils = self.library.get(brand, [])
             if not fils:
-                ctk.CTkLabel(scroll, text="Keine Filamente.",
+                ctk.CTkLabel(scroll, text=self.t("lib_no_fils"),
                               text_color="#475569").pack(pady=20); return
             for idx, fil in enumerate(fils):
                 row = ctk.CTkFrame(scroll, fg_color="#1e293b", corner_radius=6)
@@ -1222,15 +1535,15 @@ class U1FullSpectrumApp(ctk.CTk):
 
         def del_fil(brand, idx):
             n = self.library[brand][idx]["name"]
-            if messagebox.askyesno("Löschen", f'"{n}" löschen?'):
+            if messagebox.askyesno(self.t("dlg_del_title"), self.t("lib_del_fil", n=n)):
                 self.library[brand].pop(idx)
                 self.save_db(); self._refresh_brand_menus(); refresh()
 
         def del_brand():
             b = bv.get()
             if b in DEFAULT_LIBRARY and DEFAULT_LIBRARY.get(b):
-                messagebox.showerror("Geschützt", "Standard-Marken können nicht gelöscht werden."); return
-            if messagebox.askyesno("Löschen", f'Marke "{b}" löschen?'):
+                messagebox.showerror(self.t("lib_protected"), self.t("lib_protected_msg")); return
+            if messagebox.askyesno(self.t("dlg_del_title"), self.t("lib_del_brand_msg", b=b)):
                 del self.library[b]; self.save_db(); self._refresh_brand_menus()
                 nb = list(self.library.keys())
                 bm.configure(values=nb); bv.set(nb[0] if nb else ""); refresh()
@@ -1238,19 +1551,19 @@ class U1FullSpectrumApp(ctk.CTk):
         refresh()
         btm = ctk.CTkFrame(win, fg_color="transparent")
         btm.pack(fill="x", padx=14, pady=(5, 14))
-        ctk.CTkButton(btm, text="+ Filament hinzufügen", fg_color="#15803d",
+        ctk.CTkButton(btm, text=self.t("lib_add_fil"), fg_color="#15803d",
                       command=lambda: self._lm_add(bv.get(), refresh)).pack(side="left")
-        ctk.CTkButton(btm, text="Schließen", fg_color="#334155",
+        ctk.CTkButton(btm, text=self.t("lib_close"), fg_color="#334155",
                       command=win.destroy).pack(side="right")
 
     def _lm_add(self, brand, cb):
-        n = ctk.CTkInputDialog(text="Name:", title="Hinzufügen").get_input()
+        n = ctk.CTkInputDialog(text=self.t("inp_name"), title=self.t("inp_add_title")).get_input()
         if not n: return
-        h = ctk.CTkInputDialog(text="Hex (#RRGGBB):", title="Farbe").get_input()
+        h = ctk.CTkInputDialog(text=self.t("inp_hex"), title=self.t("inp_color_title")).get_input()
         if not h: return
         h = h.strip()
         if not h.startswith("#"): h = "#" + h
-        td_r = ctk.CTkInputDialog(text=f"TD (Standard {DEFAULT_TD}):", title="TD").get_input()
+        td_r = ctk.CTkInputDialog(text=self.t("inp_td2", td=DEFAULT_TD), title=self.t("inp_td_title")).get_input()
         self.library.setdefault(brand, []).append(
             {"name": n.strip(), "hex": h, "td": safe_td(td_r) if td_r else DEFAULT_TD})
         self.save_db(); self._refresh_brand_menus(); cb()
