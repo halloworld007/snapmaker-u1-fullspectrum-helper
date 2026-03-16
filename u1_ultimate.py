@@ -21,10 +21,19 @@ except ImportError:
     _HAS_TOOLTIP = False
 
 try:
-    from PIL import Image as _PILImage
+    from PIL import Image as _PILImage, ImageDraw as _ImageDraw, ImageTk as _ImageTk
     _HAS_PIL = True
 except ImportError:
     _HAS_PIL = False
+
+try:
+    import matplotlib
+    matplotlib.use("TkAgg")
+    import matplotlib.pyplot as _plt
+    from mpl_toolkits.mplot3d import Axes3D as _Axes3D   # noqa: F401
+    _HAS_MPL = True
+except ImportError:
+    _HAS_MPL = False
 
 # ── ÜBERSETZUNGEN ─────────────────────────────────────────────────────────────
 
@@ -196,7 +205,44 @@ STRINGS = {
     "tip_batch": "Mehrere Hex-Codes auf einmal berechnen",
     "tip_lang": "Sprache umschalten",
     "tip_td": "Transmission Distance: 0=deckend, 10=transparent",
-    "colorinfo_label": "RGB: {r} {g} {b}   Lab: {L:.0f} {a:.0f} {b_:.0f}",
+    "colorinfo_label": "RGB: {r} {g} {b}   HSV: {h:.0f}° {s:.0f}% {v:.0f}%   Lab: {L:.0f} {a:.0f} {b_:.0f}",
+    # Einstellungen
+    "settings_btn": "⚙  Einstellungen",
+    "settings_title": "Einstellungen",
+    "settings_max_virtual": "Max. virtuelle Druckköpfe:",
+    "settings_theme": "Erscheinungsbild:",
+    "settings_theme_dark": "Dunkel",
+    "settings_theme_light": "Hell",
+    "settings_theme_system": "System",
+    "settings_save_btn": "Speichern & Schließen",
+    "settings_saved": "Einstellungen gespeichert.",
+    # Dithering-Profile
+    "dither_profiles": "Dithering-Profile:",
+    "dither_fine": "🔬 Fein (kurz)",
+    "dither_balanced": "⚖ Ausgewogen",
+    "dither_smooth": "🌊 Sanft (lang)",
+    "dither_auto": "🤖 Auto",
+    "tip_dither_fine": "Kurze Sequenz (2-3 Layer) — präzise Farben, mehr Werkzeugwechsel",
+    "tip_dither_balanced": "Mittlere Sequenz (5 Layer) — ausgewogener Kompromiss",
+    "tip_dither_smooth": "Lange Sequenz (8-10 Layer) — sanfte Übergänge, weniger Wechsel",
+    "tip_dither_auto": "Automatisch kürzeste Sequenz mit ΔE ≤ Schwellwert",
+    # Farbsehschwäche
+    "colorblind_label": "Simulation:",
+    "colorblind_normal": "Normal",
+    "colorblind_prot": "Protanopie",
+    "colorblind_deut": "Deuteranopie",
+    "colorblind_trit": "Tritanopie",
+    # 3D Lab Plot
+    "btn_lab_plot": "🔭 Lab-Farbraum",
+    "tip_lab_plot": "3D-Visualisierung der Filamente und Zielfarbe im CIE-Lab-Farbraum",
+    "lab_plot_title": "CIE Lab Farbraum — Filamente & Zielfarbe",
+    # Swatch
+    "btn_swatch": "🖼 Swatch speichern",
+    "tip_swatch": "Farbvergleich (Ziel vs. Simuliert) als PNG speichern",
+    "swatch_saved": "Swatch gespeichert:\n{path}",
+    # Slicer-Guide
+    "btn_slicer_guide": "📖 Slicer-Guide",
+    "slicer_guide_title": "Export → OrcaSlicer FullSpectrum",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
@@ -365,7 +411,38 @@ STRINGS = {
     "tip_batch": "Calculate multiple hex codes at once",
     "tip_lang": "Switch language",
     "tip_td": "Transmission Distance: 0=opaque, 10=transparent",
-    "colorinfo_label": "RGB: {r} {g} {b}   Lab: {L:.0f} {a:.0f} {b_:.0f}",
+    "colorinfo_label": "RGB: {r} {g} {b}   HSV: {h:.0f}° {s:.0f}% {v:.0f}%   Lab: {L:.0f} {a:.0f} {b_:.0f}",
+    "settings_btn": "⚙  Settings",
+    "settings_title": "Settings",
+    "settings_max_virtual": "Max. virtual print heads:",
+    "settings_theme": "Appearance:",
+    "settings_theme_dark": "Dark",
+    "settings_theme_light": "Light",
+    "settings_theme_system": "System",
+    "settings_save_btn": "Save & Close",
+    "settings_saved": "Settings saved.",
+    "dither_profiles": "Dithering Profiles:",
+    "dither_fine": "🔬 Fine (short)",
+    "dither_balanced": "⚖ Balanced",
+    "dither_smooth": "🌊 Smooth (long)",
+    "dither_auto": "🤖 Auto",
+    "tip_dither_fine": "Short sequence (2-3 layers) — precise colors, more tool changes",
+    "tip_dither_balanced": "Medium sequence (5 layers) — balanced compromise",
+    "tip_dither_smooth": "Long sequence (8-10 layers) — smooth transitions, fewer changes",
+    "tip_dither_auto": "Automatically find shortest sequence with ΔE ≤ threshold",
+    "colorblind_label": "Simulation:",
+    "colorblind_normal": "Normal",
+    "colorblind_prot": "Protanopia",
+    "colorblind_deut": "Deuteranopia",
+    "colorblind_trit": "Tritanopia",
+    "btn_lab_plot": "🔭 Lab Space",
+    "tip_lab_plot": "3D visualization of filaments and target in CIE Lab color space",
+    "lab_plot_title": "CIE Lab Color Space — Filaments & Target",
+    "btn_swatch": "🖼 Save Swatch",
+    "tip_swatch": "Save color comparison (target vs. simulated) as PNG",
+    "swatch_saved": "Swatch saved:\n{path}",
+    "btn_slicer_guide": "📖 Slicer Guide",
+    "slicer_guide_title": "Export → OrcaSlicer FullSpectrum",
 },
 }
 
@@ -377,7 +454,8 @@ DEFAULT_TD      = 5.0
 DE_GOOD         = 3.0
 DE_OK           = 6.0
 GAMUT_WARN_DE   = 25.0
-MAX_VIRTUAL     = 20   # V5 … V24
+MAX_VIRTUAL     = 20   # Default; wird aus settings.json überschrieben
+MAX_VIRTUAL_HARD = 24  # Absolutes Maximum
 
 DEFAULT_LIBRARY = {
     "Bambu Lab Basic": [
@@ -542,7 +620,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self.lang          = self.settings.get("lang", "de")
         self.title(STRINGS[self.lang]["app_title"])
         self.geometry("1420x1000")
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode(self.settings.get("theme", "dark"))
         self.db_file       = "filament_db.json"
         self.preset_file   = "presets.json"
         self.history       = []
@@ -550,6 +628,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self.virtual_fils  = []   # list of virtual filament dicts
         self.virtual_undo  = []   # undo stack for virtual heads
         self.last_result   = {}   # last calc() result for "hinzufügen"
+        self._max_virtual  = int(self.settings.get("max_virtual", MAX_VIRTUAL))
         self.load_db()
         self.load_presets()
         self.setup_ui()
@@ -585,7 +664,8 @@ class U1FullSpectrumApp(ctk.CTk):
         return {}
 
     def _save_settings(self):
-        self.settings["lang"] = self.lang
+        self.settings["lang"]         = self.lang
+        self.settings["max_virtual"]  = self._max_virtual
         self.settings["layer_height"] = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.2"
         try:
             with open(self.settings_file, "w", encoding="utf-8") as f:
@@ -716,6 +796,11 @@ class U1FullSpectrumApp(ctk.CTk):
                       command=self.toggle_lang)
         lang_btn.pack(side="right")
         self.tip(lang_btn, "tip_lang")
+
+        sett_btn = ctk.CTkButton(lang_row, text=self.t("settings_btn"), width=120, height=26,
+                      fg_color="#374151", font=("Segoe UI", 10),
+                      command=self.open_settings_dialog)
+        sett_btn.pack(side="right", padx=(0, 6))
 
         ctk.CTkLabel(self.sidebar, text=self.t("phys_heads_title"),
                      font=("Segoe UI", 18, "bold"), text_color="#38bdf8").pack(pady=(8, 4))
@@ -958,6 +1043,48 @@ class U1FullSpectrumApp(ctk.CTk):
         # Keyboard shortcut: Enter = Berechnen
         self.bind("<Return>", lambda e: self.calc())
 
+        # ── Dithering-Profile ─────────────────────────────────────────────────
+        dp_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
+        dp_frame.grid(row=9, column=0, padx=40, pady=(0, 6), sticky="ew")
+        ctk.CTkLabel(dp_frame, text=self.t("dither_profiles"),
+                     font=("Segoe UI", 10), text_color="#64748b").pack(side="left", padx=(12, 8))
+        for key, fn in [("dither_fine", lambda: self._apply_dither_profile(2, False)),
+                        ("dither_balanced", lambda: self._apply_dither_profile(5, False)),
+                        ("dither_smooth", lambda: self._apply_dither_profile(9, False)),
+                        ("dither_auto", lambda: self._apply_dither_profile(None, True))]:
+            b = ctk.CTkButton(dp_frame, text=self.t(key), height=28, width=100,
+                              fg_color="#1e3a5f", font=("Segoe UI", 10),
+                              command=fn)
+            b.pack(side="left", padx=3, pady=6)
+            self.tip(b, "tip_" + key)
+
+        # ── Farbsehschwäche-Simulation + Extras ──────────────────────────────
+        sim_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
+        sim_frame.grid(row=10, column=0, padx=40, pady=(0, 12), sticky="ew")
+        ctk.CTkLabel(sim_frame, text=self.t("colorblind_label"),
+                     font=("Segoe UI", 10), text_color="#64748b").pack(side="left", padx=(12, 6))
+        self.colorblind_var = ctk.StringVar(value="normal")
+        for val, key in [("normal", "colorblind_normal"), ("prot", "colorblind_prot"),
+                         ("deut", "colorblind_deut"), ("trit", "colorblind_trit")]:
+            ctk.CTkRadioButton(sim_frame, text=self.t(key), variable=self.colorblind_var,
+                               value=val, font=("Segoe UI", 10),
+                               command=self._update_colorblind_preview).pack(side="left", padx=4, pady=6)
+
+        # Extra-Buttons (Lab-Plot, Swatch, Slicer-Guide)
+        extra_row = ctk.CTkFrame(sec1, fg_color="transparent")
+        extra_row.grid(row=11, column=0, padx=40, pady=(0, 14), sticky="ew")
+        lab_btn = ctk.CTkButton(extra_row, text=self.t("btn_lab_plot"), fg_color="#0f4c81",
+                                height=32, font=("Segoe UI", 11), command=self.show_lab_plot)
+        lab_btn.pack(side="left", padx=(0, 6))
+        self.tip(lab_btn, "tip_lab_plot")
+        sw_btn = ctk.CTkButton(extra_row, text=self.t("btn_swatch"), fg_color="#374151",
+                               height=32, font=("Segoe UI", 11), command=self.save_swatch)
+        sw_btn.pack(side="left", padx=(0, 6))
+        self.tip(sw_btn, "tip_swatch")
+        guide_btn = ctk.CTkButton(extra_row, text=self.t("btn_slicer_guide"), fg_color="#7c3aed",
+                                  height=32, font=("Segoe UI", 11), command=self.open_slicer_guide)
+        guide_btn.pack(side="left")
+
         # ── ABSCHNITT 2: VIRTUELLE DRUCKKÖPFE ────────────────────────────────
         sec2_hdr = ctk.CTkFrame(self.main, fg_color="transparent")
         sec2_hdr.grid(row=1, column=0, padx=0, pady=(0, 6), sticky="ew")
@@ -968,7 +1095,7 @@ class U1FullSpectrumApp(ctk.CTk):
                      font=("Segoe UI", 15, "bold"), text_color="#a78bfa").grid(
             row=0, column=0, sticky="w")
         ctk.CTkLabel(sec2_hdr,
-                     text=self.t("sec2_desc", max_v=MAX_VIRTUAL),
+                     text=self.t("sec2_desc", max_v=self._max_virtual),
                      font=("Segoe UI", 10), text_color="#64748b").grid(
             row=1, column=0, sticky="w")
 
@@ -1109,17 +1236,30 @@ class U1FullSpectrumApp(ctk.CTk):
         if not raw.startswith("#"): raw = "#" + raw
         if len(raw) == 7: self._apply_target(raw.upper())
 
+    @staticmethod
+    def _rgb_to_hsv(r, g, b):
+        r_, g_, b_ = r/255, g/255, b/255
+        mx, mn = max(r_, g_, b_), min(r_, g_, b_)
+        df = mx - mn
+        if df == 0: h = 0
+        elif mx == r_: h = (60 * ((g_ - b_) / df) + 360) % 360
+        elif mx == g_: h = (60 * ((b_ - r_) / df) + 120) % 360
+        else:          h = (60 * ((r_ - g_) / df) + 240) % 360
+        s = 0 if mx == 0 else (df / mx * 100)
+        v = mx * 100
+        return h, s, v
+
     def _apply_target(self, hex_str):
         self.target = hex_str
         self.prev.configure(fg_color=hex_str)
         self.target_circle.configure(fg_color=hex_str)
         self.hex_target_entry.delete(0, "end")
         self.hex_target_entry.insert(0, hex_str)
-        # Farbinfo aktualisieren
         rgb = hex_to_rgb(hex_str)
         lab = rgb_to_lab(rgb)
+        h, s, v = self._rgb_to_hsv(*rgb)
         info = self.t("colorinfo_label", r=rgb[0], g=rgb[1], b=rgb[2],
-                      L=lab[0], a=lab[1], b_=lab[2])
+                      h=h, s=s, v=v, L=lab[0], a=lab[1], b_=lab[2])
         if hasattr(self, "colorinfo_label"):
             self.colorinfo_label.configure(text=info)
         self.calc()
@@ -1272,9 +1412,16 @@ class U1FullSpectrumApp(ctk.CTk):
             else:
                 seg.pack_forget()
 
-        self.sim_circle.configure(fg_color=result["sim_hex"])
-        self.target_circle.configure(fg_color=self.target)
+        self._last_sim_hex = result["sim_hex"]
+        self._last_de      = result["de"]
         dv = result["de"]
+
+        # Farbsehschwäche-Simulation anwenden
+        mode = self.colorblind_var.get() if hasattr(self, "colorblind_var") else "normal"
+        sim_display = self._simulate_colorblind(result["sim_hex"], mode)
+        tgt_display = self._simulate_colorblind(self.target, mode)
+        self.sim_circle.configure(fg_color=sim_display)
+        self.target_circle.configure(fg_color=tgt_display)
         self.de_label.configure(text=self.de_label(dv), text_color=de_color(dv))
 
         self.last_result = result
@@ -1282,8 +1429,8 @@ class U1FullSpectrumApp(ctk.CTk):
     # ── VIRTUELLE DRUCKKÖPFE ───────────────────────────────────────────────────
 
     def add_to_virtual(self, result=None):
-        if len(self.virtual_fils) >= MAX_VIRTUAL:
-            messagebox.showwarning(self.t("dlg_max_virtual"), self.t("dlg_max_virtual_msg", max_v=MAX_VIRTUAL))
+        if len(self.virtual_fils) >= self._max_virtual:
+            messagebox.showwarning(self.t("dlg_max_virtual"), self.t("dlg_max_virtual_msg", max_v=self._max_virtual))
             return
         if result is None:
             result = self.last_result
@@ -1382,6 +1529,288 @@ class U1FullSpectrumApp(ctk.CTk):
         canvas.bind("<Button-1>", on_click)
         win.mainloop()
 
+    # ── DITHERING-PROFILE ──────────────────────────────────────────────────────
+
+    def _apply_dither_profile(self, length, auto):
+        """Schnellprofil: Slider + Auto-Checkbox setzen und neu berechnen."""
+        self.auto_len_var.set(auto)
+        self.len_slider.configure(state="normal")
+        if auto:
+            self.len_slider.configure(state="disabled")
+        elif length is not None:
+            self.len_slider.set(length)
+            self.len_label.configure(text=self.t("length_label", n=length))
+            for i, seg in enumerate(self.segs):
+                if i < length: seg.pack(side="left", expand=True, padx=2)
+                else: seg.pack_forget()
+        if hasattr(self, "target"):
+            self.calc()
+
+    # ── FARBSEHSCHWÄCHE-SIMULATION ─────────────────────────────────────────────
+
+    @staticmethod
+    def _simulate_colorblind(hex_str, mode):
+        """Approximation einer Farbsehschwäche via Transformationsmatrix."""
+        r, g, b = [x/255 for x in hex_to_rgb(hex_str)]
+        if mode == "prot":   # Protanopie (Rot-Blind)
+            r2 = 0.567*r + 0.433*g
+            g2 = 0.558*r + 0.442*g
+            b2 = 0.242*g + 0.758*b
+        elif mode == "deut": # Deuteranopie (Grün-Blind)
+            r2 = 0.625*r + 0.375*g
+            g2 = 0.700*r + 0.300*g
+            b2 = 0.300*g + 0.700*b
+        elif mode == "trit": # Tritanopie (Blau-Blind)
+            r2 = 0.950*r + 0.050*b
+            g2 = 0.433*g + 0.567*b
+            b2 = 0.475*g + 0.525*b
+        else:
+            return hex_str
+        ri, gi, bi = (int(max(0,min(1,v))*255) for v in (r2, g2, b2))
+        return f"#{ri:02X}{gi:02X}{bi:02X}"
+
+    def _update_colorblind_preview(self):
+        """Sim-Kreis und Ziel-Kreis mit Farbsehschwäche-Transformation aktualisieren."""
+        mode = self.colorblind_var.get() if hasattr(self, "colorblind_var") else "normal"
+        if not hasattr(self, "target"): return
+        tgt_c = self._simulate_colorblind(self.target, mode)
+        self.target_circle.configure(fg_color=tgt_c)
+        if hasattr(self, "_last_sim_hex") and self._last_sim_hex:
+            sim_c = self._simulate_colorblind(self._last_sim_hex, mode)
+            self.sim_circle.configure(fg_color=sim_c)
+
+    # ── 3D LAB-VISUALISIERUNG ─────────────────────────────────────────────────
+
+    def show_lab_plot(self):
+        """Matplotlib 3D-Plot: T1-T4 und Zielfarbe im CIE-Lab-Farbraum."""
+        if not _HAS_MPL:
+            messagebox.showinfo(self.t("dlg_note"), "matplotlib not installed."); return
+        fils = self._get_fils()
+        fig = _plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_facecolor("#0f172a")
+        fig.patch.set_facecolor("#1e293b")
+        for spine in ax.spines.values():
+            spine.set_color("#475569")
+        ax.tick_params(colors="#94a3b8")
+        ax.xaxis.label.set_color("#94a3b8")
+        ax.yaxis.label.set_color("#94a3b8")
+        ax.zaxis.label.set_color("#94a3b8")
+        for f in fils:
+            L, a, b = f["lab"]
+            ax.scatter(a, b, L, c=f["hex"], s=180, edgecolors="#ffffff",
+                       linewidths=1.5, zorder=5)
+            ax.text(a, b, L + 2, f"T{f['id']}", color="#ffffff", fontsize=9)
+        if hasattr(self, "target"):
+            tlab = rgb_to_lab(hex_to_rgb(self.target))
+            L, a, b = tlab
+            ax.scatter(a, b, L, c=self.target, s=260, marker='*',
+                       edgecolors="#ffffff", linewidths=1.5, zorder=6)
+            ax.text(a, b, L + 2, "⊙ Ziel", color="#fbbf24", fontsize=9)
+            if hasattr(self, "_last_sim_hex") and self._last_sim_hex:
+                slab = rgb_to_lab(hex_to_rgb(self._last_sim_hex))
+                ax.scatter(slab[1], slab[2], slab[0], c=self._last_sim_hex,
+                           s=180, marker='^', edgecolors="#ffffff", linewidths=1.5, zorder=6)
+                ax.text(slab[1], slab[2], slab[0] + 2, "≈ Sim", color="#4ade80", fontsize=9)
+        ax.set_xlabel("a* (grün–rot)")
+        ax.set_ylabel("b* (blau–gelb)")
+        ax.set_zlabel("L* (Helligkeit)")
+        ax.set_title(self.t("lab_plot_title"), color="#e2e8f0", pad=10)
+        _plt.tight_layout()
+        _plt.show()
+
+    # ── SWATCH SPEICHERN ──────────────────────────────────────────────────────
+
+    def save_swatch(self):
+        """Farbvergleich (Ziel vs. Simuliert) als PNG speichern."""
+        if not _HAS_PIL:
+            messagebox.showinfo(self.t("dlg_note"), "Pillow not installed."); return
+        if not hasattr(self, "target"):
+            messagebox.showinfo(self.t("dlg_note"), self.t("dlg_select_color")); return
+        path = filedialog.asksaveasfilename(
+            defaultextension=".png", filetypes=[("PNG", "*.png")],
+            title=self.t("btn_swatch"))
+        if not path: return
+        W, H, PAD = 500, 120, 16
+        img = _PILImage.new("RGB", (W, H), (15, 23, 42))
+        draw = _ImageDraw.Draw(img)
+        # Ziel-Quadrat
+        tr, tg, tb = hex_to_rgb(self.target)
+        draw.rectangle([PAD, PAD, W//2 - PAD//2, H - PAD], fill=(tr, tg, tb))
+        # Simuliert-Quadrat
+        sim_h = getattr(self, "_last_sim_hex", "#808080")
+        sr, sg, sb = hex_to_rgb(sim_h)
+        draw.rectangle([W//2 + PAD//2, PAD, W - PAD, H - PAD], fill=(sr, sg, sb))
+        # Labels
+        draw.text((PAD + 4, PAD + 4), f"Target\n{self.target}", fill=(255,255,255))
+        draw.text((W//2 + PAD//2 + 4, PAD + 4), f"Simulated\n{sim_h}", fill=(255,255,255))
+        if hasattr(self, "de_label") and hasattr(self, "_last_de"):
+            draw.text((W//2 - 30, H//2 - 8), f"ΔE {self._last_de:.1f}", fill=(255,200,100))
+        img.save(path)
+        messagebox.showinfo(self.t("dlg_saved"), self.t("swatch_saved", path=path))
+
+    # ── SLICER-GUIDE ──────────────────────────────────────────────────────────
+
+    def open_slicer_guide(self):
+        """Schritt-für-Schritt Anleitung: Ergebnis in OrcaSlicer FullSpectrum einbinden."""
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("slicer_guide_title"))
+        win.geometry("720x640")
+        win.grab_set()
+
+        scroll = ctk.CTkScrollableFrame(win)
+        scroll.pack(fill="both", expand=True, padx=16, pady=16)
+
+        def section(title, color="#38bdf8"):
+            ctk.CTkLabel(scroll, text=title, font=("Segoe UI", 13, "bold"),
+                         text_color=color).pack(anchor="w", pady=(14, 2))
+
+        def para(text, color="#cbd5e1"):
+            ctk.CTkLabel(scroll, text=text, font=("Segoe UI", 11),
+                         text_color=color, wraplength=660, justify="left").pack(anchor="w", pady=2)
+
+        def code(text):
+            ctk.CTkLabel(scroll, text=text, font=("Courier New", 11),
+                         fg_color="#0f172a", corner_radius=6,
+                         text_color="#4ade80").pack(anchor="w", fill="x", padx=4, pady=3)
+
+        if self.lang == "de":
+            section("① Voraussetzung: OrcaSlicer FullSpectrum")
+            para("Installiere den OrcaSlicer-FullSpectrum Fork (nicht den Standard-OrcaSlicer):")
+            code("  github.com/ratdoux/OrcaSlicer-FullSpectrum")
+            para("Die FullSpectrum-Funktion befindet sich unter:  Filament → Others → Dithering")
+
+            section("② Filamente im Slicer konfigurieren")
+            para("Lade die 4 physischen Filamente T1–T4 in OrcaSlicer als separate Filament-Profile.\n"
+                 "Stelle sicher, dass Farbe und TD-Wert mit deinen Slot-Einstellungen hier übereinstimmen.")
+
+            section("③ Virtuellen Druckkopf im Slicer anlegen", "#a78bfa")
+            para("Für jeden virtuellen Druckkopf (V5, V6, ...) musst du ein neues Filament-Profil anlegen\n"
+                 "und die Dithering-Einstellungen setzen:")
+
+            section("  2-Filament-Sequenz → Cadence Height", "#4ade80")
+            para("Beispiel: Sequenz  1121  →  T1×2, T2×1, T1×1")
+            code("  Others → Dithering → Enable Dithering: ✓")
+            code("  Dithering Step Size: 0.2 mm  (= deine Schichthöhe)")
+            code("  Cadence Height A: aus dem Export  (z.B. 0.4 mm)")
+            code("  Cadence Height B: aus dem Export  (z.B. 0.2 mm)")
+
+            section("  3–4-Filament-Sequenz → Pattern Mode", "#a78bfa")
+            para("Beispiel: Sequenz  11213  →  Pattern String  1/1/2/1/3")
+            code("  Others → Dithering → Enable Dithering: ✓")
+            code("  Dithering Step Size: 0.2 mm")
+            code("  Pattern: 1/1/2/1/3  ← aus dem Export kopieren")
+
+            section("④ Dithering Step Size", "#fbbf24")
+            para("Der Dithering Step Size ist GLEICH der Schichthöhe (z.B. 0.2 mm).\n"
+                 "Dies ist NICHT der Düsendurchmesser (0.4 oder 0.8 mm)!")
+
+            section("⑤ Objekt einfärben")
+            para("Wähle im Slicer das Objekt aus und weise Flächen/Regionen\n"
+                 "dem virtuellen Filament V5, V6, ... zu (Paint-Brush oder per Filament-Zuweisung).")
+
+            section("⑥ Tipps für beste Ergebnisse", "#fbbf24")
+            para("• ΔE < 3: Ausgezeichnete Übereinstimmung — direkt drucken\n"
+                 "• ΔE 3–6: Gute Annäherung — leichte Farbabweichung sichtbar\n"
+                 "• ΔE > 6: Starke Abweichung — Sequenz optimieren oder andere Filamente wählen\n"
+                 "• Für glatte Farbverläufe: Sanft-Profil (8-10 Layer)\n"
+                 "• Für präzise Farben: Fein-Profil (2-3 Layer)\n"
+                 "• Immer zuerst einen kleinen Testdruck machen!")
+        else:
+            section("① Prerequisite: OrcaSlicer FullSpectrum")
+            para("Install the OrcaSlicer-FullSpectrum fork (not standard OrcaSlicer):")
+            code("  github.com/ratdoux/OrcaSlicer-FullSpectrum")
+            para("The FullSpectrum feature is at:  Filament → Others → Dithering")
+
+            section("② Configure Filaments in Slicer")
+            para("Load the 4 physical filaments T1–T4 in OrcaSlicer as separate filament profiles.\n"
+                 "Make sure color and TD values match your slot settings here.")
+
+            section("③ Create Virtual Print Head in Slicer", "#a78bfa")
+            para("For each virtual head (V5, V6, ...) create a new filament profile\n"
+                 "and set the dithering parameters:")
+
+            section("  2-Filament Sequence → Cadence Height", "#4ade80")
+            para("Example: Sequence  1121  →  T1×2, T2×1, T1×1")
+            code("  Others → Dithering → Enable Dithering: ✓")
+            code("  Dithering Step Size: 0.2 mm  (= your layer height)")
+            code("  Cadence Height A: from export  (e.g. 0.4 mm)")
+            code("  Cadence Height B: from export  (e.g. 0.2 mm)")
+
+            section("  3–4-Filament Sequence → Pattern Mode", "#a78bfa")
+            para("Example: Sequence  11213  →  Pattern String  1/1/2/1/3")
+            code("  Others → Dithering → Enable Dithering: ✓")
+            code("  Dithering Step Size: 0.2 mm")
+            code("  Pattern: 1/1/2/1/3  ← copy from export")
+
+            section("④ Dithering Step Size", "#fbbf24")
+            para("The Dithering Step Size EQUALS the layer height (e.g. 0.2 mm).\n"
+                 "This is NOT the nozzle diameter (0.4 or 0.8 mm)!")
+
+            section("⑤ Paint the Object")
+            para("Select the object in the slicer and assign surfaces/regions\n"
+                 "to virtual filament V5, V6, ... (paint brush or filament assignment).")
+
+            section("⑥ Tips for Best Results", "#fbbf24")
+            para("• ΔE < 3: Excellent match — print directly\n"
+                 "• ΔE 3–6: Good approximation — slight color deviation visible\n"
+                 "• ΔE > 6: Large deviation — optimize sequence or choose other filaments\n"
+                 "• For smooth gradients: Smooth profile (8-10 layers)\n"
+                 "• For precise colors: Fine profile (2-3 layers)\n"
+                 "• Always do a small test print first!")
+
+        ctk.CTkButton(win, text="OK", fg_color="#2563eb",
+                      command=win.destroy, height=36).pack(pady=(0, 14))
+
+    # ── EINSTELLUNGEN-DIALOG ──────────────────────────────────────────────────
+
+    def open_settings_dialog(self):
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("settings_title"))
+        win.geometry("400x300")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text=self.t("settings_title"),
+                     font=("Segoe UI", 14, "bold")).pack(pady=(18, 12))
+
+        # Max virtuelle Druckköpfe
+        mv_frame = ctk.CTkFrame(win, fg_color="transparent")
+        mv_frame.pack(fill="x", padx=24, pady=6)
+        ctk.CTkLabel(mv_frame, text=self.t("settings_max_virtual"),
+                     font=("Segoe UI", 11)).pack(side="left")
+        mv_var = ctk.IntVar(value=self._max_virtual)
+        mv_spin = ctk.CTkEntry(mv_frame, width=60, textvariable=mv_var)
+        mv_spin.pack(side="left", padx=(8, 4))
+        ctk.CTkLabel(mv_frame, text=f"(1–{MAX_VIRTUAL_HARD})",
+                     font=("Segoe UI", 9), text_color="#475569").pack(side="left")
+
+        # Erscheinungsbild
+        th_frame = ctk.CTkFrame(win, fg_color="transparent")
+        th_frame.pack(fill="x", padx=24, pady=6)
+        ctk.CTkLabel(th_frame, text=self.t("settings_theme"),
+                     font=("Segoe UI", 11)).pack(side="left")
+        theme_var = ctk.StringVar(value=self.settings.get("theme", "dark"))
+        for val, key in [("dark", "settings_theme_dark"), ("light", "settings_theme_light"),
+                         ("system", "settings_theme_system")]:
+            ctk.CTkRadioButton(th_frame, text=self.t(key), variable=theme_var,
+                               value=val, font=("Segoe UI", 10)).pack(side="left", padx=6)
+
+        def do_save():
+            try:
+                new_max = max(1, min(MAX_VIRTUAL_HARD, int(mv_var.get())))
+            except (ValueError, TypeError):
+                new_max = MAX_VIRTUAL
+            self._max_virtual = new_max
+            self.settings["theme"] = theme_var.get()
+            ctk.set_appearance_mode(theme_var.get())
+            self._save_settings()
+            win.destroy()
+            messagebox.showinfo(self.t("dlg_saved"), self.t("settings_saved"))
+
+        ctk.CTkButton(win, text=self.t("settings_save_btn"), fg_color="#2563eb",
+                      command=do_save, height=40,
+                      font=("Segoe UI", 12, "bold")).pack(pady=(20, 8), padx=24, fill="x")
+
     def copy_sequence(self):
         """Aktuelle Sequenz in die Zwischenablage kopieren."""
         seq = self.res.cget("text") if hasattr(self, "res") else ""
@@ -1449,9 +1878,9 @@ class U1FullSpectrumApp(ctk.CTk):
                     hexes.append(h.upper())
             added = 0
             for i, h in enumerate(hexes):
-                if len(self.virtual_fils) >= MAX_VIRTUAL:
+                if len(self.virtual_fils) >= self._max_virtual:
                     messagebox.showwarning(self.t("dlg_max_virtual"),
-                                           self.t("batch_warn_max", max_v=MAX_VIRTUAL))
+                                           self.t("batch_warn_max", max_v=self._max_virtual))
                     break
                 prog.configure(text=f"{i+1}/{len(hexes)}  {h}")
                 win.update_idletasks()
@@ -1621,7 +2050,7 @@ class U1FullSpectrumApp(ctk.CTk):
         def render_rows():
             for w in scroll.winfo_children(): w.destroy()
             vid_vars.clear()
-            for idx, hex_c in enumerate(colors[:MAX_VIRTUAL]):
+            for idx, hex_c in enumerate(colors[:self._max_virtual]):
                 r = results[idx]
                 row = ctk.CTkFrame(scroll, fg_color="#1e293b", corner_radius=6)
                 row.pack(fill="x", padx=4, pady=2)
@@ -1654,9 +2083,9 @@ class U1FullSpectrumApp(ctk.CTk):
 
         def run_all():
             opt = opt_var.get()
-            free = MAX_VIRTUAL - len(self.virtual_fils)
+            free = self._max_virtual - len(self.virtual_fils)
             to_calc = min(len(colors), free) if free < len(colors) else len(colors)
-            for idx in range(min(len(colors), MAX_VIRTUAL)):
+            for idx in range(min(len(colors), self._max_virtual)):
                 prog_label.configure(
                     text=self.t("3mf_progress", i=idx+1, total=to_calc, c=colors[idx]))
                 win.update_idletasks()
@@ -1672,7 +2101,7 @@ class U1FullSpectrumApp(ctk.CTk):
             added = 0
             for idx, sv in enumerate(vid_vars):
                 if not sv.get() or results[idx] is None: continue
-                if len(self.virtual_fils) >= MAX_VIRTUAL: break
+                if len(self.virtual_fils) >= self._max_virtual: break
                 self.add_to_virtual(results[idx])
                 added += 1
             win.destroy()
