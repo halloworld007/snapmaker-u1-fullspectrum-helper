@@ -28,6 +28,12 @@ except ImportError:
     _HAS_PIL = False
 
 try:
+    from tkinterdnd2 import TkinterDnD, DND_FILES
+    _HAS_DND = True
+except ImportError:
+    _HAS_DND = False
+
+try:
     import matplotlib
     matplotlib.use("TkAgg")
     import matplotlib.pyplot as _plt
@@ -390,6 +396,24 @@ STRINGS = {
     "slot_loaded": "Geladen",
     # Werkzeugwechsel-Warnung pro V-Kopf
     "tc_warn_badge": "⚠ {n}×WW",
+    # Slot-Vergleich (Change 10)
+    "btn_slot_compare": "🔀 Slot-Vergleich",
+    "slot_compare_title": "Slot-Vergleich — Live ΔE-Auswirkung",
+    "slot_compare_slot": "Zu vergleichender Slot:",
+    "slot_compare_alt": "Alternatives Filament:",
+    "slot_compare_col_vid": "V-Kopf",
+    "slot_compare_col_cur": "Aktuell ΔE",
+    "slot_compare_col_new": "Neu ΔE",
+    "slot_compare_col_delta": "Δ",
+    # Werkzeugwechsel-Kosten (Change 11)
+    "tc_cost_per_kg": "Filamentpreis (€/kg):",
+    "tc_density": "Dichte (g/cm³):",
+    "tc_purge_cost": "Purge-Kosten gesamt: ~{cost:.2f}€",
+    "tc_purge_layers": "Purge entspricht: ~{n} Druckschichten",
+    # TD-Schätzung (Change 8)
+    "btn_estimate_td": "TD schätzen",
+    # DnD-Hint (Change 5)
+    "dnd_hint": "← .3mf oder .u1proj hierher ziehen",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
@@ -736,6 +760,24 @@ STRINGS = {
     "slot_loaded": "Loaded",
     # Tool change warning per V-head
     "tc_warn_badge": "⚠ {n}×TC",
+    # Slot comparison (Change 10)
+    "btn_slot_compare": "🔀 Slot Compare",
+    "slot_compare_title": "Slot Compare — Live ΔE Impact",
+    "slot_compare_slot": "Slot to compare:",
+    "slot_compare_alt": "Alternative filament:",
+    "slot_compare_col_vid": "V-Head",
+    "slot_compare_col_cur": "Current ΔE",
+    "slot_compare_col_new": "New ΔE",
+    "slot_compare_col_delta": "Δ",
+    # Tool change costs (Change 11)
+    "tc_cost_per_kg": "Filament price (€/kg):",
+    "tc_density": "Density (g/cm³):",
+    "tc_purge_cost": "Total purge cost: ~{cost:.2f}€",
+    "tc_purge_layers": "Purge equals: ~{n} print layers",
+    # TD estimation (Change 8)
+    "btn_estimate_td": "Estimate TD",
+    # DnD hint (Change 5)
+    "dnd_hint": "← drop .3mf or .u1proj here",
 },
 }
 
@@ -1157,6 +1199,18 @@ def calc_cadence(sequence, layer_height):
 def seq_filament_count(sequence):
     return len(set(sequence))
 
+def estimate_td(hex_color):
+    """Estimate TD from hex brightness. Bright/saturated = higher TD (more transparent)."""
+    try:
+        r, g, b = hex_to_rgb(hex_color)
+        # Perceived brightness 0-1
+        brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        # Very dark colors (black): TD ~0.3; white: TD ~8.5
+        return round(0.3 + brightness * 8.2, 1)
+    except Exception:
+        return 5.0
+
+
 def de_label_text(de, lang="de"):
     s = STRINGS[lang]
     q = s["de_good"] if de < DE_GOOD else s["de_ok"] if de < DE_OK else s["de_far"]
@@ -1169,6 +1223,7 @@ HEX_RE = re.compile(r'#([0-9A-Fa-f]{6})\b')
 def parse_3mf_colors(filepath):
     found = set()
     try:
+        import xml.etree.ElementTree as _ET3MF
         with zipfile.ZipFile(filepath, 'r') as zf:
             for name in zf.namelist():
                 if not any(name.endswith(e) for e in ('.model', '.config', '.xml', '.json')):
@@ -1188,14 +1243,53 @@ def parse_3mf_colors(filepath):
                                     if m: found.add('#' + m.group(1).upper())
                     except (json.JSONDecodeError, AttributeError):
                         pass
+                # Generic hex extraction from all file types
                 for m in HEX_RE.finditer(content):
                     found.add('#' + m.group(1).upper())
+                # XML-based extraction for .model files (PrusaSlicer p:color, BambuStudio m:colorgroup)
+                if name.endswith('.model') or name.endswith('.xml'):
+                    try:
+                        root = _ET3MF.fromstring(content)
+                        # Walk all elements looking for color-related attributes
+                        for elem in root.iter():
+                            # p:color attribute (PrusaSlicer)
+                            for attr_name, attr_val in elem.attrib.items():
+                                lname = attr_name.lower()
+                                if 'color' in lname and isinstance(attr_val, str):
+                                    m = HEX_RE.search(attr_val.strip())
+                                    if m: found.add('#' + m.group(1).upper())
+                            # p:colorgroup / m:colorgroup children
+                            tag_local = elem.tag.split('}')[-1].lower() if '}' in elem.tag else elem.tag.lower()
+                            if tag_local in ('colorgroup', 'color', 'basematerials', 'basematerial'):
+                                for child in elem:
+                                    for attr_val in child.attrib.values():
+                                        m = HEX_RE.search(str(attr_val).strip())
+                                        if m: found.add('#' + m.group(1).upper())
+                                # Also check element's own text/attribs
+                                for attr_val in elem.attrib.values():
+                                    m = HEX_RE.search(str(attr_val).strip())
+                                    if m: found.add('#' + m.group(1).upper())
+                    except Exception:
+                        pass
     except Exception as e:
         return [], str(e)
     trivial = {"#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF",
                "#AAAAAA", "#333333", "#CCCCCC"}
     meaningful = [c for c in found if c not in trivial]
-    return (meaningful if meaningful else list(found)), None
+    raw = meaningful if meaningful else list(found)
+    # Deduplicate: remove near-duplicates with ΔE < 3
+    deduped = []
+    deduped_labs = []
+    for hex_c in raw:
+        try:
+            lab = rgb_to_lab(hex_to_rgb(hex_c))
+        except Exception:
+            deduped.append(hex_c)
+            continue
+        if not any(delta_e(lab, el) < 3.0 for el in deduped_labs):
+            deduped.append(hex_c)
+            deduped_labs.append(lab)
+    return deduped, None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1222,6 +1316,8 @@ class U1FullSpectrumApp(ctk.CTk):
         self.last_result   = {}   # last calc() result for "hinzufügen"
         self._max_virtual  = int(self.settings.get("max_virtual", MAX_VIRTUAL))
         self.favorites     = []
+        self._3mf_win      = None   # singleton for 3MF assistant window
+        self._recent_colors = []    # recent target colors (max 10)
         self.load_db()
         self.load_presets()
         self._load_favorites()
@@ -1242,10 +1338,171 @@ class U1FullSpectrumApp(ctk.CTk):
         self._restore_extended_settings()
         # Single gamut update after everything is ready
         self.after(400, self._update_gamut_strip)
+        # Drag & Drop support
+        if _HAS_DND:
+            try:
+                self.drop_target_register(DND_FILES)
+                self.dnd_bind('<<Drop>>', self._on_dnd_drop)
+            except Exception:
+                pass
 
     def _on_close(self):
         self._save_settings()
         self.destroy()
+
+    def _on_dnd_drop(self, event):
+        """Handle drag-and-drop of .3mf or .u1proj files onto the main window."""
+        path = event.data.strip().strip('{}')
+        if path.lower().endswith('.3mf'):
+            self._open_3mf_with_path(path)
+        elif path.lower().endswith('.u1proj'):
+            self._load_project_from_path(path)
+
+    def _open_3mf_with_path(self, path):
+        """Open 3MF assistant with a given file path (used by DnD)."""
+        colors, err = parse_3mf_colors(path)
+        if not colors:
+            messagebox.showinfo(self.t("dlg_3mf_title"),
+                f"{self.t('dlg_3mf_no_colors_fallback') if not err else err}"); return
+        # Reuse open_3mf_assistant logic but skip file dialog
+        # Store path temporarily and call open with pre-loaded data
+        self._dnd_3mf_path = path
+        self._dnd_3mf_colors = colors
+        self._open_3mf_with_colors(path, colors)
+
+    def _open_3mf_with_colors(self, path, colors):
+        """Open 3MF assistant window with pre-loaded colors."""
+        if self._3mf_win is not None and self._3mf_win.winfo_exists():
+            self._3mf_win.focus_force()
+            self._3mf_win.lift()
+            return
+        win = ctk.CTkToplevel(self)
+        self._3mf_win = win
+        win.protocol("WM_DELETE_WINDOW", lambda: (setattr(self, "_3mf_win", None), win.destroy()))
+        win.title(f"{self.t('dlg_3mf_title')} — {os.path.basename(path)}")
+        win.geometry("860x680")
+        win.grab_set()
+        ctk.CTkLabel(win,
+                     text=self.t("3mf_analysis_title", n=len(colors)),
+                     font=("Segoe UI", 15, "bold"), text_color="#38bdf8").pack(pady=(16, 2))
+        ctk.CTkLabel(win,
+                     text=self.t("3mf_basis",
+                          t1=self.slots[0]['hex'].get(), t2=self.slots[1]['hex'].get(),
+                          t3=self.slots[2]['hex'].get(), t4=self.slots[3]['hex'].get()),
+                     font=("Segoe UI", 10), text_color="#64748b").pack(pady=(0, 6))
+        opt_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(win, text=self.t("3mf_optimizer"), variable=opt_var,
+                        font=("Segoe UI", 11)).pack(pady=(0, 4))
+        prog_label = ctk.CTkLabel(win, text=self.t("3mf_ready"),
+                                   font=("Segoe UI", 11), text_color="#94a3b8")
+        prog_label.pack(pady=(0, 6))
+        hdr = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=6)
+        hdr.pack(fill="x", padx=14, pady=(0, 4))
+        hdr.grid_columnconfigure(4, weight=1)
+        for col, txt in enumerate(["#", self.t("3mf_col_target"), self.t("3mf_col_seq"),
+                                    self.t("3mf_col_sim"), self.t("3mf_col_quality"), "VID"]):
+            ctk.CTkLabel(hdr, text=txt, font=("Segoe UI", 10, "bold"),
+                         text_color="#64748b").grid(row=0, column=col, padx=10, pady=6, sticky="w")
+        scroll = ctk.CTkScrollableFrame(win, height=380, fg_color="#0f172a")
+        scroll.pack(fill="both", expand=True, padx=14, pady=4)
+        scroll.grid_columnconfigure(4, weight=1)
+        results = [None] * len(colors)
+        vid_vars = []
+        def render_rows():
+            for w in scroll.winfo_children(): w.destroy()
+            vid_vars.clear()
+            for idx, hex_c in enumerate(colors[:self._max_virtual]):
+                r = results[idx]
+                row = ctk.CTkFrame(scroll, fg_color="#1e293b", corner_radius=6)
+                row.pack(fill="x", padx=4, pady=2)
+                row.grid_columnconfigure(4, weight=1)
+                ctk.CTkLabel(row, text=str(idx+1), width=30, font=("Segoe UI", 10),
+                             text_color="#64748b").grid(row=0, column=0, padx=8, pady=7)
+                ctk.CTkLabel(row, text="", width=34, height=34,
+                             fg_color=hex_c, corner_radius=17).grid(row=0, column=1, padx=4)
+                if r:
+                    ctk.CTkLabel(row, text=r["sequence"],
+                                 font=("Courier New", 15, "bold"), text_color="#4ade80",
+                                 width=145).grid(row=0, column=2, padx=6)
+                    ctk.CTkLabel(row, text="", width=34, height=34,
+                                 fg_color=r["sim_hex"], corner_radius=17).grid(row=0, column=3, padx=4)
+                    ctk.CTkLabel(row, text=self.de_label(r["de"]),
+                                 font=("Segoe UI", 11, "bold"),
+                                 text_color=de_color(r["de"])).grid(row=0, column=4, padx=6, sticky="w")
+                else:
+                    ctk.CTkLabel(row, text=self.t("3mf_not_calc"),
+                                 text_color="#334155").grid(row=0, column=2, columnspan=3, padx=6, sticky="w")
+                sv = ctk.BooleanVar(value=True if r else False)
+                vid_vars.append(sv)
+                ctk.CTkCheckBox(row, text=self.t("3mf_include"), variable=sv,
+                                font=("Segoe UI", 9), width=100).grid(row=0, column=5, padx=(4, 10))
+        render_rows()
+        def run_all():
+            opt = opt_var.get()
+            free = self._max_virtual - len(self.virtual_fils)
+            to_calc = min(len(colors), free) if free < len(colors) else len(colors)
+            for idx in range(min(len(colors), self._max_virtual)):
+                prog_label.configure(text=self.t("3mf_progress", i=idx+1, total=to_calc, c=colors[idx]))
+                win.update_idletasks()
+                r = self._calc_for_color(colors[idx], optimizer=opt,
+                                        seq_len=int(self.len_slider.get()),
+                                        auto=self.auto_len_var.get(),
+                                        auto_threshold=safe_td(self.auto_thresh_entry.get()))
+                results[idx] = r
+            prog_label.configure(text=self.t("3mf_done", n=to_calc))
+            render_rows()
+        def apply_selected():
+            added = 0
+            for idx, sv in enumerate(vid_vars):
+                if not sv.get() or results[idx] is None: continue
+                if len(self.virtual_fils) >= self._max_virtual: break
+                self.add_to_virtual(results[idx])
+                added += 1
+            win.destroy()
+            setattr(self, "_3mf_win", None)
+            messagebox.showinfo(self.t("dlg_3mf_title"), self.t("dlg_3mf_added", n=added))
+        btm = ctk.CTkFrame(win, fg_color="transparent")
+        btm.pack(fill="x", padx=14, pady=(6, 14))
+        ctk.CTkButton(btm, text=self.t("3mf_btn_calc"), fg_color="#2563eb",
+                      command=run_all, height=42, font=("Segoe UI", 12, "bold")).pack(side="left", padx=(0, 6))
+        ctk.CTkButton(btm, text=self.t("3mf_btn_apply"), fg_color="#15803d",
+                      command=apply_selected, height=42, font=("Segoe UI", 12, "bold")).pack(side="left")
+        ctk.CTkButton(btm, text=self.t("3mf_btn_cancel"), fg_color="#374151",
+                      command=win.destroy, height=42).pack(side="right")
+
+    def _load_project_from_path(self, path):
+        """Load a .u1proj file from a given path (used by DnD)."""
+        try:
+            with open(path, encoding="utf-8") as f:
+                project = json.load(f)
+        except Exception as e:
+            messagebox.showerror(self.t("dlg_error"), self.t("proj_err", e=e)); return
+        if hasattr(self, "layer_height_entry") and "layer_height" in project:
+            self.layer_height_entry.delete(0, "end")
+            self.layer_height_entry.insert(0, project["layer_height"])
+        for i, s_data in enumerate(project.get("slots", [])[:4]):
+            s = self.slots[i]
+            if s_data.get("brand") and s_data["brand"] in self.library:
+                s["brand"].set(s_data["brand"])
+                self.update_menu(i)
+            if s_data.get("color"):
+                try: s["color"].set(s_data["color"])
+                except: pass
+            if s_data.get("hex"):
+                s["hex"].delete(0, "end")
+                s["hex"].insert(0, s_data["hex"])
+                try: s["preview"].configure(fg_color=s_data["hex"])
+                except: pass
+            if s_data.get("td"):
+                s["td"].delete(0, "end")
+                s["td"].insert(0, s_data["td"])
+        self.virtual_fils = project.get("virtual_fils", [])
+        if "recent_colors" in project:
+            self._recent_colors = project["recent_colors"]
+            self._update_recent_swatches()
+        self._refresh_virtual_grid()
+        self._schedule_gamut_update()
+        messagebox.showinfo(self.t("dlg_saved"), self.t("proj_loaded", path=path))
 
     # ── FAVORITEN ──────────────────────────────────────────────────────────────
 
@@ -1453,6 +1710,7 @@ class U1FullSpectrumApp(ctk.CTk):
                 for s in self.slots
             ],
             "virtual_fils": self.virtual_fils,
+            "recent_colors": self._recent_colors,
         }
         try:
             with open(path, "w", encoding="utf-8") as f:
@@ -1494,6 +1752,10 @@ class U1FullSpectrumApp(ctk.CTk):
                 s["td"].insert(0, s_data["td"])
         # Virtuelle Köpfe
         self.virtual_fils = project.get("virtual_fils", [])
+        # Recent colors
+        if "recent_colors" in project:
+            self._recent_colors = project["recent_colors"]
+            self._update_recent_swatches()
         self._refresh_virtual_grid()
         self._schedule_gamut_update()
         messagebox.showinfo(self.t("dlg_saved"), self.t("proj_loaded", path=path))
@@ -1851,9 +2113,19 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkLabel(wh, text=self.t("weight_top"), font=("Segoe UI", 8),
                      text_color="#475569").pack(side="right")
 
+        # Layer stack preview canvas (visual sequence bars)
+        _seq_pf = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=6)
+        _seq_pf.grid(row=5, column=0, padx=40, pady=(28, 2), sticky="ew")
+        _seq_pf.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(_seq_pf, text="Schichten:", font=("Segoe UI", 8),
+                     text_color="#475569").grid(row=0, column=0, padx=(8, 4), pady=3, sticky="w")
+        self._seq_preview_canvas = tk.Canvas(_seq_pf, height=80, bg="#0f172a",
+                                             highlightthickness=0, bd=0)
+        self._seq_preview_canvas.grid(row=0, column=1, sticky="ew", padx=(0, 4), pady=3)
+
         # Gamut-Vorschau
         gf = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=6)
-        gf.grid(row=5, column=0, padx=40, pady=(28, 4), sticky="ew")
+        gf.grid(row=6, column=0, padx=40, pady=(0, 4), sticky="ew")
         ctk.CTkLabel(gf, text="Gamut:", font=("Segoe UI", 8),
                      text_color="#475569").pack(side="left", padx=(8, 4), pady=3)
         self._gamut_canvas = tk.Canvas(gf, height=16, bg="#1e293b",
@@ -1863,7 +2135,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Mix-Vorschau + ΔE
         mf = ctk.CTkFrame(sec1, fg_color="#1e293b", corner_radius=8)
-        mf.grid(row=6, column=0, padx=40, pady=6, sticky="ew")
+        mf.grid(row=7, column=0, padx=40, pady=6, sticky="ew")
         mf.grid_columnconfigure(1, weight=1)
 
         tgt_col = ctk.CTkFrame(mf, fg_color="transparent")
@@ -1905,7 +2177,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Sequenzlänge + Auto-Modus
         lr = ctk.CTkFrame(sec1, fg_color="#1a2535", corner_radius=8)
-        lr.grid(row=7, column=0, padx=40, pady=(4, 4), sticky="ew")
+        lr.grid(row=8, column=0, padx=40, pady=(4, 4), sticky="ew")
         lr.grid_columnconfigure(1, weight=1)
 
         self.len_label = ctk.CTkLabel(lr, text=self.t("length_label", n=10),
@@ -1931,7 +2203,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Steuerleiste
         bl = ctk.CTkFrame(sec1, fg_color="transparent")
-        bl.grid(row=8, column=0, padx=40, pady=(4, 16), sticky="ew")
+        bl.grid(row=9, column=0, padx=40, pady=(4, 16), sticky="ew")
         bl.grid_columnconfigure(0, weight=1)
         calc_btn = ctk.CTkButton(bl, text=self.t("btn_calculate"), fg_color="#2563eb",
                       command=self.calc, height=46,
@@ -1966,7 +2238,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Top-3 Sequenzen (nach Optimizer)
         self.top3_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
-        self.top3_frame.grid(row=8, column=0, padx=40, pady=(0, 4), sticky="ew")
+        self.top3_frame.grid(row=9, column=0, padx=40, pady=(0, 4), sticky="ew")
         self.top3_frame.grid_remove()
 
         # Keyboard shortcut: Enter = Berechnen
@@ -1974,7 +2246,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Dithering-Profile
         dp_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
-        dp_frame.grid(row=10, column=0, padx=40, pady=(0, 6), sticky="ew")
+        dp_frame.grid(row=11, column=0, padx=40, pady=(0, 6), sticky="ew")
         ctk.CTkLabel(dp_frame, text=self.t("dither_profiles"),
                      font=("Segoe UI", 10), text_color="#64748b").pack(side="left", padx=(12, 8))
         for key, fn in [("dither_fine", lambda: self._apply_dither_profile(2, False)),
@@ -1989,7 +2261,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Farbsehschwäche-Simulation
         sim_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
-        sim_frame.grid(row=11, column=0, padx=40, pady=(0, 12), sticky="ew")
+        sim_frame.grid(row=12, column=0, padx=40, pady=(0, 12), sticky="ew")
         ctk.CTkLabel(sim_frame, text=self.t("colorblind_label"),
                      font=("Segoe UI", 10), text_color="#64748b").pack(side="left", padx=(12, 6))
         self.colorblind_var = ctk.StringVar(value="normal")
@@ -1999,9 +2271,18 @@ class U1FullSpectrumApp(ctk.CTk):
                                value=val, font=("Segoe UI", 10),
                                command=self._update_colorblind_preview).pack(side="left", padx=4, pady=6)
 
+        # Recent colors palette (Change 7)
+        recent_outer = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
+        recent_outer.grid(row=13, column=0, padx=40, pady=(0, 4), sticky="ew")
+        ctk.CTkLabel(recent_outer, text="Zuletzt:", font=("Segoe UI", 9),
+                     text_color="#64748b").pack(side="left", padx=(8, 4), pady=4)
+        self._recent_frame = ctk.CTkFrame(recent_outer, fg_color="transparent")
+        self._recent_frame.pack(side="left", fill="x", expand=True, pady=4)
+        self._update_recent_swatches()
+
         # Feature 5: History panel (last 10 calculations)
         hist_outer = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
-        hist_outer.grid(row=12, column=0, padx=40, pady=(0, 12), sticky="ew")
+        hist_outer.grid(row=14, column=0, padx=40, pady=(0, 12), sticky="ew")
         ctk.CTkLabel(hist_outer, text="🕘 Verlauf",
                      font=("Segoe UI", 10), text_color="#64748b").pack(anchor="w", padx=12, pady=(6, 2))
         self._history_frame = ctk.CTkScrollableFrame(hist_outer, height=100, fg_color="transparent")
@@ -2086,10 +2367,22 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Scrollbares Grid
         self.vgrid = ctk.CTkScrollableFrame(tab2, fg_color="#0f172a", corner_radius=8)
-        self.vgrid.grid(row=4, column=0, padx=8, sticky="nsew", pady=(0, 8))
+        self.vgrid.grid(row=4, column=0, padx=8, sticky="nsew", pady=(0, 0))
         tab2.grid_rowconfigure(4, weight=1)
         self.vgrid.grid_columnconfigure(4, weight=1)
         self._refresh_virtual_grid()
+
+        # DnD hint label + export hint label
+        _hint_row = ctk.CTkFrame(tab2, fg_color="transparent")
+        _hint_row.grid(row=5, column=0, padx=8, pady=(2, 6), sticky="ew")
+        _hint_row.grid_columnconfigure(0, weight=1)
+        if _HAS_DND:
+            ctk.CTkLabel(_hint_row, text="← .3mf oder .u1proj hierher ziehen",
+                         font=("Segoe UI", 9), text_color="#334155").grid(
+                row=0, column=0, sticky="w", padx=4)
+        self._export_hint_label = ctk.CTkLabel(_hint_row, text="",
+                                               font=("Segoe UI", 9), text_color="#64748b")
+        self._export_hint_label.grid(row=0, column=1, sticky="e", padx=4)
 
         # ────────────────────────────────────────────────────────────────────
         # TAB 3 — WERKZEUGE
@@ -2131,6 +2424,7 @@ class U1FullSpectrumApp(ctk.CTk):
         f = _tools_section(tab3, "🎯  Optimierung & Kalibrierung")
         _tool_btn(f, self.t("btn_slot_opt"), "#7c3aed", self.open_slot_optimizer)
         _tool_btn(f, self.t("btn_td_cal"), "#0f4c81", self.open_td_calibration)
+        _tool_btn(f, self.t("btn_slot_compare"), "#7c3aed", self.open_slot_compare)
 
         # Bibliothek
         f = _tools_section(tab3, "📚  Bibliothek & Datenbank")
@@ -2408,6 +2702,30 @@ class U1FullSpectrumApp(ctk.CTk):
             "seq_len":    len(chosen_seq),
         }
 
+    def _draw_seq_preview(self, sequence):
+        """Draw colored horizontal bars representing each layer in the sequence."""
+        if not hasattr(self, '_seq_preview_canvas'):
+            return
+        c = self._seq_preview_canvas
+        c.update_idletasks()
+        W = c.winfo_width() or 300
+        n = len(sequence)
+        if n == 0:
+            c.delete("all")
+            return
+        bar_h = max(1, 80 // n)
+        fils = {f["id"]: f["hex"] for f in self._get_fils()}
+        c.delete("all")
+        for i, fid_str in enumerate(reversed(sequence)):
+            try:
+                fid = int(fid_str)
+            except (ValueError, TypeError):
+                continue
+            color = fils.get(fid, "#888888")
+            y0 = i * bar_h
+            y1 = y0 + bar_h
+            c.create_rectangle(0, y0, W, y1, fill=color, outline="")
+
     def _schedule_gamut_update(self, delay=150):
         """Debounced gamut strip update — cancels any pending call and reschedules."""
         if self._gamut_job:
@@ -2572,6 +2890,10 @@ class U1FullSpectrumApp(ctk.CTk):
 
         self.last_result = result
         self._show_top3()
+        self._draw_seq_preview(seq)
+
+        # Update recent colors
+        self._add_recent_color(self.target)
 
         # Feature 9: Auto-suggestion
         if dv > 6:
@@ -3586,6 +3908,12 @@ class U1FullSpectrumApp(ctk.CTk):
     # ── 3MF ASSISTENT ──────────────────────────────────────────────────────────
 
     def open_3mf_assistant(self):
+        # Singleton: focus existing window if open
+        if self._3mf_win is not None and self._3mf_win.winfo_exists():
+            self._3mf_win.focus_force()
+            self._3mf_win.lift()
+            return
+
         path = filedialog.askopenfilename(
             filetypes=[(self.t("3mf_filetypes"), "*.3mf"), ("*", "*.*")],
             title=self.t("open_3mf_title"))
@@ -3597,6 +3925,8 @@ class U1FullSpectrumApp(ctk.CTk):
                 f"{self.t('dlg_3mf_no_colors_fallback') if not err else err}"); return
 
         win = ctk.CTkToplevel(self)
+        self._3mf_win = win
+        win.protocol("WM_DELETE_WINDOW", lambda: (setattr(self, "_3mf_win", None), win.destroy()))
         win.title(f"{self.t('dlg_3mf_title')} — {os.path.basename(path)}")
         win.geometry("860x680")
         win.grab_set()
@@ -3860,6 +4190,11 @@ class U1FullSpectrumApp(ctk.CTk):
                     with open(path, "w", encoding="utf-8") as f:
                         f.write("\n".join(lines))
                 messagebox.showinfo(self.t("dlg_saved"), self.t("dlg_export_saved", path=path))
+                # Show slicer hint (Change 9)
+                if scope == "virtual":
+                    self._show_export_hint_for_virtual()
+                elif scope == "single" and hasattr(self, "last_result") and self.last_result:
+                    self._show_export_hint_for_seq(self.last_result.get("sequence", ""))
                 win.destroy()
             except IOError as e:
                 messagebox.showerror(self.t("dlg_error"), str(e))
@@ -3872,6 +4207,34 @@ class U1FullSpectrumApp(ctk.CTk):
                       height=40, font=("Segoe UI", 13, "bold")).pack(pady=(0, 4), padx=40, fill="x")
         ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
                       command=win.destroy, height=36).pack(padx=40, fill="x")
+
+    def _show_export_hint_for_seq(self, seq):
+        """Show post-export slicer hint for a single sequence (Change 9)."""
+        if not hasattr(self, '_export_hint_label') or not seq:
+            return
+        lh = safe_td(self.layer_height_entry.get()) if hasattr(self, "layer_height_entry") else 0.08
+        n_f = seq_filament_count(seq)
+        cad = calc_cadence(seq, lh)
+        ids = sorted(cad.keys())
+        if n_f <= 2 and len(ids) >= 2:
+            a = round(cad.get(ids[0], lh), 3)
+            b = round(cad.get(ids[1], lh), 3)
+            hint = f"OrcaSlicer: Others → Dithering → Cadence Height  A={a}mm / B={b}mm"
+        elif n_f >= 3:
+            hint = f"OrcaSlicer: Others → Dithering → Pattern Mode  {''.join(seq)}"
+        else:
+            hint = ""
+        if hint:
+            self._export_hint_label.configure(text=hint)
+            self.after(8000, lambda: self._export_hint_label.configure(text="") if self._export_hint_label.winfo_exists() else None)
+
+    def _show_export_hint_for_virtual(self):
+        """Show post-export slicer hint for all virtual heads (Change 9)."""
+        if not hasattr(self, '_export_hint_label') or not self.virtual_fils:
+            return
+        # Show hint for first virtual head as example
+        vf = self.virtual_fils[0]
+        self._show_export_hint_for_seq(vf.get("sequence", ""))
 
     # ── ORCASLICER DIREKT-EXPORT ───────────────────────────────────────────────
 
@@ -4305,6 +4668,110 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
                       command=win.destroy, height=36).pack(padx=24, fill="x")
 
+    # ── SLOT-VERGLEICH (Change 10) ─────────────────────────────────────────────
+
+    def open_slot_compare(self):
+        """Opens a window showing ΔE impact of replacing a slot with an alternative filament."""
+        if not self.virtual_fils:
+            messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("slot_compare_title"))
+        win.geometry("700x520")
+        win.grab_set()
+        ctk.CTkLabel(win, text=self.t("slot_compare_title"),
+                     font=("Segoe UI", 13, "bold"), text_color="#38bdf8").pack(pady=(14, 8))
+
+        ctrl = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=8)
+        ctrl.pack(fill="x", padx=16, pady=(0, 8))
+
+        # Slot selector
+        slot_f = ctk.CTkFrame(ctrl, fg_color="transparent")
+        slot_f.pack(side="left", padx=12, pady=8)
+        ctk.CTkLabel(slot_f, text=self.t("slot_compare_slot"),
+                     font=("Segoe UI", 10)).pack(anchor="w")
+        slot_var = ctk.StringVar(value="T2")
+        slot_opts = [f"T{i+1}" for i in range(4)]
+        ctk.CTkOptionMenu(slot_f, variable=slot_var, values=slot_opts, width=80).pack()
+
+        # Alternative filament selector
+        alt_f = ctk.CTkFrame(ctrl, fg_color="transparent")
+        alt_f.pack(side="left", padx=12, pady=8, expand=True, fill="x")
+        ctk.CTkLabel(alt_f, text=self.t("slot_compare_alt"),
+                     font=("Segoe UI", 10)).pack(anchor="w")
+        all_fils = [(brand, fil) for brand, fils in self.library.items() for fil in fils]
+        alt_opts = [f"{b} — {f['name']}" for b, f in all_fils] if all_fils else ["(none)"]
+        alt_var = ctk.StringVar(value=alt_opts[0] if alt_opts else "")
+        alt_menu = ctk.CTkOptionMenu(alt_f, variable=alt_var, values=alt_opts, width=260)
+        alt_menu.pack()
+
+        # Results table
+        hdr = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=6)
+        hdr.pack(fill="x", padx=16, pady=(0, 2))
+        for col, (txt, w) in enumerate([(self.t("slot_compare_col_vid"), 60),
+                                         (self.t("slot_compare_col_cur"), 100),
+                                         (self.t("slot_compare_col_new"), 100),
+                                         (self.t("slot_compare_col_delta"), 80)]):
+            ctk.CTkLabel(hdr, text=txt, font=("Segoe UI", 10, "bold"),
+                         text_color="#64748b", width=w).grid(row=0, column=col, padx=8, pady=6, sticky="w")
+
+        scroll = ctk.CTkScrollableFrame(win, height=300, fg_color="#0f172a")
+        scroll.pack(fill="both", expand=True, padx=16, pady=(0, 8))
+
+        def run_compare():
+            for w in scroll.winfo_children(): w.destroy()
+            slot_idx = int(slot_var.get()[1]) - 1  # T1→0, T2→1, ...
+            # Find alternative filament
+            alt_label = alt_var.get()
+            alt_fil = None
+            for brand, fil in all_fils:
+                if f"{brand} — {fil['name']}" == alt_label:
+                    alt_fil = fil
+                    break
+            if alt_fil is None: return
+
+            fils_current = self._get_fils()
+            # Build alternative filament set
+            alt_hex = alt_fil.get("hex", "#888888")
+            alt_td = alt_fil.get("td", DEFAULT_TD)
+            alt_lab = rgb_to_lab(hex_to_rgb(alt_hex))
+
+            fils_alt = []
+            for f in fils_current:
+                if f["id"] == slot_idx + 1:
+                    fils_alt.append({"id": f["id"], "hex": alt_hex, "td": alt_td, "lab": alt_lab})
+                else:
+                    fils_alt.append(f)
+
+            for vf in self.virtual_fils:
+                seq = vf["sequence"]
+                target_hex = vf.get("target_hex", "")
+                if not target_hex: continue
+                t_lab = rgb_to_lab(hex_to_rgb(target_hex))
+                cur_de = vf.get("de", 0.0)
+                # Simulate with alternative filament (convert string seq to int list)
+                seq_ids = [int(c) for c in seq]
+                new_sim = self._simulate_mix(seq_ids, fils_alt)
+                new_de = delta_e(new_sim, t_lab)
+                delta = new_de - cur_de
+
+                row = ctk.CTkFrame(scroll, fg_color="#1e293b", corner_radius=6)
+                row.pack(fill="x", padx=4, pady=2)
+                ctk.CTkLabel(row, text=f"V{vf['vid']}", width=60,
+                             font=("Segoe UI", 10, "bold")).grid(row=0, column=0, padx=8, pady=6)
+                ctk.CTkLabel(row, text=f"{cur_de:.1f}", width=100,
+                             text_color=de_color(cur_de)).grid(row=0, column=1, padx=8)
+                ctk.CTkLabel(row, text=f"{new_de:.1f}", width=100,
+                             text_color=de_color(new_de)).grid(row=0, column=2, padx=8)
+                delta_col = "#4ade80" if delta < 0 else "#f87171" if delta > 0 else "#94a3b8"
+                delta_txt = f"+{delta:.1f}" if delta > 0 else f"{delta:.1f}"
+                ctk.CTkLabel(row, text=delta_txt, width=80, font=("Segoe UI", 10, "bold"),
+                             text_color=delta_col).grid(row=0, column=3, padx=8)
+
+        ctk.CTkButton(ctrl, text="▶  Vergleichen", fg_color="#2563eb",
+                      command=run_compare, height=36).pack(side="right", padx=12, pady=8)
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
+                      command=win.destroy, height=34).pack(padx=16, pady=(0, 10), fill="x")
+
     # ── SLOT-OPTIMIZER ────────────────────────────────────────────────────────
 
     def open_slot_optimizer(self):
@@ -4574,6 +5041,17 @@ class U1FullSpectrumApp(ctk.CTk):
                 title="Speichern als")
             if not save_path: return
 
+            # Create backup if file already exists
+            backup_info = ""
+            if os.path.exists(save_path):
+                import shutil as _shutil_bak
+                backup_path = save_path + ".bak"
+                try:
+                    _shutil_bak.copy2(save_path, backup_path)
+                    backup_info = f"\n(Backup: {backup_path})"
+                except Exception:
+                    pass
+
             # ext → neue Slot/V-ID ermitteln
             def parse_choice(choice, ext_str):
                 if choice == self.t("remap_keep"):
@@ -4688,7 +5166,7 @@ class U1FullSpectrumApp(ctk.CTk):
                                           json.dumps(cfg, indent=4, ensure_ascii=False).encode("utf-8"))
 
                 shutil.move(tmp_path, save_path)
-                messagebox.showinfo(self.t("dlg_saved"), self.t("3mf_write_ok", path=save_path))
+                messagebox.showinfo(self.t("dlg_saved"), self.t("3mf_write_ok", path=save_path) + backup_info)
                 win.destroy()
             except Exception as e:
                 messagebox.showerror(self.t("dlg_error"), str(e))
@@ -4702,34 +5180,43 @@ class U1FullSpectrumApp(ctk.CTk):
     # ── WERKZEUGWECHSEL-SCHÄTZUNG ─────────────────────────────────────────────
 
     def open_tc_estimator(self):
-        """Schätzt Werkzeugwechsel, Zusatzzeit und Purge-Material."""
+        """Schätzt Werkzeugwechsel, Zusatzzeit und Purge-Material inkl. Kosten."""
         if not self.virtual_fils:
             messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
         win = ctk.CTkToplevel(self)
         win.title(self.t("tc_title"))
-        win.geometry("440x340")
+        win.geometry("460x440")
         win.grab_set()
         ctk.CTkLabel(win, text=self.t("tc_title"),
                      font=("Segoe UI", 14, "bold")).pack(pady=(16, 10))
 
         # Eingaben
         in_frame = ctk.CTkFrame(win, fg_color="transparent"); in_frame.pack(padx=30, fill="x")
-        ctk.CTkLabel(in_frame, text=self.t("tc_layers"), width=200).grid(row=0, column=0, sticky="w", pady=4)
+        ctk.CTkLabel(in_frame, text=self.t("tc_layers"), width=220).grid(row=0, column=0, sticky="w", pady=4)
         layers_entry = ctk.CTkEntry(in_frame, width=100, placeholder_text="200")
         layers_entry.insert(0, "200"); layers_entry.grid(row=0, column=1, padx=6)
 
-        ctk.CTkLabel(in_frame, text="Sekunden/Werkzeugwechsel:", width=200).grid(row=1, column=0, sticky="w", pady=4)
+        ctk.CTkLabel(in_frame, text="Sekunden/Werkzeugwechsel:", width=220).grid(row=1, column=0, sticky="w", pady=4)
         secs_entry = ctk.CTkEntry(in_frame, width=100, placeholder_text="30")
         secs_entry.insert(0, "30"); secs_entry.grid(row=1, column=1, padx=6)
 
-        ctk.CTkLabel(in_frame, text="Purge-Menge (mm³/Wechsel):", width=200).grid(row=2, column=0, sticky="w", pady=4)
+        ctk.CTkLabel(in_frame, text="Purge-Menge (mm³/Wechsel):", width=220).grid(row=2, column=0, sticky="w", pady=4)
         purge_entry = ctk.CTkEntry(in_frame, width=100, placeholder_text="120")
         purge_entry.insert(0, "120"); purge_entry.grid(row=2, column=1, padx=6)
+
+        # Cost inputs (Change 11)
+        ctk.CTkLabel(in_frame, text=self.t("tc_cost_per_kg"), width=220).grid(row=3, column=0, sticky="w", pady=4)
+        cost_entry = ctk.CTkEntry(in_frame, width=100, placeholder_text="25")
+        cost_entry.insert(0, "25"); cost_entry.grid(row=3, column=1, padx=6)
+
+        ctk.CTkLabel(in_frame, text=self.t("tc_density"), width=220).grid(row=4, column=0, sticky="w", pady=4)
+        density_entry = ctk.CTkEntry(in_frame, width=100, placeholder_text="1.24")
+        density_entry.insert(0, "1.24"); density_entry.grid(row=4, column=1, padx=6)
 
         result_frame = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=8)
         result_frame.pack(fill="x", padx=30, pady=12)
         res_lbl = ctk.CTkLabel(result_frame, text="", font=("Segoe UI", 11),
-                                text_color="#4ade80", wraplength=360, justify="left")
+                                text_color="#4ade80", wraplength=380, justify="left")
         res_lbl.pack(pady=12, padx=14)
 
         def calculate():
@@ -4737,28 +5224,35 @@ class U1FullSpectrumApp(ctk.CTk):
                 n_layers  = int(layers_entry.get())
                 secs      = float(secs_entry.get())
                 purge_vol = float(purge_entry.get())
+                cost_per_kg = float(cost_entry.get())
+                density = float(density_entry.get())
             except ValueError: return
 
             lh = safe_td(self.layer_height_entry.get()) if hasattr(self, "layer_height_entry") else 0.08
-            # Gesamte Wechsel: pro Virtual-Kopf = Werkzeugwechsel pro Schicht in der Sequenz
             total_changes = 0
             for vf in self.virtual_fils:
                 seq = vf["sequence"]
-                # Wechsel in der Sequenz = Anzahl aufeinanderfolgend verschiedener Tools
                 changes_per_cycle = sum(1 for i in range(len(seq)-1) if seq[i] != seq[i+1])
                 cycle_len = len(seq)
                 cycles = n_layers / max(cycle_len, 1)
                 total_changes += int(cycles * changes_per_cycle)
 
             extra_min = total_changes * secs / 60
-            # Purge in Gramm (PLA Dichte ~1.24 g/cm³, 1.75mm Filament)
-            # mm³ → cm³ → g
-            purge_g = total_changes * purge_vol * 1.24 / 1000
+            # Purge in Gramm: mm³ × density(g/cm³) / 1000 (cm³)
+            purge_cm3 = total_changes * purge_vol / 1000
+            purge_g = purge_cm3 * density
+            # Cost = volume_cm3 × density(g/cm3) × cost_per_kg/1000
+            purge_cost = purge_cm3 * density * (cost_per_kg / 1000)
+            # Equivalent print layers
+            layer_vol_mm3 = purge_vol  # rough approximation: each layer ~ same as purge vol
+            purge_layer_equiv = int(total_changes * purge_vol / max(layer_vol_mm3, 1)) if layer_vol_mm3 > 0 else 0
 
             res_lbl.configure(text=(
                 f"{self.t('tc_result', n=total_changes)}\n"
                 f"{self.t('tc_time', min=extra_min, sec=int(secs))}\n"
-                f"{self.t('tc_purge', g=purge_g)}"
+                f"{self.t('tc_purge', g=purge_g)}\n"
+                f"{self.t('tc_purge_cost', cost=purge_cost)}\n"
+                f"{self.t('tc_purge_layers', n=total_changes)}"
             ))
 
         ctk.CTkButton(win, text="Berechnen", fg_color="#2563eb",
@@ -5331,9 +5825,13 @@ class U1FullSpectrumApp(ctk.CTk):
         if not h: return
         h = h.strip()
         if not h.startswith("#"): h = "#" + h
-        td_r = ctk.CTkInputDialog(text=self.t("inp_td2", td=DEFAULT_TD), title=self.t("inp_td_title")).get_input()
+        # Pre-suggest TD from hex brightness (Change 8 / 13)
+        est_td = estimate_td(h)
+        td_r = ctk.CTkInputDialog(
+            text=self.t("inp_td2", td=DEFAULT_TD) + f"\n(Schätzung aus Helligkeit: ~{est_td})",
+            title=self.t("inp_td_title")).get_input()
         self.library.setdefault(brand, []).append(
-            {"name": n.strip(), "hex": h, "td": safe_td(td_r) if td_r else DEFAULT_TD})
+            {"name": n.strip(), "hex": h, "td": safe_td(td_r) if td_r else est_td})
         self.save_db(); self._refresh_brand_menus(); cb()
 
 
@@ -5388,6 +5886,36 @@ class U1FullSpectrumApp(ctk.CTk):
             def _load_hist(e=entry):
                 self._apply_target(e["target_hex"])
             lbl.bind("<Button-1>", lambda ev, e=entry: self._apply_target(e["target_hex"]))
+
+    # ── RECENT COLORS (Change 7) ──────────────────────────────────────────────
+
+    def _add_recent_color(self, hex_color):
+        """Add color to recent colors list, deduplicate, keep max 10."""
+        if not hex_color:
+            return
+        hex_color = hex_color.upper()
+        self._recent_colors = [c for c in self._recent_colors if c != hex_color]
+        self._recent_colors.insert(0, hex_color)
+        self._recent_colors = self._recent_colors[:10]
+        self._update_recent_swatches()
+
+    def _update_recent_swatches(self):
+        """Clear and redraw recent color swatches."""
+        if not hasattr(self, '_recent_frame'):
+            return
+        for w in self._recent_frame.winfo_children():
+            w.destroy()
+        for hex_c in self._recent_colors[:10]:
+            try:
+                swatch = ctk.CTkLabel(self._recent_frame, text="", width=18, height=18,
+                                      fg_color=hex_c, corner_radius=3, cursor="hand2")
+                swatch.pack(side="left", padx=2, pady=2)
+                def _on_click(e, h=hex_c):
+                    self._apply_target(h)
+                    self.calc()
+                swatch.bind("<Button-1>", _on_click)
+            except Exception:
+                pass
 
     # ── FEATURE 7: FILAMENT SEARCH DIALOG ────────────────────────────────────
 
@@ -5730,4 +6258,110 @@ class U1FullSpectrumApp(ctk.CTk):
 
 
 if __name__ == "__main__":
-    U1FullSpectrumApp().mainloop()
+    import sys
+    import argparse
+    parser = argparse.ArgumentParser(description="U1 FullSpectrum Helper", add_help=False)
+    parser.add_argument("--target", help="Target hex color e.g. #FF5500")
+    parser.add_argument("--t1", help="T1 hex color")
+    parser.add_argument("--t2", help="T2 hex color")
+    parser.add_argument("--t3", help="T3 hex color")
+    parser.add_argument("--t4", help="T4 hex color")
+    parser.add_argument("--auto", action="store_true", help="Use auto shortest sequence")
+    parser.add_argument("--optimizer", action="store_true", help="Use optimizer")
+    parser.add_argument("--lh", type=float, default=0.08, help="Layer height mm")
+    parser.add_argument("--json", action="store_true", dest="json_out", help="Output as JSON")
+    parser.add_argument("--help", "-h", action="store_true", help="Show help")
+
+    # Only parse known args so CTk doesn't choke on unknown args
+    args, unknown = parser.parse_known_args()
+
+    if args.help:
+        parser.print_help()
+        sys.exit(0)
+
+    if args.target:
+        # CLI mode - no GUI
+        slots = []
+        for i, hex_c in enumerate([args.t1, args.t2, args.t3, args.t4]):
+            if hex_c:
+                _h = hex_c if hex_c.startswith("#") else "#" + hex_c
+                slots.append({"id": i+1, "hex": _h, "td": DEFAULT_TD,
+                              "lab": rgb_to_lab(hex_to_rgb(_h))})
+        if not slots:
+            print("Error: specify at least --t1 and --t2"); sys.exit(1)
+
+        target_lab = rgb_to_lab(hex_to_rgb(args.target))
+        scores = [{"id": f["id"], "w": (1/(delta_e(target_lab, f["lab"])+0.1))*(10/DEFAULT_TD), "h": f["hex"]} for f in slots]
+        tot = sum(s["w"] for s in scores)
+        if tot == 0:
+            print("Error: could not compute scores"); sys.exit(1)
+
+        def _build_seq_cli(sorted_scores, tot, n):
+            counts = [max(0, round((s["w"]/tot)*n)) for s in sorted_scores]
+            diff = n - sum(counts)
+            i = 0
+            while diff > 0: counts[i % len(counts)] += 1; diff -= 1; i += 1
+            while diff < 0:
+                for j in range(len(counts)):
+                    if counts[j] > 0: counts[j] -= 1; diff += 1; break
+            arr = [None] * n
+            pos = n - 1
+            for j, s in enumerate(sorted_scores):
+                for _ in range(counts[j]):
+                    if pos >= 0: arr[pos] = s["id"]; pos -= 1
+            return [x or sorted_scores[0]["id"] for x in arr]
+
+        def _sim_mix_cli(seq, slots_list):
+            lin = [0.0, 0.0, 0.0]
+            for fid in seq:
+                slot = next((s for s in slots_list if s["id"] == fid), None)
+                if slot is None: continue
+                r, g, b = hex_to_rgb(slot["hex"])
+                lin[0] += (r/255)**2.2; lin[1] += (g/255)**2.2; lin[2] += (b/255)**2.2
+            n = len(seq)
+            lin = [x/n for x in lin]
+            return rgb_to_lab(tuple(int((x**(1/2.2))*255) for x in lin))
+
+        result_seq = None
+        result_de = float("inf")
+        srt = sorted(scores, key=lambda x: x["w"], reverse=True)
+        for n in range(1, 11):
+            if args.optimizer:
+                best_s, best_dv = None, float("inf")
+                for perm in iter_permutations(srt):
+                    seq = _build_seq_cli(list(perm), tot, n)
+                    sim_lab = _sim_mix_cli(seq, slots)
+                    dv = delta_e(sim_lab, target_lab)
+                    if dv < best_dv: best_dv = dv; best_s = seq
+                seq = best_s
+                dv = best_dv
+            else:
+                seq = _build_seq_cli(srt, tot, n)
+                sim_lab = _sim_mix_cli(seq, slots)
+                dv = delta_e(sim_lab, target_lab)
+            if dv < result_de:
+                result_de = dv; result_seq = seq
+            if args.auto and dv <= 2.0:
+                break
+
+        seq_str = "".join(map(str, result_seq)) if result_seq else ""
+        cad = calc_cadence(seq_str, args.lh)
+        ids = sorted(cad.keys())
+
+        if args.json_out:
+            import json as _json
+            print(_json.dumps({"sequence": seq_str, "de": round(result_de, 2),
+                               "cadence": cad, "layer_height": args.lh}))
+        else:
+            print(f"Sequence: {seq_str}")
+            print(f"ΔE:       {result_de:.2f}")
+            if len(ids) == 1:
+                print("Mode:     Pure color")
+            elif len(ids) == 2:
+                print(f"Mode:     Cadence  A={cad[ids[0]]}mm  B={cad[ids[1]]}mm")
+            else:
+                print(f"Mode:     Pattern  {seq_str}")
+    else:
+        # GUI mode
+        app = U1FullSpectrumApp()
+        app.mainloop()
