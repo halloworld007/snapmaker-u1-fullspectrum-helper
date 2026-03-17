@@ -251,6 +251,13 @@ STRINGS = {
     "de_overview_col_seq": "Sequenz",
     "de_overview_col_de": "ΔE",
     "de_overview_col_quality": "Qualität",
+    "auto_found": "Auto: Länge {n} gefunden",
+    "auto_finding": "Auto — Länge wird berechnet",
+    "status_ready": "Bereit",
+    "status_calculated": "Berechnet — ΔE {de:.1f} — Sequenz: {seq}",
+    "status_added": "V{vid} hinzugefügt",
+    "status_exported": "Exportiert: {f}",
+    "status_3mf": "3MF: {n} Farben gefunden",
     "recipe_title": "Farbrezept-Export",
     "recipe_copy_btn": "In Zwischenablage",
     "btn_multitarget": "🎯 Multi-Ziel",
@@ -481,6 +488,13 @@ STRINGS = {
     "de_overview_col_seq": "Sequence",
     "de_overview_col_de": "ΔE",
     "de_overview_col_quality": "Quality",
+    "auto_found": "Auto: length {n} found",
+    "auto_finding": "Auto — calculating length",
+    "status_ready": "Ready",
+    "status_calculated": "Calculated — ΔE {de:.1f} — Sequence: {seq}",
+    "status_added": "V{vid} added",
+    "status_exported": "Exported: {f}",
+    "status_3mf": "3MF: {n} colors found",
     "recipe_title": "Color Recipe Export",
     "recipe_copy_btn": "Copy to Clipboard",
     "btn_multitarget": "🎯 Multi-Target",
@@ -1031,6 +1045,33 @@ class SwatchLabel(QLabel):
         super().mousePressEvent(event)
 
 
+# ── CLICKABLE LABEL ───────────────────────────────────────────────────────────
+
+class ClickableLabel(QLabel):
+    """A QLabel that copies its text to clipboard on click and flashes green."""
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setCursor(QCursor(Qt.PointingHandCursor))
+        self._original_style = ""
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            txt = self.text().strip()
+            if txt and txt != "----------":
+                QApplication.clipboard().setText(txt)
+                self._flash()
+        super().mousePressEvent(event)
+
+    def _flash(self):
+        self._original_style = self.styleSheet()
+        self.setStyleSheet(self._original_style + " background-color: #16a34a; border-radius: 4px;")
+        QTimer.singleShot(600, self._restore_style)
+
+    def _restore_style(self):
+        self.setStyleSheet(self._original_style)
+
+
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 
 MAX_SEQ_LEN      = 10
@@ -1262,6 +1303,8 @@ class U1App(QMainWindow):
         self._virtual = []
         self._history = []
         self._undo_stack = []
+        self._slot_undo_stack = []
+        self._slot_expanded = [True, False, False, False]
         self._search_wins = {}
         self._last_result = {}
         self._last_sim_hex = None
@@ -1316,6 +1359,7 @@ class U1App(QMainWindow):
 
     def closeEvent(self, event):
         self._save_settings()
+        self._settings.setValue("geometry", self.saveGeometry())
         event.accept()
 
     def _save_settings(self):
@@ -1337,6 +1381,117 @@ class U1App(QMainWindow):
     def t(self, key, **kwargs):
         s = STRINGS[self.lang].get(key, STRINGS["de"].get(key, key))
         return s.format(**kwargs) if kwargs else s
+
+    # ── STATUS BAR ─────────────────────────────────────────────────────────────
+
+    def _set_status(self, msg, duration=0):
+        self.statusBar().showMessage(msg, duration)
+
+    # ── SLOT UNDO ──────────────────────────────────────────────────────────────
+
+    def _save_slot_snapshot(self):
+        snapshot = []
+        for s in getattr(self, "_slots", []):
+            snapshot.append({
+                "brand": s["brand_combo"].currentText(),
+                "fil": s["fil_combo"].currentText(),
+                "hex": s["hex_edit"].text(),
+                "td": s["td_spin"].value(),
+            })
+        self._slot_undo_stack.append(snapshot)
+        if len(self._slot_undo_stack) > 10:
+            self._slot_undo_stack.pop(0)
+
+    def _undo_slot(self):
+        if not self._slot_undo_stack:
+            return
+        snapshot = self._slot_undo_stack.pop()
+        for i, data in enumerate(snapshot):
+            if i >= len(self._slots):
+                break
+            s = self._slots[i]
+            brands = [s["brand_combo"].itemText(j) for j in range(s["brand_combo"].count())]
+            if data["brand"] in brands:
+                s["brand_combo"].setCurrentText(data["brand"])
+                self._update_filament_combo(i)
+            for j in range(s["fil_combo"].count()):
+                if s["fil_combo"].itemText(j) == data["fil"]:
+                    s["fil_combo"].setCurrentIndex(j)
+                    break
+            s["hex_edit"].setText(data["hex"])
+            s["td_spin"].setValue(data["td"])
+            self._update_slot_preview(i)
+        self._update_gamut_strip()
+
+    # ── SLOT COLOR STRIP ───────────────────────────────────────────────────────
+
+    def _update_slot_strip(self, idx):
+        s = self._slots[idx]
+        hex_val = s["hex_edit"].text().strip()
+        if not hex_val.startswith("#"):
+            hex_val = "#" + hex_val
+        strip = s.get("color_strip")
+        if strip:
+            try:
+                r, g, b = hex_to_rgb(hex_val)
+                strip.setStyleSheet(
+                    f"background-color: #{r:02X}{g:02X}{b:02X}; "
+                    f"border-radius: 2px; border: none;")
+            except Exception:
+                pass
+
+    # ── AUTO TOGGLE ────────────────────────────────────────────────────────────
+
+    def _on_auto_toggle(self, checked):
+        if hasattr(self, "_len_spin"):
+            self._len_spin.setVisible(not checked)
+        if hasattr(self, "_auto_found_label"):
+            self._auto_found_label.setVisible(checked)
+
+    # ── RESULT BORDER ──────────────────────────────────────────────────────────
+
+    def _set_result_border(self, de):
+        if de < 3.0:
+            color = "#16a34a"
+        elif de < 6.0:
+            color = "#d97706"
+        else:
+            color = "#dc2626"
+            QTimer.singleShot(0, lambda: self._pulse_result(3))
+        if hasattr(self, "_result_frame"):
+            self._result_frame.setStyleSheet(
+                f"QFrame {{ border: 2px solid {color}; border-radius: 6px; }}")
+
+    def _pulse_result(self, n):
+        if n <= 0 or not hasattr(self, "_result_frame"):
+            return
+        cur = self._result_frame.styleSheet()
+        if "4px" in cur:
+            new_w = "2px"
+        else:
+            new_w = "4px"
+        import re as _re
+        new_style = _re.sub(r'\d+px solid', f'{new_w} solid', cur)
+        self._result_frame.setStyleSheet(new_style)
+        QTimer.singleShot(500, lambda: self._pulse_result(n - 1))
+
+    # ── VIRTUAL SORT / FILTER ──────────────────────────────────────────────────
+
+    def _get_sorted_filtered_virtual(self):
+        fils = list(self._virtual)
+        ftext = self._virt_filter.text().lower().strip() if hasattr(self, "_virt_filter") else ""
+        if ftext:
+            fils = [v for v in fils if ftext in v.get("label", "").lower()
+                    or ftext in v.get("sequence", "").lower()
+                    or ftext in v.get("target_hex", "").lower()]
+        sk = self._virt_sort.currentText() if hasattr(self, "_virt_sort") else ""
+        if "ΔE ↑" in sk:
+            fils.sort(key=lambda v: v.get("de", 99))
+        elif "ΔE ↓" in sk:
+            fils.sort(key=lambda v: v.get("de", 0), reverse=True)
+        elif "Label" in sk or "A-Z" in sk:
+            fils.sort(key=lambda v: v.get("label", ""))
+        return fils
 
     # ── DATABASE ───────────────────────────────────────────────────────────────
 
@@ -1448,6 +1603,9 @@ class U1App(QMainWindow):
 
     def _build_ui(self):
         self.setWindowTitle(self.t("app_title"))
+        self.statusBar().setStyleSheet(
+            "QStatusBar { background: #0a1628; color: #64748b; font-size: 10px; }")
+        self.statusBar().showMessage(self.t("status_ready"))
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -1520,10 +1678,15 @@ class U1App(QMainWindow):
         preset_btn_row = QHBoxLayout()
         load_preset_btn = QPushButton(self.t("btn_load"))
         save_preset_btn = QPushButton(self.t("btn_save"))
+        slot_undo_btn = QPushButton("↩ Slot")
+        slot_undo_btn.setFixedHeight(26)
+        slot_undo_btn.setToolTip("Slot-Änderung rückgängig")
+        slot_undo_btn.clicked.connect(self._undo_slot)
         load_preset_btn.clicked.connect(self._load_preset)
         save_preset_btn.clicked.connect(self._save_preset)
         preset_btn_row.addWidget(load_preset_btn)
         preset_btn_row.addWidget(save_preset_btn)
+        preset_btn_row.addWidget(slot_undo_btn)
         preset_layout.addLayout(preset_btn_row)
         layout.addWidget(preset_gb)
 
@@ -1570,34 +1733,64 @@ class U1App(QMainWindow):
         layout.addWidget(proj_gb)
 
     def _build_slot_frame(self, idx):
-        frame = QFrame()
-        frame.setObjectName("slot_frame")
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(4)
+        # Outer frame with left color strip
+        outer_frame = QFrame()
+        outer_frame.setObjectName("slot_frame")
+        outer_layout = QHBoxLayout(outer_frame)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
 
-        # Header row
+        # Left color strip (4px wide)
+        color_strip = QFrame()
+        color_strip.setFixedWidth(4)
+        color_strip.setStyleSheet("background-color: #808080; border-radius: 2px; border: none;")
+        outer_layout.addWidget(color_strip)
+
+        # Main slot content
+        frame = QFrame()
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setContentsMargins(6, 4, 6, 6)
+        frame_layout.setSpacing(4)
+        outer_layout.addWidget(frame, 1)
+
+        # Accordion header button
+        is_expanded = self._slot_expanded[idx]
+        toggle_btn = QPushButton(
+            f"▼ T{idx+1}" if is_expanded else f"▶ T{idx+1}")
+        toggle_btn.setFixedHeight(26)
+        toggle_btn.setStyleSheet(
+            "QPushButton { text-align: left; padding-left: 4px; "
+            "font-weight: bold; background-color: transparent; border: none; "
+            "color: #94a3b8; } "
+            "QPushButton:hover { color: #e2e8f0; }")
+        frame_layout.addWidget(toggle_btn)
+
+        # Body widget (collapsible)
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(4)
+        body.setVisible(is_expanded)
+
+        # Header row inside body
         hdr = QHBoxLayout()
-        title = QLabel(self.t("tool_header", i=idx + 1))
-        title.setObjectName("slot_title")
-        hdr.addWidget(title)
-        hdr.addStretch()
         search_btn = QPushButton("🔍")
         search_btn.setFixedSize(26, 26)
         search_btn.clicked.connect(lambda checked, i=idx: self._open_filament_search(i))
+        hdr.addStretch()
         hdr.addWidget(search_btn)
-        layout.addLayout(hdr)
+        body_layout.addLayout(hdr)
 
         # Brand combo
         brand_combo = QComboBox()
         brand_combo.addItems(list(self.library.keys()))
         brand_combo.currentTextChanged.connect(lambda t, i=idx: self._update_filament_combo(i))
-        layout.addWidget(brand_combo)
+        body_layout.addWidget(brand_combo)
 
         # Filament combo
         fil_combo = QComboBox()
         fil_combo.currentTextChanged.connect(lambda t, i=idx: self._apply_filament(i))
-        layout.addWidget(fil_combo)
+        body_layout.addWidget(fil_combo)
 
         # Hex + preview + TD row
         hex_row = QHBoxLayout()
@@ -1608,7 +1801,7 @@ class U1App(QMainWindow):
         hex_row.addWidget(hex_edit)
 
         preview_lbl = QLabel()
-        preview_lbl.setFixedSize(20, 20)
+        preview_lbl.setFixedSize(36, 36)
         preview_lbl.setStyleSheet("background-color: #808080; border-radius: 4px; border: 1px solid #334155;")
         hex_row.addWidget(preview_lbl)
 
@@ -1628,7 +1821,9 @@ class U1App(QMainWindow):
         td_spin.setMaximumWidth(70)
         td_spin.valueChanged.connect(lambda v, i=idx: self._update_gamut_strip())
         hex_row.addWidget(td_spin)
-        layout.addLayout(hex_row)
+        body_layout.addLayout(hex_row)
+
+        frame_layout.addWidget(body)
 
         slot_data = {
             "brand_combo": brand_combo,
@@ -1636,12 +1831,31 @@ class U1App(QMainWindow):
             "hex_edit": hex_edit,
             "preview_lbl": preview_lbl,
             "td_spin": td_spin,
+            "toggle_btn": toggle_btn,
+            "body": body,
+            "color_strip": color_strip,
         }
         self._slots.append(slot_data)
 
+        # Wire accordion toggle
+        toggle_btn.clicked.connect(lambda checked, i=idx: self._toggle_slot(i))
+
         # Initialize filament combo
         self._update_filament_combo(idx)
-        return frame
+        return outer_frame
+
+    def _toggle_slot(self, i):
+        self._slot_expanded[i] = not self._slot_expanded[i]
+        s = self._slots[i]
+        expanded = self._slot_expanded[i]
+        s["body"].setVisible(expanded)
+        if expanded:
+            s["toggle_btn"].setText(f"▼ T{i+1}")
+        else:
+            hex_val = s["hex_edit"].text().strip() or "#808080"
+            if not hex_val.startswith("#"):
+                hex_val = "#" + hex_val
+            s["toggle_btn"].setText(f"▶ T{i+1}  {hex_val.upper()}")
 
     def _update_filament_combo(self, idx):
         s = self._slots[idx]
@@ -1682,6 +1896,10 @@ class U1App(QMainWindow):
                 f"background-color: #{r:02X}{g:02X}{b:02X}; border-radius: 4px; border: 1px solid #334155;")
         except Exception:
             pass
+        self._update_slot_strip(idx)
+        # Update toggle button text when collapsed
+        if not self._slot_expanded[idx]:
+            s["toggle_btn"].setText(f"▶ T{idx+1}  {hex_val.upper()}")
         self._update_gamut_strip()
 
     def _pick_slot_color(self, idx):
@@ -1757,6 +1975,7 @@ class U1App(QMainWindow):
                     break
         if entries is None:
             return
+        self._save_slot_snapshot()
         for i, entry in enumerate(entries[:4]):
             self._apply_slot(i, entry)
         self._update_gamut_strip()
@@ -1831,6 +2050,7 @@ class U1App(QMainWindow):
             return
         if "layer_height" in project:
             self._lh_spin.setValue(float(project["layer_height"]))
+        self._save_slot_snapshot()
         for i, s_data in enumerate(project.get("slots", [])[:4]):
             self._apply_slot(i, s_data)
         self._virtual = project.get("virtual_fils", [])
@@ -1949,11 +2169,17 @@ class U1App(QMainWindow):
         self._len_spin.setValue(10)
         opts_layout.addWidget(self._len_spin)
 
+        self._auto_found_label = QLabel(self.t("auto_finding"))
+        self._auto_found_label.setObjectName("hint")
+        opts_layout.addWidget(self._auto_found_label)
+
         self._auto_check = QCheckBox(self.t("auto_check").replace("\n", " "))
         self._auto_check.setChecked(True)
-        self._auto_check.toggled.connect(lambda on: self._len_spin.setEnabled(not on))
+        self._auto_check.toggled.connect(self._on_auto_toggle)
         opts_layout.addWidget(self._auto_check)
-        self._len_spin.setEnabled(False)  # Auto ist Standard
+        # Apply initial state: auto is default True
+        self._len_spin.setVisible(False)
+        self._auto_found_label.setVisible(True)
 
         opts_layout.addWidget(QLabel("ΔE≤"))
         self._auto_thresh_spin = QDoubleSpinBox()
@@ -1982,15 +2208,22 @@ class U1App(QMainWindow):
         layout.addWidget(opts_frame)
 
         # Calculate button
-        calc_btn = QPushButton(self.t("btn_calculate"))
-        calc_btn.setObjectName("btn_primary")
-        calc_btn.setFixedHeight(46)
-        calc_btn.clicked.connect(self._calc)
-        layout.addWidget(calc_btn)
+        self._calc_btn = QPushButton(self.t("btn_calculate"))
+        self._calc_btn.setObjectName("btn_primary")
+        self._calc_btn.setFixedHeight(44)
+        self._calc_btn.setStyleSheet(
+            "QPushButton { background-color: #2563eb; color: white; font-size: 13px; "
+            "font-weight: bold; border-radius: 6px; } "
+            "QPushButton:hover { background-color: #1d4ed8; } "
+            "QPushButton:disabled { background-color: #334155; }")
+        self._calc_btn.setToolTip(self.t("btn_calculate") + " (Enter)")
+        self._calc_btn.clicked.connect(self._calc)
+        layout.addWidget(self._calc_btn)
 
         # Result area
-        result_frame = QFrame()
-        result_frame.setObjectName("card")
+        self._result_frame = QFrame()
+        self._result_frame.setObjectName("card")
+        result_frame = self._result_frame
         result_layout = QHBoxLayout(result_frame)
         result_layout.setContentsMargins(16, 12, 16, 12)
         result_layout.setSpacing(16)
@@ -2031,11 +2264,17 @@ class U1App(QMainWindow):
         # Sequence text + copy
         seq_col = QVBoxLayout()
         seq_col.setAlignment(Qt.AlignCenter)
-        self._seq_label = QLabel("----------")
+        self._seq_label = ClickableLabel("----------")
         font = QFont("Courier New", 28, QFont.Bold)
         self._seq_label.setFont(font)
         self._seq_label.setStyleSheet("color: #4ade80;")
+        self._seq_label.setAlignment(Qt.AlignCenter)
+        self._seq_label.setToolTip("Klick zum Kopieren" if self.lang == "de" else "Click to copy")
         seq_col.addWidget(self._seq_label)
+        _copy_hint_lbl = QLabel("(Klick zum Kopieren)" if self.lang == "de" else "(Click to copy)")
+        _copy_hint_lbl.setObjectName("hint")
+        _copy_hint_lbl.setAlignment(Qt.AlignCenter)
+        seq_col.addWidget(_copy_hint_lbl)
         self._hint_label = QLabel("")
         self._hint_label.setObjectName("hint")
         self._hint_label.setWordWrap(True)
@@ -2050,9 +2289,16 @@ class U1App(QMainWindow):
         # Add virtual button
         add_virt_btn = QPushButton(self.t("btn_add_virtual").replace("\n", " "))
         add_virt_btn.setObjectName("btn_green")
-        add_virt_btn.setFixedHeight(46)
+        add_virt_btn.setFixedHeight(44)
+        add_virt_btn.setStyleSheet(
+            "QPushButton { background-color: #15803d; color: white; font-size: 13px; "
+            "font-weight: bold; border-radius: 6px; } "
+            "QPushButton:hover { background-color: #16a34a; } "
+            "QPushButton:disabled { background-color: #334155; }")
+        add_virt_btn.setToolTip(self.t("btn_add_virtual").replace("\n", " ") + " (Ctrl+Enter)")
         add_virt_btn.clicked.connect(self.add_virtual)
         layout.addWidget(add_virt_btn)
+        QShortcut(QKeySequence("Ctrl+Return"), self, self.add_virtual)
 
         # Top-3 frame (hidden by default)
         self._top3_frame = QFrame()
@@ -2147,6 +2393,24 @@ class U1App(QMainWindow):
         _mkbtn2(self.t("btn_recalc_all"), "#065f46", self._recalc_all_virtual)
         tb2_layout.addStretch()
         tab_layout.addWidget(tb2)
+
+        # Sort / Filter bar
+        sort_filter_bar = QFrame()
+        sort_filter_bar.setObjectName("card")
+        sf_layout = QHBoxLayout(sort_filter_bar)
+        sf_layout.setContentsMargins(6, 4, 6, 4)
+        sf_layout.setSpacing(6)
+        sf_layout.addWidget(QLabel("Sort:" if self.lang == "en" else "Sortierung:"))
+        self._virt_sort = QComboBox()
+        self._virt_sort.addItems(["Hinzugefügt", "ΔE ↑", "ΔE ↓", "Label A-Z"])
+        self._virt_sort.setFixedWidth(130)
+        self._virt_sort.currentIndexChanged.connect(self._refresh_virtual_grid)
+        sf_layout.addWidget(self._virt_sort)
+        self._virt_filter = QLineEdit()
+        self._virt_filter.setPlaceholderText("Filter…")
+        self._virt_filter.textChanged.connect(self._refresh_virtual_grid)
+        sf_layout.addWidget(self._virt_filter, 1)
+        tab_layout.addWidget(sort_filter_bar)
 
         # Virtual grid scroll area
         self._vgrid_scroll = QScrollArea()
@@ -2515,70 +2779,86 @@ class U1App(QMainWindow):
             QMessageBox.information(self, self.t("dlg_note"), self.t("dlg_select_color"))
             return
 
-        t_lab = rgb_to_lab(hex_to_rgb(self._target_hex))
-        fils = self._slot_filaments()
+        if hasattr(self, "_calc_btn"):
+            self._calc_btn.setText("⏳ Berechne…")
+            self._calc_btn.setEnabled(False)
+            QApplication.processEvents()
 
-        # Gamut warning
-        if min(delta_e(t_lab, f["lab"]) for f in fils) > GAMUT_WARN_DE:
-            self._gamut_warn.show()
-        else:
-            self._gamut_warn.hide()
+        try:
+            t_lab = rgb_to_lab(hex_to_rgb(self._target_hex))
+            fils = self._slot_filaments()
 
-        auto = self._auto_check.isChecked()
-        threshold = self._auto_thresh_spin.value() if auto else 2.0
-        seq_len = self._len_spin.value() if not auto else None
+            # Gamut warning
+            if min(delta_e(t_lab, f["lab"]) for f in fils) > GAMUT_WARN_DE:
+                self._gamut_warn.show()
+            else:
+                self._gamut_warn.hide()
 
-        result = self._calc_for_color(
-            self._target_hex,
-            self._optimizer_check.isChecked(),
-            seq_len=seq_len,
-            auto=auto,
-            auto_threshold=threshold)
-        if result is None:
-            return
+            auto = self._auto_check.isChecked()
+            threshold = self._auto_thresh_spin.value() if auto else 2.0
+            seq_len = self._len_spin.value() if not auto else None
 
-        seq = result["sequence"]
-        if auto:
-            self._len_spin.setValue(result["seq_len"])
+            result = self._calc_for_color(
+                self._target_hex,
+                self._optimizer_check.isChecked(),
+                seq_len=seq_len,
+                auto=auto,
+                auto_threshold=threshold)
+            if result is None:
+                return
 
-        self._seq_label.setText(seq)
-        self._last_sim_hex = result["sim_hex"]
-        self._last_de = result["de"]
-        dv = result["de"]
+            seq = result["sequence"]
+            if auto:
+                if hasattr(self, "_auto_found_label"):
+                    self._auto_found_label.setText(
+                        self.t("auto_found", n=result["seq_len"]))
 
-        # Update result swatches
-        self._result_target_swatch.set_color(self._target_hex)
-        self._result_target_hex_lbl.setText(self._target_hex.upper())
-        self._result_sim_swatch.set_color(result["sim_hex"])
-        self._result_sim_hex_lbl.setText(result["sim_hex"].upper())
+            self._seq_label.setText(seq)
+            self._last_sim_hex = result["sim_hex"]
+            self._last_de = result["de"]
+            dv = result["de"]
 
-        # ΔE display
-        self._de_label.setText(f"ΔE {dv:.1f}")
-        self._de_label.setStyleSheet(f"color: {_de_color(dv)}; font-size: 22pt; font-weight: bold;")
-        quality = ("excellent ✓" if dv < 3.0 else "good" if dv < 6.0 else "visible") \
-            if self.lang == "en" else \
-            ("ausgezeichnet ✓" if dv < 3.0 else "gut" if dv < 6.0 else "sichtbar")
-        self._de_quality_lbl.setText(quality)
-        self._de_quality_lbl.setStyleSheet(f"color: {_de_color(dv)};")
+            # Update result swatches
+            self._result_target_swatch.set_color(self._target_hex)
+            self._result_target_hex_lbl.setText(self._target_hex.upper())
+            self._result_sim_swatch.set_color(result["sim_hex"])
+            self._result_sim_hex_lbl.setText(result["sim_hex"].upper())
 
-        # Hint
-        lh = self._lh_spin.value()
-        n_fils = _seq_filament_count(seq)
-        pat_str = "/".join(seq)
-        if n_fils == 1:
-            hint = self.t("hint_pure")
-        elif n_fils == 2 and lh > 0:
-            cad = calc_cadence(seq, lh)
-            ids = sorted(cad.keys())
-            hint = self.t("hint_cadence", a=cad[ids[0]],
-                          b=cad[ids[1]] if len(ids) > 1 else lh, p=pat_str)
-        else:
-            hint = self.t("hint_pattern", p=pat_str)
-        self._hint_label.setText(hint)
+            # ΔE display
+            self._de_label.setText(f"ΔE {dv:.1f}")
+            self._de_label.setStyleSheet(f"color: {_de_color(dv)}; font-size: 22pt; font-weight: bold;")
+            quality = ("excellent ✓" if dv < 3.0 else "good" if dv < 6.0 else "visible") \
+                if self.lang == "en" else \
+                ("ausgezeichnet ✓" if dv < 3.0 else "gut" if dv < 6.0 else "sichtbar")
+            self._de_quality_lbl.setText(quality)
+            self._de_quality_lbl.setStyleSheet(f"color: {_de_color(dv)};")
 
-        self._last_result = result
-        self._show_top3()
-        self._update_history(self._target_hex, result["sim_hex"], dv, seq)
+            # Result border color based on ΔE
+            self._set_result_border(dv)
+
+            # Hint
+            lh = self._lh_spin.value()
+            n_fils = _seq_filament_count(seq)
+            pat_str = "/".join(seq)
+            if n_fils == 1:
+                hint = self.t("hint_pure")
+            elif n_fils == 2 and lh > 0:
+                cad = calc_cadence(seq, lh)
+                ids = sorted(cad.keys())
+                hint = self.t("hint_cadence", a=cad[ids[0]],
+                              b=cad[ids[1]] if len(ids) > 1 else lh, p=pat_str)
+            else:
+                hint = self.t("hint_pattern", p=pat_str)
+            self._hint_label.setText(hint)
+
+            self._last_result = result
+            self._show_top3()
+            self._update_history(self._target_hex, result["sim_hex"], dv, seq)
+            self._set_status(self.t("status_calculated", de=dv, seq=seq), 5000)
+        finally:
+            if hasattr(self, "_calc_btn"):
+                self._calc_btn.setText(self.t("btn_calculate"))
+                self._calc_btn.setEnabled(True)
 
     def _show_top3(self):
         # Clear existing
@@ -2655,6 +2935,7 @@ class U1App(QMainWindow):
             "label": self.t("virtual_label_default", vid=vid),
         })
         self._refresh_virtual_grid()
+        self._set_status(self.t("status_added", vid=vid), 3000)
 
     def _undo_last(self):
         if not self._undo_stack:
@@ -2744,7 +3025,7 @@ class U1App(QMainWindow):
             self._vgrid_layout.addStretch()
             return
 
-        for vf in self._virtual:
+        for vf in self._get_sorted_filtered_virtual():
             row_widget = self._build_virtual_row(vf)
             self._vgrid_layout.addWidget(row_widget)
         self._vgrid_layout.addStretch()
@@ -2942,6 +3223,7 @@ class U1App(QMainWindow):
         dlg.show()
 
     def _on_filament_search_select(self, slot_idx, fil_data):
+        self._save_slot_snapshot()
         s = self._slots[slot_idx]
         brand = fil_data.get("brand", "")
         brands = [s["brand_combo"].itemText(j) for j in range(s["brand_combo"].count())]
