@@ -1026,53 +1026,54 @@ DEFAULT_LIBRARY = {
 # ── EINGEBAUTE SLOT-PRESETS ────────────────────────────────────────────────────
 # Wissenschaftlich optimierte Kombis für maximale Farbgamut (FullSpectrum additiv)
 # Werden immer angezeigt (★-Präfix), können nicht überschrieben werden.
+# Interne Keys sind sprachunabhängig — Anzeigenamen kommen aus BUILTIN_PRESET_LABELS.
 BUILTIN_PRESETS = {
-    "★ CMYK — Max. Gamut": [
-        # Optimale 4er-Kombi für größtmögliche Farbpalette im additiven Mischen
-        # Cyan+Magenta+Yellow decken ~300° Farbkreis ab, Schwarz für Tiefe
+    "★ CMYK": [
         {"brand": "Bambu Lab Basic", "filament": "Cyan",         "hex": "#0086D6", "td": 5.0},
         {"brand": "Bambu Lab Basic", "filament": "Magenta",      "hex": "#EC008C", "td": 8.0},
         {"brand": "Bambu Lab Basic", "filament": "Lemon Yellow", "hex": "#FFF176", "td": 7.5},
         {"brand": "Bambu Lab Basic", "filament": "Black",        "hex": "#101012", "td": 0.3},
     ],
-    "★ RGB + Weiß — Additiv": [
-        # Reine additive Primärfarben + Weiß für helle Pastelltöne
-        # Deckt den gesamten RGB-Raum mit Aufhellungsoption ab
+    "★ RGB+W": [
         {"brand": "Bambu Lab Basic", "filament": "Vivid Red",    "hex": "#E53935", "td": 3.5},
         {"brand": "Bambu Lab Basic", "filament": "Grass Green",  "hex": "#43A047", "td": 4.5},
         {"brand": "Bambu Lab Basic", "filament": "Cobalt Blue",  "hex": "#1565C0", "td": 3.5},
         {"brand": "Bambu Lab Basic", "filament": "Jade White",   "hex": "#F5F5F3", "td": 8.5},
     ],
-    "★ Primärfarben Classic": [
-        # Malerische Grundfarben Weiß+Gelb+Rot+Blau — klassische Allrounder-Kombi
-        # Gut für Alltag, Beschriftungen, bunte Objekte
+    "★ Primary": [
         {"brand": "Bambu Lab Basic", "filament": "Jade White",   "hex": "#F5F5F3", "td": 8.5},
         {"brand": "Bambu Lab Basic", "filament": "Yellow",       "hex": "#FCE300", "td": 6.5},
         {"brand": "Bambu Lab Basic", "filament": "Vivid Red",    "hex": "#E53935", "td": 3.5},
         {"brand": "Bambu Lab Basic", "filament": "Cobalt Blue",  "hex": "#1565C0", "td": 3.5},
     ],
-    "★ Warm-Palette": [
-        # Weiß → Gelb → Orange → Rot: Hauttöne, Feuer, Sonnenuntergang, Erdtöne
+    "★ Warm": [
         {"brand": "Bambu Lab Basic", "filament": "Jade White",   "hex": "#F5F5F3", "td": 8.5},
         {"brand": "Bambu Lab Basic", "filament": "Lemon Yellow", "hex": "#FFF176", "td": 7.5},
         {"brand": "Bambu Lab Basic", "filament": "Tangerine",    "hex": "#FF7043", "td": 5.5},
         {"brand": "Bambu Lab Basic", "filament": "Flame Red",    "hex": "#D32F2F", "td": 3.5},
     ],
-    "★ Kalt-Palette": [
-        # Weiß → Mint → Cyan → Violett: Himmel, Ozean, Eis, kühle Technik-Looks
+    "★ Cool": [
         {"brand": "Bambu Lab Basic", "filament": "Jade White",   "hex": "#F5F5F3", "td": 8.5},
         {"brand": "Bambu Lab Basic", "filament": "Mint",         "hex": "#A5D6A7", "td": 7.0},
         {"brand": "Bambu Lab Basic", "filament": "Cyan",         "hex": "#0086D6", "td": 5.0},
         {"brand": "Bambu Lab Basic", "filament": "Violet",       "hex": "#4527A0", "td": 3.0},
     ],
-    "★ Snapmaker Standard": [
-        # Snapmaker PLA Grundsortiment: Weiß+Gelb+Rot+Blau
-        # Ideal für U1-Nutzer mit Original-Snapmaker-Filamenten
+    "★ Snapmaker": [
         {"brand": "Snapmaker PLA",   "filament": "White",        "hex": "#F8F8F8", "td": 8.5},
         {"brand": "Snapmaker PLA",   "filament": "Yellow",       "hex": "#FFD700", "td": 6.5},
         {"brand": "Snapmaker PLA",   "filament": "Red",          "hex": "#CC2020", "td": 3.5},
         {"brand": "Snapmaker PLA",   "filament": "Blue",         "hex": "#0047AB", "td": 3.5},
     ],
+}
+
+# Übersetzung der Anzeigenamen für BUILTIN_PRESETS (interner Key → DE/EN Label)
+BUILTIN_PRESET_LABELS = {
+    "★ CMYK":      {"de": "★ CMYK — Max. Gamut",       "en": "★ CMYK — Max. Gamut"},
+    "★ RGB+W":     {"de": "★ RGB + Weiß — Additiv",    "en": "★ RGB + White — Additive"},
+    "★ Primary":   {"de": "★ Primärfarben Classic",     "en": "★ Primary Colors Classic"},
+    "★ Warm":      {"de": "★ Warm-Palette",             "en": "★ Warm Tones"},
+    "★ Cool":      {"de": "★ Kalt-Palette",             "en": "★ Cool Tones"},
+    "★ Snapmaker": {"de": "★ Snapmaker Standard",       "en": "★ Snapmaker Standard"},
 }
 
 # ── FARB-MATHEMATIK ───────────────────────────────────────────────────────────
@@ -1413,10 +1414,16 @@ class U1FullSpectrumApp(ctk.CTk):
 
     def load_preset(self):
         name = self.preset_var.get()
-        # check built-in presets first, then user presets
-        all_presets = {**BUILTIN_PRESETS, **self.presets}
-        if not name or name not in all_presets: return
-        for i, entry in enumerate(all_presets[name][:4]):
+        if not name: return
+        # Displayed name → internal key (for built-in presets)
+        entries = self.presets.get(name)
+        if entries is None:
+            for key, labels in BUILTIN_PRESET_LABELS.items():
+                if name in labels.values():
+                    entries = BUILTIN_PRESETS.get(key)
+                    break
+        if entries is None: return
+        for i, entry in enumerate(entries[:4]):
             s = self.slots[i]
             brand = entry.get("brand", "")
             if brand in self.library:
@@ -1430,8 +1437,9 @@ class U1FullSpectrumApp(ctk.CTk):
             s["preview"].configure(fg_color=h)
 
     def _refresh_preset_dropdown(self):
-        # Built-in presets first (★), then user presets
-        names = list(BUILTIN_PRESETS.keys()) + list(self.presets.keys())
+        # Built-in presets first (★, übersetzt), dann User-Presets
+        builtin = [BUILTIN_PRESET_LABELS[k][self.lang] for k in BUILTIN_PRESETS]
+        names = builtin + list(self.presets.keys())
         if not names: names = [self.t("no_presets")]
         self.preset_dropdown.configure(values=names)
         if self.preset_var.get() not in names: self.preset_var.set(names[0])
