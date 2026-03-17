@@ -326,6 +326,10 @@ STRINGS = {
     "3mf_write_desc": "Wähle eine 3MF-Datei. Die Filament-Farben werden mit den simulierten Farben der virtuellen Köpfe aktualisiert.",
     "3mf_write_ok": "3MF erfolgreich aktualisiert:\n{path}",
     "3mf_write_err": "Fehler beim Schreiben:\n{e}",
+    "remap_title": "3MF Extruder-Remap",
+    "remap_col_hdr": "Originale Extruder  →  Ziel (T1–T4 oder V-Kopf)",
+    "remap_keep": "(unverändert lassen)",
+    "remap_btn_write": "3MF schreiben",
     # Werkzeugwechsel
     "btn_tc_est": "🔄 Werkzeugwechsel",
     "tc_title": "Werkzeugwechsel-Schätzung",
@@ -636,6 +640,10 @@ STRINGS = {
     "3mf_write_desc": "Select a 3MF file. Filament colors will be updated with the simulated colors of the virtual heads.",
     "3mf_write_ok": "3MF updated successfully:\n{path}",
     "3mf_write_err": "Write error:\n{e}",
+    "remap_title": "3MF Extruder Remap",
+    "remap_col_hdr": "Original extruders  →  Target (T1–T4 or virtual head)",
+    "remap_keep": "(keep unchanged)",
+    "remap_btn_write": "Write 3MF",
     # Tool changes
     "btn_tc_est": "🔄 Tool Changes",
     "tc_title": "Tool Change Estimator",
@@ -3726,113 +3734,210 @@ class U1FullSpectrumApp(ctk.CTk):
     # ── 3MF ZURÜCKSCHREIBEN ────────────────────────────────────────────────────
 
     def write_3mf_colors(self):
-        """Schreibt simulierte Farben + Dithering-Notizen in alle filament_settings_X.config
-        und aktualisiert extruder-Zuweisungen in model_settings.config."""
-        if not self.virtual_fils:
-            messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
+        """Öffnet 3MF, liest alle Objekte + ihre Extruder-Zuweisungen,
+        zeigt Remap-Dialog und schreibt gezielt filament_settings + model_settings."""
+        import xml.etree.ElementTree as ET
+
         path = filedialog.askopenfilename(
             filetypes=[("3MF","*.3mf"),("*","*.*")], title=self.t("3mf_write_title"))
         if not path: return
-        save_path = filedialog.asksaveasfilename(
-            defaultextension=".3mf", filetypes=[("3MF","*.3mf")],
-            initialfile=os.path.splitext(os.path.basename(path))[0]+"_colored.3mf",
-            title="Speichern als")
-        if not save_path: return
-        try:
-            import shutil, tempfile, xml.etree.ElementTree as ET
-            lh = safe_td(self.layer_height_entry.get()) if hasattr(self,"layer_height_entry") else 0.08
 
+        # ── 3MF analysieren ──────────────────────────────────────────────────
+        try:
             with zipfile.ZipFile(path,"r") as zin:
                 names = zin.namelist()
+                # model_settings lesen → Objekte + Extruder
+                ms_raw = zin.read("Metadata/model_settings.config").decode("utf-8")
+                ms_root = ET.fromstring(ms_raw)
+                # {extruder_str: [obj_name, ...]}
+                ext_objects = {}
+                for obj in ms_root.findall("object"):
+                    obj_name = next((m.get("value") for m in obj.findall("metadata")
+                                     if m.get("key")=="name"), "?")
+                    ext_val  = next((m.get("value") for m in obj.findall("metadata")
+                                     if m.get("key")=="extruder"), "1")
+                    ext_objects.setdefault(ext_val, []).append(obj_name)
+
+                # filament_settings_X vorhanden?
                 fil_cfgs = sorted([n for n in names
                                    if re.match(r"Metadata/filament_settings_\d+\.config", n)])
+        except Exception as e:
+            messagebox.showerror(self.t("dlg_error"), str(e)); return
 
-                with tempfile.NamedTemporaryFile(suffix=".3mf", delete=False) as tmp:
-                    tmp_path = tmp.name
+        # ── Remap-Dialog ─────────────────────────────────────────────────────
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("remap_title"))
+        win.geometry("680x520")
+        win.grab_set()
 
-                with zipfile.ZipFile(tmp_path,"w", zipfile.ZIP_DEFLATED) as zout:
-                    for item in zin.infolist():
-                        data = zin.read(item.filename)
-                        fname = item.filename
+        ctk.CTkLabel(win, text=self.t("remap_title"),
+                     font=("Segoe UI",14,"bold"), text_color="#38bdf8").pack(pady=(16,4))
+        ctk.CTkLabel(win, text=os.path.basename(path),
+                     font=("Segoe UI",9), text_color="#64748b").pack()
 
-                        # filament_settings_X.config → V-Kopf-Farbe + Dithering-Notiz
-                        if fname in fil_cfgs:
-                            idx = fil_cfgs.index(fname)
-                            if idx < len(self.virtual_fils):
+        sf = ctk.CTkScrollableFrame(win, fg_color="#0f172a", height=300)
+        sf.pack(fill="x", padx=16, pady=(10,4))
+
+        ctk.CTkLabel(sf, text=self.t("remap_col_hdr"),
+                     font=("Segoe UI",10,"bold"), text_color="#94a3b8").pack(anchor="w", padx=8, pady=(6,2))
+
+        # Optionen für Dropdown: T1–T4 + V5+
+        slot_opts = [f"T{i+1} — {self.slots[i]['color'].get() or self.slots[i]['hex'].get()}"
+                     for i in range(4)]
+        virt_opts = [f"V{vf['vid']} — {vf.get('label','?')} (ΔE {vf.get('de',0):.1f})"
+                     for vf in self.virtual_fils]
+        all_opts  = slot_opts + virt_opts + [self.t("remap_keep")]
+
+        remap_vars = {}  # ext_str → StringVar
+        sorted_exts = sorted(ext_objects.keys(), key=lambda x: int(x) if x.isdigit() else 99)
+
+        for ext in sorted_exts:
+            row = ctk.CTkFrame(sf, fg_color="#1e293b", corner_radius=6)
+            row.pack(fill="x", padx=4, pady=3)
+            obj_list = ", ".join(ext_objects[ext])[:55]
+            ctk.CTkLabel(row, text=f"Extruder {ext}",
+                         font=("Segoe UI",10,"bold"), width=90).pack(side="left", padx=8)
+            ctk.CTkLabel(row, text=obj_list, font=("Segoe UI",9),
+                         text_color="#94a3b8").pack(side="left", padx=4, expand=True, anchor="w")
+            var = ctk.StringVar(value=all_opts[min(int(ext)-1, len(all_opts)-1)]
+                                if ext.isdigit() and int(ext)-1 < len(all_opts) else all_opts[-1])
+            remap_vars[ext] = var
+            ctk.CTkOptionMenu(row, variable=var, values=all_opts, width=240).pack(
+                side="right", padx=8, pady=4)
+
+        lh = safe_td(self.layer_height_entry.get()) if hasattr(self,"layer_height_entry") else 0.08
+
+        def do_write():
+            save_path = filedialog.asksaveasfilename(
+                defaultextension=".3mf", filetypes=[("3MF","*.3mf")],
+                initialfile=os.path.splitext(os.path.basename(path))[0]+"_u1.3mf",
+                title="Speichern als")
+            if not save_path: return
+
+            # ext → neue Slot/V-ID ermitteln
+            def parse_choice(choice, ext_str):
+                if choice == self.t("remap_keep"):
+                    return None, None  # unverändert
+                if choice.startswith("T"):
+                    slot_i = int(choice[1]) - 1
+                    return int(ext_str), slot_i + 1   # neue Ext = T1→1, T2→2, …
+                if choice.startswith("V"):
+                    vid = int(choice.split()[0][1:])
+                    return int(ext_str), vid
+                return None, None
+
+            ext_map = {}  # {old_ext_int: new_ext_int}
+            vf_for_ext = {}  # {new_ext_int: vf-dict or None}
+            slot_for_ext = {}  # {new_ext_int: slot_index}
+
+            for ext, var in remap_vars.items():
+                choice = var.get()
+                old_e = int(ext) if ext.isdigit() else None
+                if old_e is None: continue
+                if choice == self.t("remap_keep"):
+                    continue
+                if choice.startswith("T"):
+                    slot_i = int(choice[1]) - 1
+                    new_e = slot_i + 1
+                    ext_map[old_e] = new_e
+                    slot_for_ext[new_e] = slot_i
+                elif choice.startswith("V"):
+                    vid = int(choice.split()[0][1:])
+                    new_e = vid
+                    ext_map[old_e] = new_e
+                    vf_match = next((v for v in self.virtual_fils if v["vid"]==vid), None)
+                    vf_for_ext[new_e] = vf_match
+
+            try:
+                import shutil, tempfile
+                with zipfile.ZipFile(path,"r") as zin:
+                    with tempfile.NamedTemporaryFile(suffix=".3mf", delete=False) as tmp:
+                        tmp_path = tmp.name
+                    new_filament_cfgs = {}  # fname → bytes to add
+
+                    with zipfile.ZipFile(tmp_path,"w", zipfile.ZIP_DEFLATED) as zout:
+                        for item in zin.infolist():
+                            data = zin.read(item.filename)
+                            fname = item.filename
+
+                            # model_settings.config — extruder remappen
+                            if fname == "Metadata/model_settings.config":
                                 try:
-                                    cfg = json.loads(data.decode("utf-8"))
-                                    vf = self.virtual_fils[idx]
-                                    sim_hex = vf.get("sim_hex", vf.get("target_hex","#888888"))
-                                    if not sim_hex.startswith("#"):
-                                        sim_hex = "#" + sim_hex
-                                    cfg["default_filament_colour"] = [sim_hex]
-                                    seq = vf["sequence"]
-                                    n_f = seq_filament_count(seq)
-                                    cad = calc_cadence(seq, lh)
-                                    ids_s = sorted(cad.keys())
-                                    if n_f == 1:
-                                        note = f"U1 FullSpectrum | Reine Farbe T{seq[0]} | ΔE={vf.get('de',0):.1f}"
-                                    elif n_f == 2:
-                                        a = round(cad.get(ids_s[0], lh), 3)
-                                        b = round(cad.get(ids_s[1], lh) if len(ids_s)>1 else lh, 3)
-                                        note = (f"U1 FullSpectrum | Seq:{''.join(seq)} | "
-                                                f"Cadence A={a}mm B={b}mm | Step={lh}mm | ΔE={vf.get('de',0):.1f}")
-                                    else:
-                                        note = (f"U1 FullSpectrum | Seq:{''.join(seq)} | "
-                                                f"Pattern={''.join(seq)} | Step={lh}mm | ΔE={vf.get('de',0):.1f}")
-                                    cfg["filament_notes"] = [note]
-                                    cfg["filament_vendor"] = ["U1 FullSpectrum"]
-                                    cfg["filament_settings_id"] = [f"U1-V{vf['vid']}"]
-                                    data = json.dumps(cfg, indent=4, ensure_ascii=False).encode("utf-8")
-                                except Exception:
-                                    pass
-
-                        # model_settings.config (XML) — extruder-Zuweisung
-                        elif fname == "Metadata/model_settings.config":
-                            try:
-                                content = data.decode("utf-8")
-                                root = ET.fromstring(content)
-                                objects = root.findall("object")
-                                for oi, obj in enumerate(objects):
-                                    if oi < len(self.virtual_fils):
-                                        new_ext = str(self.virtual_fils[oi]["vid"])
-                                        updated = False
+                                    root2 = ET.fromstring(data.decode("utf-8"))
+                                    for obj in root2.findall("object"):
                                         for meta in obj.findall("metadata"):
                                             if meta.get("key") == "extruder":
-                                                meta.set("value", new_ext)
-                                                updated = True
-                                        if not updated:
-                                            meta_el = ET.SubElement(obj, "metadata")
-                                            meta_el.set("key", "extruder")
-                                            meta_el.set("value", new_ext)
-                                data = ET.tostring(root, encoding="unicode").encode("utf-8")
-                            except Exception:
+                                                old_e = int(meta.get("value","1"))
+                                                if old_e in ext_map:
+                                                    meta.set("value", str(ext_map[old_e]))
+                                    data = ET.tostring(root2, encoding="unicode").encode("utf-8")
+                                except Exception: pass
+
+                            # filament_settings_X.config für neue V-Köpfe/Slots generieren
+                            elif re.match(r"Metadata/filament_settings_\d+\.config", fname):
+                                # Original beibehalten — neue kommen später separat
                                 pass
 
-                        # Sonstige .config-Dateien: filament_colour regex
-                        elif fname.endswith(".config") or fname.endswith(".json"):
-                            try:
-                                content = data.decode("utf-8")
-                                for idx, vf in enumerate(self.virtual_fils):
-                                    sim_hex = vf.get("sim_hex", vf.get("target_hex","#888888")).lstrip("#")
-                                    old_pat = re.compile(
-                                        r'(key="filament_colour"[^>]*value=")([^"]*?)(")', re.IGNORECASE)
-                                    matches = list(old_pat.finditer(content))
-                                    if idx < len(matches):
-                                        m = matches[idx]
-                                        content = (content[:m.start(2)]
-                                                   + f"#{sim_hex.upper()}"
-                                                   + content[m.end(2):])
-                                data = content.encode("utf-8")
-                            except Exception:
-                                pass
+                            zout.writestr(item, data)
 
-                        zout.writestr(item, data)
+                        # Neue filament_settings für remappte Extruder hinzufügen
+                        def _dithering_note(vf):
+                            seq = vf["sequence"]
+                            n_f = seq_filament_count(seq)
+                            cad = calc_cadence(seq, lh)
+                            ids_s = sorted(cad.keys())
+                            if n_f == 1:
+                                return f"U1 FullSpectrum | Reine Farbe T{seq[0]} | dE={vf.get('de',0):.1f}"
+                            elif n_f == 2:
+                                a = round(cad.get(ids_s[0],lh),3)
+                                b = round(cad.get(ids_s[1],lh) if len(ids_s)>1 else lh,3)
+                                return (f"U1 FullSpectrum | Seq:{''.join(seq)} | "
+                                        f"Cadence A={a}mm B={b}mm | Step={lh}mm | dE={vf.get('de',0):.1f}")
+                            else:
+                                return (f"U1 FullSpectrum | Seq:{''.join(seq)} | "
+                                        f"Pattern={''.join(seq)} | Step={lh}mm | dE={vf.get('de',0):.1f}")
 
-            shutil.move(tmp_path, save_path)
-            messagebox.showinfo(self.t("dlg_saved"), self.t("3mf_write_ok", path=save_path))
-        except Exception as e:
-            messagebox.showerror(self.t("dlg_error"), self.t("3mf_write_err", e=e))
+                        base_cfg = {"type":"filament","from":"User","instantiation":"true",
+                                    "filament_type":["PLA"],"filament_diameter":["1.75"],
+                                    "filament_flow_ratio":["1"],"compatible_printers":[]}
+
+                        for new_e, vf in vf_for_ext.items():
+                            if vf is None: continue
+                            sim_hex = vf.get("sim_hex", vf.get("target_hex","#888888"))
+                            if not sim_hex.startswith("#"): sim_hex = "#"+sim_hex
+                            cfg = dict(base_cfg)
+                            cfg["filament_settings_id"] = [f"U1-V{vf['vid']}"]
+                            cfg["filament_vendor"] = ["U1 FullSpectrum"]
+                            cfg["default_filament_colour"] = [sim_hex]
+                            cfg["filament_notes"] = [_dithering_note(vf)]
+                            fname_new = f"Metadata/filament_settings_{new_e}.config"
+                            zout.writestr(fname_new,
+                                          json.dumps(cfg, indent=4, ensure_ascii=False).encode("utf-8"))
+
+                        for new_e, slot_i in slot_for_ext.items():
+                            s = self.slots[slot_i]
+                            sim_hex = s["hex"].get().strip() or "#888888"
+                            if not sim_hex.startswith("#"): sim_hex = "#"+sim_hex
+                            cfg = dict(base_cfg)
+                            cfg["filament_settings_id"] = [f"U1-T{slot_i+1}"]
+                            cfg["filament_vendor"] = [s["brand"].get() or "U1"]
+                            cfg["default_filament_colour"] = [sim_hex]
+                            cfg["filament_notes"] = [f"U1 FullSpectrum | T{slot_i+1} | TD={s['td'].get()}"]
+                            fname_new = f"Metadata/filament_settings_{new_e}.config"
+                            zout.writestr(fname_new,
+                                          json.dumps(cfg, indent=4, ensure_ascii=False).encode("utf-8"))
+
+                shutil.move(tmp_path, save_path)
+                messagebox.showinfo(self.t("dlg_saved"), self.t("3mf_write_ok", path=save_path))
+                win.destroy()
+            except Exception as e:
+                messagebox.showerror(self.t("dlg_error"), str(e))
+
+        ctk.CTkButton(win, text=self.t("remap_btn_write"), fg_color="#0f766e",
+                      height=40, font=("Segoe UI",12,"bold"),
+                      command=do_write).pack(pady=(8,4), padx=20, fill="x")
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
+                      command=win.destroy, height=34).pack(padx=20, fill="x", pady=(0,10))
 
     # ── WERKZEUGWECHSEL-SCHÄTZUNG ─────────────────────────────────────────────
 
