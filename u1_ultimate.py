@@ -5,6 +5,7 @@ import copy
 import zipfile
 import re
 from itertools import permutations as iter_permutations
+import tkinter as tk
 from tkinter import colorchooser, messagebox, filedialog
 import math
 from datetime import datetime
@@ -1212,24 +1213,95 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.set_appearance_mode(self.settings.get("theme", "dark"))
         self.db_file       = "filament_db.json"
         self.preset_file   = "presets.json"
+        self._building_ui  = True   # suppress expensive redraws during startup
+        self._gamut_job    = None   # debounce handle for gamut strip
         self.history       = []
         self.presets       = {}
         self.virtual_fils  = []   # list of virtual filament dicts
         self.virtual_undo  = []   # undo stack for virtual heads
         self.last_result   = {}   # last calc() result for "hinzufügen"
         self._max_virtual  = int(self.settings.get("max_virtual", MAX_VIRTUAL))
+        self.favorites     = []
         self.load_db()
         self.load_presets()
+        self._load_favorites()
         self.setup_ui()
+        self._building_ui = False   # UI fully built — allow redraws now
         # Einstellungen wiederherstellen
         lh = self.settings.get("layer_height", "0.08")
         self.layer_height_entry.delete(0, "end")
         self.layer_height_entry.insert(0, lh)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        # Keyboard shortcuts
+        self.bind("<Control-z>", lambda e: self.undo_last())
+        self.bind("<Control-Return>", lambda e: self.add_to_virtual())
+        self.bind("<Control-1>", lambda e: self._switch_tab(0))
+        self.bind("<Control-2>", lambda e: self._switch_tab(1))
+        self.bind("<Control-3>", lambda e: self._switch_tab(2))
+        # Restore extended settings
+        self._restore_extended_settings()
+        # Single gamut update after everything is ready
+        self.after(400, self._update_gamut_strip)
 
     def _on_close(self):
         self._save_settings()
         self.destroy()
+
+    # ── FAVORITEN ──────────────────────────────────────────────────────────────
+
+    def _load_favorites(self):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "favorites.json")
+        try:
+            with open(path) as f:
+                self.favorites = json.load(f)
+        except Exception:
+            self.favorites = []
+
+    def _save_favorites(self):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "favorites.json")
+        try:
+            with open(path, "w") as f:
+                json.dump(self.favorites, f)
+        except Exception:
+            pass
+
+    def _add_to_favorites(self):
+        raw = self.hex_target_entry.get().strip() if hasattr(self, "hex_target_entry") else ""
+        hex_val = raw.lstrip("#")
+        if len(hex_val) == 6:
+            entry = f"#{hex_val.upper()}"
+            if entry not in self.favorites:
+                self.favorites.append(entry)
+                self._save_favorites()
+
+    def open_favorites(self):
+        win = ctk.CTkToplevel(self)
+        win.title("Favoriten")
+        win.geometry("280x400")
+        sf = ctk.CTkScrollableFrame(win)
+        sf.pack(fill="both", expand=True, padx=8, pady=8)
+        for fav in list(self.favorites):
+            row = ctk.CTkFrame(sf, fg_color="transparent")
+            row.pack(fill="x", pady=2)
+            try:
+                swatch = ctk.CTkLabel(row, text="  ", width=30, fg_color=fav, corner_radius=4)
+                swatch.pack(side="left", padx=4)
+            except Exception:
+                pass
+            lbl = ctk.CTkLabel(row, text=fav, cursor="hand2")
+            lbl.pack(side="left", padx=4)
+            lbl.bind("<Button-1>", lambda e, h=fav: (
+                self._apply_target(h),
+                win.lift()))
+            del_btn = ctk.CTkButton(row, text="✕", width=28, height=24,
+                command=lambda h=fav, r=row: self._del_favorite(h, r))
+            del_btn.pack(side="right", padx=4)
+
+    def _del_favorite(self, hex_val, row_widget):
+        if hex_val in self.favorites:
+            self.favorites.remove(hex_val)
+            self._save_favorites()
+            row_widget.destroy()
 
     def t(self, key, **kwargs):
         s = STRINGS[self.lang].get(key, STRINGS["de"].get(key, key))
@@ -1256,11 +1328,63 @@ class U1FullSpectrumApp(ctk.CTk):
         self.settings["lang"]         = self.lang
         self.settings["max_virtual"]  = self._max_virtual
         self.settings["layer_height"] = self.layer_height_entry.get() if hasattr(self, "layer_height_entry") else "0.08"
+        self.settings["geometry"]     = self.geometry()
+        self.settings["last_color"]   = self.hex_target_entry.get() if hasattr(self, "hex_target_entry") else ""
+        self.settings["color_model"]  = self.color_model_var.get() if hasattr(self, "color_model_var") else "linear"
+        try:
+            tab_list = list(self.tabs._tab_dict.keys())
+            current = self.tabs.get()
+            self.settings["last_tab"] = tab_list.index(current)
+        except Exception:
+            self.settings["last_tab"] = 0
         try:
             with open(self.settings_file, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f, indent=2)
         except IOError:
             pass
+
+    def _restore_extended_settings(self):
+        """Restore geometry, last color, color model, last tab after UI is built."""
+        try:
+            if self.settings.get("geometry"):
+                self.geometry(self.settings["geometry"])
+        except Exception:
+            pass
+        try:
+            lc = self.settings.get("last_color", "")
+            if lc and len(lc.lstrip("#")) == 6:
+                raw = lc.lstrip("#")
+                self.hex_target_entry.delete(0, "end")
+                self.hex_target_entry.insert(0, lc)
+                self._on_hex_live()
+        except Exception:
+            pass
+        try:
+            cm = self.settings.get("color_model", "")
+            if cm and hasattr(self, "color_model_var"):
+                self.color_model_var.set(cm)
+        except Exception:
+            pass
+        try:
+            idx = self.settings.get("last_tab")
+            if idx is not None:
+                tab_list = list(self.tabs._tab_dict.keys())
+                if 0 <= idx < len(tab_list):
+                    self.tabs.set(tab_list[idx])
+        except Exception:
+            pass
+
+    def _switch_tab(self, idx):
+        try:
+            tab_list = list(self.tabs._tab_dict.keys())
+            if 0 <= idx < len(tab_list):
+                self.tabs.set(tab_list[idx])
+        except Exception:
+            pass
+
+    def undo_last(self):
+        """Ctrl+Z: undo last virtual head addition."""
+        self.undo_virtual()
 
     def _save_slot_values(self):
         return [{"brand": s["brand"].get(), "hex": s["hex"].get(),
@@ -1371,7 +1495,7 @@ class U1FullSpectrumApp(ctk.CTk):
         # Virtuelle Köpfe
         self.virtual_fils = project.get("virtual_fils", [])
         self._refresh_virtual_grid()
-        self.after(100, self._update_gamut_strip)
+        self._schedule_gamut_update()
         messagebox.showinfo(self.t("dlg_saved"), self.t("proj_loaded", path=path))
 
     def save_db(self):
@@ -1468,6 +1592,14 @@ class U1FullSpectrumApp(ctk.CTk):
                       command=self.open_settings_dialog)
         sett_btn.pack(side="right", padx=(0, 6))
 
+        # Feature 13: Light/Dark mode toggle
+        _cur_mode = ctk.get_appearance_mode()
+        _appearance_icon = "🌙" if _cur_mode == "Dark" else "☀️"
+        self.appearance_btn = ctk.CTkButton(lang_row, text=_appearance_icon, width=36, height=26,
+                      fg_color="#374151", font=("Segoe UI", 12),
+                      command=self._toggle_appearance)
+        self.appearance_btn.pack(side="right", padx=(0, 4))
+
         ctk.CTkLabel(self.sidebar, text=self.t("phys_heads_title"),
                      font=("Segoe UI", 18, "bold"), text_color="#38bdf8").pack(pady=(8, 4))
         ctk.CTkLabel(self.sidebar,
@@ -1487,6 +1619,8 @@ class U1FullSpectrumApp(ctk.CTk):
                           command=lambda idx=i: self.add_filament(idx)).pack(side="right", padx=2)
             ctk.CTkButton(hdr, text="💾", width=26, height=20,
                           command=lambda idx=i: self.save_current(idx)).pack(side="right", padx=2)
+            ctk.CTkButton(hdr, text="🔍", width=26, height=20, fg_color="#0e7490",
+                          command=lambda idx=i: self.open_filament_search(idx)).pack(side="right", padx=2)
 
             brand = ctk.CTkOptionMenu(frame, values=list(self.library.keys()),
                                        command=lambda x, idx=i: self.update_menu(idx))
@@ -1658,6 +1792,21 @@ class U1FullSpectrumApp(ctk.CTk):
         img_btn.grid(row=0, column=5, padx=(4, 0))
         self.tip(img_btn, "tip_img_pick")
 
+        fav_star_btn = ctk.CTkButton(top, text="⭐", width=40, height=46,
+                      fg_color="#374151", font=("Segoe UI", 14),
+                      command=self._add_to_favorites)
+        fav_star_btn.grid(row=0, column=6, padx=(4, 0))
+
+        fav_list_btn = ctk.CTkButton(top, text="📋", width=40, height=46,
+                      fg_color="#374151", font=("Segoe UI", 14),
+                      command=self.open_favorites)
+        fav_list_btn.grid(row=0, column=7, padx=(2, 0))
+
+        # Suggestion label (Feature 9)
+        self.suggestion_label = ctk.CTkLabel(sec1, text="", text_color="gray",
+                                              font=("Segoe UI", 11), wraplength=500)
+        self.suggestion_label.grid(row=1, column=0, padx=20, pady=(2, 0), sticky="w")
+
         # Gamut-Warnung
         self.gamut_label = ctk.CTkLabel(
             sec1, text=self.t("gamut_warning"),
@@ -1707,15 +1856,10 @@ class U1FullSpectrumApp(ctk.CTk):
         gf.grid(row=5, column=0, padx=40, pady=(28, 4), sticky="ew")
         ctk.CTkLabel(gf, text="Gamut:", font=("Segoe UI", 8),
                      text_color="#475569").pack(side="left", padx=(8, 4), pady=3)
-        self.gamut_strip = ctk.CTkFrame(gf, fg_color="transparent", height=16)
-        self.gamut_strip.pack(side="left", fill="x", expand=True, padx=4, pady=3)
-        self._gamut_cells = []
-        for _ in range(40):
-            c = ctk.CTkLabel(self.gamut_strip, text="", width=0, height=16,
-                              fg_color="#1e293b", corner_radius=0)
-            c.pack(side="left", fill="x", expand=True)
-            self._gamut_cells.append(c)
-        self.after(200, self._update_gamut_strip)
+        self._gamut_canvas = tk.Canvas(gf, height=16, bg="#1e293b",
+                                       highlightthickness=0, bd=0)
+        self._gamut_canvas.pack(side="left", fill="x", expand=True, padx=4, pady=3)
+        self._gamut_rects = []   # canvas rect IDs, filled lazily
 
         # Mix-Vorschau + ΔE
         mf = ctk.CTkFrame(sec1, fg_color="#1e293b", corner_radius=8)
@@ -1854,6 +1998,14 @@ class U1FullSpectrumApp(ctk.CTk):
                                value=val, font=("Segoe UI", 10),
                                command=self._update_colorblind_preview).pack(side="left", padx=4, pady=6)
 
+        # Feature 5: History panel (last 10 calculations)
+        hist_outer = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
+        hist_outer.grid(row=12, column=0, padx=40, pady=(0, 12), sticky="ew")
+        ctk.CTkLabel(hist_outer, text="🕘 Verlauf",
+                     font=("Segoe UI", 10), text_color="#64748b").pack(anchor="w", padx=12, pady=(6, 2))
+        self._history_frame = ctk.CTkScrollableFrame(hist_outer, height=100, fg_color="transparent")
+        self._history_frame.pack(fill="x", padx=8, pady=(0, 6))
+
         # ────────────────────────────────────────────────────────────────────
         # TAB 2 — VIRTUELLE DRUCKKÖPFE
         # ────────────────────────────────────────────────────────────────────
@@ -1964,6 +2116,8 @@ class U1FullSpectrumApp(ctk.CTk):
         _tool_btn(f, self.t("btn_swatch"), "#374151", self.save_swatch, "tip_swatch")
         _tool_btn(f, self.t("btn_slicer_guide"), "#7c3aed", self.open_slicer_guide)
         _tool_btn(f, self.t("btn_tc_est"), "#374151", self.open_tc_estimator)
+        _tool_btn(f, "📊 ΔE-Matrix", "#1e3a5f", self.open_filament_matrix)
+        _tool_btn(f, "🖼 PNG Export", "#374151", self.export_png_summary)
 
         # Farb-Generierung
         f = _tools_section(tab3, "🌈  Farb-Generierung")
@@ -2002,7 +2156,8 @@ class U1FullSpectrumApp(ctk.CTk):
         self.slots[idx]["hex"].delete(0, "end"); self.slots[idx]["hex"].insert(0, f["hex"])
         self.slots[idx]["td"].delete(0, "end");  self.slots[idx]["td"].insert(0, str(f["td"]))
         self.slots[idx]["preview"].configure(fg_color=f["hex"])
-        self.after(100, self._update_gamut_strip)
+        if not getattr(self, "_building_ui", False):
+            self._schedule_gamut_update()
 
     def pick_slot_color(self, idx):
         cur = self.slots[idx]["hex"].get().strip() or "#808080"
@@ -2014,7 +2169,7 @@ class U1FullSpectrumApp(ctk.CTk):
         manual = self.t("manual_color")
         self.slots[idx]["color"].configure(values=[manual] + cur_vals)
         self.slots[idx]["color"].set(manual)
-        self.after(100, self._update_gamut_strip)
+        self._schedule_gamut_update()
 
     def save_current(self, idx):
         n = ctk.CTkInputDialog(text=self.t("inp_fil_name"), title=self.t("inp_save_fav")).get_input()
@@ -2252,9 +2407,20 @@ class U1FullSpectrumApp(ctk.CTk):
             "seq_len":    len(chosen_seq),
         }
 
+    def _schedule_gamut_update(self, delay=150):
+        """Debounced gamut strip update — cancels any pending call and reschedules."""
+        if self._gamut_job:
+            self.after_cancel(self._gamut_job)
+        self._gamut_job = self.after(delay, self._run_gamut_update)
+
     def _update_gamut_strip(self):
-        """Füllt die Gamut-Strip-Zellen mit erreichbaren Mischfarben."""
-        if not hasattr(self, "_gamut_cells"):
+        """Public entry point — delegates through the debouncer."""
+        self._schedule_gamut_update()
+
+    def _run_gamut_update(self):
+        """Redraws the gamut strip Canvas with reachable mixed colors."""
+        self._gamut_job = None
+        if not hasattr(self, "_gamut_canvas"):
             return
         fils = self._get_fils()
         if not fils or len(fils) < 2:
@@ -2284,10 +2450,22 @@ class U1FullSpectrumApp(ctk.CTk):
             return (0 if s < 10 else 1, hue)
         samples.sort(key=hue_key)
 
-        n = len(self._gamut_cells)
-        for i, cell in enumerate(self._gamut_cells):
+        # Draw onto Canvas — much faster than 40 individual CTkLabel widgets
+        canvas = self._gamut_canvas
+        canvas.update_idletasks()
+        W = canvas.winfo_width()
+        H = canvas.winfo_height() or 16
+        if W < 2:
+            W = 400
+        n = min(len(samples), 60)
+        cell_w = W / n
+        canvas.delete("all")
+        for i in range(n):
             idx = int(i * len(samples) / n)
-            cell.configure(fg_color=samples[min(idx, len(samples)-1)])
+            color = samples[min(idx, len(samples) - 1)]
+            x0 = int(i * cell_w)
+            x1 = int((i + 1) * cell_w) + 1  # +1 avoids gaps between rects
+            canvas.create_rectangle(x0, 0, x1, H, fill=color, outline="")
 
     def _show_top3(self):
         """Zeigt Top-3 Sequenzen nach Optimizer in einem kompakten Frame."""
@@ -2393,6 +2571,24 @@ class U1FullSpectrumApp(ctk.CTk):
 
         self.last_result = result
         self._show_top3()
+
+        # Feature 9: Auto-suggestion
+        if dv > 6:
+            self._check_auto_suggestion(self.target)
+        else:
+            if hasattr(self, "suggestion_label"):
+                self.suggestion_label.configure(text="")
+
+        # Feature 10: Material compatibility warning
+        seq_ids = list(set(int(c) - 1 for c in seq))
+        mat_warn = self._check_material_compatibility(seq_ids)
+        if mat_warn and hasattr(self, "suggestion_label"):
+            cur = self.suggestion_label.cget("text")
+            combined = mat_warn if not cur else f"{cur}  |  {mat_warn}"
+            self.suggestion_label.configure(text=combined, text_color="#f59e0b")
+
+        # Update history
+        self._update_history(self.target, result["sim_hex"], result["de"], seq)
 
     # ── VIRTUELLE DRUCKKÖPFE ───────────────────────────────────────────────────
 
@@ -2899,37 +3095,78 @@ class U1FullSpectrumApp(ctk.CTk):
     def _build_virtual_row(self, vf):
         outer = ctk.CTkFrame(self.vgrid, fg_color="#1e293b", corner_radius=7)
         outer.pack(fill="x", padx=6, pady=3)
-        outer.grid_columnconfigure(4, weight=1)
+        outer.grid_columnconfigure(5, weight=1)
+
+        # Get index for reorder buttons (Feature 4)
+        try:
+            row_idx = self.virtual_fils.index(vf)
+        except ValueError:
+            row_idx = 0
+
+        # Feature 4: ↑↓ reorder buttons
+        nav_frame = ctk.CTkFrame(outer, fg_color="transparent")
+        nav_frame.grid(row=0, column=0, padx=(4, 0), pady=(8, 2))
+        ctk.CTkButton(nav_frame, text="↑", width=22, height=20, fg_color="#334155",
+                      command=lambda i=row_idx: self._vhead_move(i, -1)).pack(pady=(0, 1))
+        ctk.CTkButton(nav_frame, text="↓", width=22, height=20, fg_color="#334155",
+                      command=lambda i=row_idx: self._vhead_move(i, +1)).pack()
 
         # Zeile 0: Haupt-Info
         ctk.CTkLabel(outer, text=f"V{vf['vid']}",
                      font=("Segoe UI", 13, "bold"), text_color="#a78bfa",
-                     width=50).grid(row=0, column=0, padx=(10, 4), pady=(8, 2))
-        ctk.CTkLabel(outer, text="", width=36, height=36,
-                     fg_color=vf["target_hex"], corner_radius=18).grid(
-            row=0, column=1, padx=4, pady=(8, 2))
+                     width=44).grid(row=0, column=1, padx=(4, 2), pady=(8, 2))
+
+        # Feature 3: clickable target circle
+        def _copy_hex_to_clipboard(hex_val, widget):
+            self.clipboard_clear()
+            self.clipboard_append(hex_val)
+            try:
+                orig = widget.cget("text")
+                widget.configure(text="✓")
+                widget.after(800, lambda: widget.configure(text=orig))
+            except Exception:
+                pass
+
+        tgt_lbl = ctk.CTkLabel(outer, text="", width=36, height=36,
+                               fg_color=vf["target_hex"], corner_radius=18, cursor="hand2")
+        tgt_lbl.grid(row=0, column=2, padx=4, pady=(8, 2))
+        tgt_lbl.bind("<Button-1>", lambda e, h=vf["target_hex"], w=tgt_lbl:
+                     _copy_hex_to_clipboard(h, w))
+
         ctk.CTkLabel(outer, text=vf["sequence"],
                      font=("Courier New", 17, "bold"), text_color="#4ade80",
-                     width=155).grid(row=0, column=2, padx=6, pady=(8, 2))
-        ctk.CTkLabel(outer, text="", width=36, height=36,
-                     fg_color=vf["sim_hex"], corner_radius=18).grid(
-            row=0, column=3, padx=4, pady=(8, 2))
+                     width=155).grid(row=0, column=3, padx=6, pady=(8, 2))
+
+        # Feature 3: clickable sim circle
+        sim_lbl = ctk.CTkLabel(outer, text="", width=36, height=36,
+                               fg_color=vf["sim_hex"], corner_radius=18, cursor="hand2")
+        sim_lbl.grid(row=0, column=4, padx=4, pady=(8, 2))
+        sim_lbl.bind("<Button-1>", lambda e, h=vf["sim_hex"], w=sim_lbl:
+                     _copy_hex_to_clipboard(h, w))
+
         ctk.CTkLabel(outer, text=self.de_label(vf["de"]),
                      font=("Segoe UI", 11, "bold"), text_color=de_color(vf["de"])).grid(
-            row=0, column=4, padx=6, sticky="w", pady=(8, 2))
-        lbl_entry = ctk.CTkEntry(outer, width=155, font=("Segoe UI", 11))
-        lbl_entry.insert(0, vf["label"])
+            row=0, column=5, padx=6, sticky="w", pady=(8, 2))
+        lbl_entry = ctk.CTkEntry(outer, width=130, font=("Segoe UI", 11))
+        lbl_entry.insert(0, vf.get("label", ""))
         lbl_entry.bind("<FocusOut>", lambda e, vfd=vf, en=lbl_entry:
                        vfd.update({"label": en.get()}))
-        lbl_entry.grid(row=0, column=5, padx=6, pady=(8, 2))
+        lbl_entry.grid(row=0, column=6, padx=4, pady=(8, 2))
+
+        # Feature 12: sequence editor button
+        ctk.CTkButton(outer, text="✏", width=28, height=30,
+                      fg_color="#1e3a5f", hover_color="#2563eb",
+                      command=lambda i=row_idx: self.open_sequence_editor(i)).grid(
+            row=0, column=7, padx=(2, 2), pady=(8, 2))
+
         ctk.CTkButton(outer, text="✕", width=30, height=30,
                       fg_color="#7f1d1d", hover_color="#991b1b",
                       command=lambda vid=vf["vid"]: self._remove_virtual(vid)).grid(
-            row=0, column=6, padx=(4, 10), pady=(8, 2))
+            row=0, column=8, padx=(2, 10), pady=(8, 2))
 
         # Zeile 1: Runs-Visualisierung + Cadence-Hinweis
         info_row = ctk.CTkFrame(outer, fg_color="transparent")
-        info_row.grid(row=1, column=0, columnspan=7, padx=10, pady=(0, 8), sticky="w")
+        info_row.grid(row=1, column=0, columnspan=9, padx=10, pady=(0, 8), sticky="w")
 
         runs = seq_to_runs(vf["sequence"])
         n_fils = seq_filament_count(vf["sequence"])
@@ -2999,7 +3236,15 @@ class U1FullSpectrumApp(ctk.CTk):
     # ── LIVE ΔE ────────────────────────────────────────────────────────────────
 
     def _on_hex_live(self, event=None):
-        """Quick ΔE preview while the user types a hex code."""
+        """Quick ΔE preview while the user types a hex code (debounced 300 ms)."""
+        if not hasattr(self, "_hex_live_job"):
+            self._hex_live_job = None
+        if self._hex_live_job:
+            self.after_cancel(self._hex_live_job)
+        self._hex_live_job = self.after(300, self._run_hex_live)
+
+    def _run_hex_live(self):
+        self._hex_live_job = None
         raw = self.hex_target_entry.get().strip()
         if not raw.startswith("#"):
             raw = "#" + raw
@@ -4228,7 +4473,7 @@ class U1FullSpectrumApp(ctk.CTk):
                 # Filament-Name setzen falls vorhanden
                 try: s["color"].set(f["name"])
                 except: pass
-            self.after(100, self._update_gamut_strip)
+            self._schedule_gamut_update()
             win.destroy()
 
         apply_btn = ctk.CTkButton(win, text=self.t("slot_opt_apply"),
@@ -5086,6 +5331,398 @@ class U1FullSpectrumApp(ctk.CTk):
         self.library.setdefault(brand, []).append(
             {"name": n.strip(), "hex": h, "td": safe_td(td_r) if td_r else DEFAULT_TD})
         self.save_db(); self._refresh_brand_menus(); cb()
+
+
+    # ── FEATURE 3: HEX-CLICK IN V-GRID (added in _build_virtual_row) ──────────
+
+    # ── FEATURE 4: V-HEAD REORDER ─────────────────────────────────────────────
+
+    def _vhead_move(self, idx, direction):
+        vf = self.virtual_fils
+        new_idx = idx + direction
+        if 0 <= new_idx < len(vf):
+            vf[idx], vf[new_idx] = vf[new_idx], vf[idx]
+            for i, v in enumerate(vf):
+                v["vid"] = 5 + i
+            self._refresh_virtual_grid()
+
+    # ── FEATURE 5: IMPROVED HISTORY ───────────────────────────────────────────
+
+    def _update_history(self, target_hex, sim_hex, de, seq):
+        """Add entry to history (max 10) and refresh history UI if available."""
+        entry = {"target_hex": target_hex, "sim_hex": sim_hex,
+                 "de": de, "sequence": seq}
+        # Remove duplicate target
+        self.history = [h for h in self.history if h["target_hex"] != target_hex]
+        self.history.insert(0, entry)
+        if len(self.history) > 10:
+            self.history = self.history[:10]
+        self._refresh_history_ui()
+
+    def _refresh_history_ui(self):
+        """Refresh history cards panel if it exists."""
+        if not hasattr(self, "_history_frame"):
+            return
+        frame = self._history_frame
+        for w in frame.winfo_children():
+            w.destroy()
+        for entry in self.history:
+            card = ctk.CTkFrame(frame, fg_color="#1e293b", corner_radius=6)
+            card.pack(fill="x", pady=2, padx=2)
+            try:
+                swatch = ctk.CTkLabel(card, text="  ", width=20, height=20,
+                                      fg_color=entry["target_hex"], corner_radius=3)
+                swatch.pack(side="left", padx=(4, 2), pady=3)
+            except Exception:
+                pass
+            seq_str = entry.get("sequence", "")
+            de_val = entry.get("de", 0)
+            lbl_text = f"{entry['target_hex']}  ΔE={de_val:.1f}  [{seq_str}]"
+            lbl = ctk.CTkLabel(card, text=lbl_text, font=("Segoe UI", 9),
+                               cursor="hand2", anchor="w")
+            lbl.pack(side="left", padx=4, fill="x", expand=True)
+            def _load_hist(e=entry):
+                self._apply_target(e["target_hex"])
+            lbl.bind("<Button-1>", lambda ev, e=entry: self._apply_target(e["target_hex"]))
+
+    # ── FEATURE 7: FILAMENT SEARCH DIALOG ────────────────────────────────────
+
+    def open_filament_search(self, slot_idx):
+        # Singleton per slot — focus existing window instead of opening a second one
+        if not hasattr(self, "_search_wins"):
+            self._search_wins = {}
+        existing = self._search_wins.get(slot_idx)
+        if existing and existing.winfo_exists():
+            existing.focus_force()
+            existing.lift()
+            return
+
+        win = ctk.CTkToplevel(self)
+        win.title("Filament suchen")
+        win.geometry("400x500")
+        self._search_wins[slot_idx] = win
+        win.protocol("WM_DELETE_WINDOW", lambda: (self._search_wins.pop(slot_idx, None), win.destroy()))
+
+        search_var = ctk.StringVar()
+        entry = ctk.CTkEntry(win, textvariable=search_var, placeholder_text="Suchen...")
+        entry.pack(fill="x", padx=8, pady=8)
+        entry.focus()
+
+        sf = ctk.CTkScrollableFrame(win, height=400)
+        sf.pack(fill="both", expand=True, padx=8, pady=4)
+
+        _debounce_id = [None]
+
+        def _schedule_update(*args):
+            if _debounce_id[0]:
+                win.after_cancel(_debounce_id[0])
+            _debounce_id[0] = win.after(250, _update_results)
+
+        def _update_results():
+            for w in sf.winfo_children():
+                w.destroy()
+            q = search_var.get().lower()
+            count = 0
+            for brand, filaments in self.library.items():
+                for fil in filaments:
+                    if q in brand.lower() or q in fil.get("name", "").lower():
+                        if count >= 100:
+                            break
+                        count += 1
+                        row = ctk.CTkFrame(sf, fg_color="transparent")
+                        row.pack(fill="x", pady=1)
+                        hex_c = fil.get("hex", "#888888")
+                        try:
+                            swatch = ctk.CTkLabel(row, text="  ", width=28,
+                                                  fg_color=hex_c, corner_radius=3)
+                            swatch.pack(side="left", padx=3)
+                        except Exception:
+                            pass
+                        name_str = f"{brand} — {fil.get('name', '?')}"
+                        lbl = ctk.CTkLabel(row, text=name_str, cursor="hand2", anchor="w")
+                        lbl.pack(side="left", padx=3, fill="x", expand=True)
+                        def _load(b=brand, fi=fil, w=win):
+                            s = self.slots[slot_idx]
+                            s["brand"].set(b)
+                            self.update_menu(slot_idx)
+                            try:
+                                s["color"].set(fi.get("name", ""))
+                            except Exception:
+                                pass
+                            s["hex"].delete(0, "end")
+                            s["hex"].insert(0, fi.get("hex", "#FFFFFF").lstrip("#"))
+                            s["td"].delete(0, "end")
+                            s["td"].insert(0, str(fi.get("td", 5.0)))
+                            try:
+                                s["preview"].configure(fg_color=fi.get("hex", "#FFFFFF"))
+                            except Exception:
+                                pass
+                            self._search_wins.pop(slot_idx, None)
+                            w.destroy()
+                        lbl.bind("<Button-1>", lambda e, f=_load: f())
+
+        search_var.trace_add("write", _schedule_update)
+        _update_results()
+
+    # ── FEATURE 8: FILAMENT DISTANCE MATRIX ──────────────────────────────────
+
+    def open_filament_matrix(self):
+        win = ctk.CTkToplevel(self)
+        win.title("Filament ΔE-Matrix")
+        win.geometry("440x300")
+
+        colors = []
+        names = []
+        for s in self.slots:
+            hex_c = s["hex"].get().strip().lstrip("#")
+            try:
+                lab = rgb_to_lab(hex_to_rgb(hex_c))
+                colors.append(lab)
+                names.append(s["color"].get() or f"T{self.slots.index(s)+1}")
+            except Exception:
+                colors.append((50, 0, 0))
+                names.append(f"T{self.slots.index(s)+1}")
+
+        frame = ctk.CTkFrame(win)
+        frame.pack(fill="both", expand=True, padx=8, pady=8)
+
+        ctk.CTkLabel(frame, text="", width=90).grid(row=0, column=0, padx=4, pady=4)
+        for j, name in enumerate(names):
+            ctk.CTkLabel(frame, text=name[:10],
+                         font=ctk.CTkFont(weight="bold")).grid(row=0, column=j+1, padx=4, pady=4)
+
+        for i in range(4):
+            ctk.CTkLabel(frame, text=names[i][:10],
+                         font=ctk.CTkFont(weight="bold")).grid(row=i+1, column=0, padx=4, pady=4)
+            for j in range(4):
+                if i == j:
+                    val = "—"
+                    fg = None
+                else:
+                    de = delta_e(colors[i], colors[j])
+                    val = f"{de:.1f}"
+                    fg = "#2d8a2d" if de < 10 else ("#d4a000" if de < 30 else "#c0392b")
+                lbl = ctk.CTkLabel(frame, text=val, text_color=fg)
+                lbl.grid(row=i+1, column=j+1, padx=4, pady=4)
+
+    # ── FEATURE 9: AUTO-SLOT SUGGESTION ──────────────────────────────────────
+
+    def _check_auto_suggestion(self, target_hex):
+        target_lab = rgb_to_lab(hex_to_rgb(target_hex.lstrip("#")))
+        best_de = float('inf')
+        best_fil = None
+        best_brand = None
+        loaded_hexes = {s["hex"].get().strip().lstrip("#").upper() for s in self.slots}
+
+        for brand, filaments in self.library.items():
+            for fil in filaments:
+                fhex = fil.get("hex", "").lstrip("#")
+                if fhex.upper() in loaded_hexes:
+                    continue
+                try:
+                    flab = rgb_to_lab(hex_to_rgb(fhex))
+                    de = delta_e(target_lab, flab)
+                    if de < best_de:
+                        best_de = de
+                        best_fil = fil
+                        best_brand = brand
+                except Exception:
+                    pass
+
+        if best_fil and best_de < 15 and hasattr(self, "suggestion_label"):
+            msg = f"💡 Tipp: «{best_brand} {best_fil.get('name','')}» könnte ΔE auf ~{best_de:.1f} senken"
+            self.suggestion_label.configure(text=msg, text_color="gray")
+
+    # ── FEATURE 10: MATERIAL COMPATIBILITY WARNING ────────────────────────────
+
+    def _check_material_compatibility(self, sequence_slot_indices):
+        used_slots = set(sequence_slot_indices)
+        types_used = set()
+        for idx in used_slots:
+            if idx < 0 or idx >= len(self.slots):
+                continue
+            slot_name = self.slots[idx]["color"].get()
+            slot_brand = self.slots[idx]["brand"].get()
+            fil_type = None
+            for fil in self.library.get(slot_brand, []):
+                if fil.get("name") == slot_name:
+                    fil_type = fil.get("type", None)
+                    break
+            if fil_type is None:
+                n = slot_name.upper()
+                if "ABS" in n:
+                    fil_type = "ABS"
+                elif "PETG" in n:
+                    fil_type = "PETG"
+                elif "TPU" in n:
+                    fil_type = "TPU"
+                elif "ASA" in n:
+                    fil_type = "ASA"
+                else:
+                    fil_type = None  # unknown, skip
+            if fil_type:
+                types_used.add(fil_type)
+
+        if len(types_used) < 2:
+            return None
+        incompatible_pairs = {("PLA", "ABS"), ("ABS", "PLA"),
+                               ("PLA", "ASA"), ("ASA", "PLA"),
+                               ("ABS", "PETG"), ("PETG", "ABS")}
+        for a, b in incompatible_pairs:
+            if a in types_used and b in types_used:
+                return f"⚠ Materialwarnung: {a} + {b} — unterschiedliche Drucktemperaturen!"
+        return None
+
+    # ── FEATURE 11: PNG SUMMARY EXPORT ───────────────────────────────────────
+
+    def export_png_summary(self):
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+        except ImportError:
+            messagebox.showerror("Fehler", "Pillow nicht installiert. pip install Pillow")
+            return
+
+        if not self.virtual_fils:
+            messagebox.showinfo("Info", "Keine virtuellen Köpfe vorhanden.")
+            return
+
+        path = filedialog.asksaveasfilename(defaultextension=".png",
+            filetypes=[("PNG", "*.png")], title="PNG exportieren")
+        if not path:
+            return
+
+        cols = 4
+        rows = math.ceil(len(self.virtual_fils) / cols)
+        cell_w, cell_h = 160, 80
+        img_w = cols * cell_w + 20
+        img_h = rows * cell_h + 40
+
+        img = Image.new("RGB", (img_w, img_h), (30, 30, 30))
+        draw = ImageDraw.Draw(img)
+
+        try:
+            font = ImageFont.truetype("arial.ttf", 12)
+            small_font = ImageFont.truetype("arial.ttf", 10)
+        except Exception:
+            font = ImageFont.load_default()
+            small_font = font
+
+        for i, vf in enumerate(self.virtual_fils):
+            col = i % cols
+            row_idx = i // cols
+            x = col * cell_w + 10
+            y = row_idx * cell_h + 30
+
+            sim_hex = vf.get("sim_hex", "#888888").lstrip("#")
+            try:
+                r, g, b = int(sim_hex[0:2], 16), int(sim_hex[2:4], 16), int(sim_hex[4:6], 16)
+                draw.rectangle([x, y, x + cell_w - 10, y + 50], fill=(r, g, b))
+            except Exception:
+                draw.rectangle([x, y, x + cell_w - 10, y + 50], fill=(128, 128, 128))
+
+            name = vf.get("name", vf.get("label", f"V{vf.get('vid', i+5)}"))
+            de = vf.get("de", 0)
+            seq = vf.get("sequence", "")
+            draw.text((x + 2, y + 52),
+                      f"{name}  ΔE={de:.1f}  [{seq}]",
+                      fill=(200, 200, 200), font=small_font)
+
+        draw.text((10, 8), "U1 FullSpectrum — Virtual Heads", fill=(255, 255, 255), font=font)
+
+        img.save(path)
+        messagebox.showinfo("Export", f"PNG gespeichert: {path}")
+
+    # ── FEATURE 12: SEQUENCE EDITOR ──────────────────────────────────────────
+
+    def open_sequence_editor(self, vf_idx):
+        vf = self.virtual_fils[vf_idx]
+        seq = list(vf["sequence"])
+
+        win = ctk.CTkToplevel(self)
+        win.title(f"Sequenz bearbeiten — {vf.get('label', vf.get('name', ''))}")
+        win.geometry("440x240")
+
+        frame = ctk.CTkFrame(win)
+        frame.pack(fill="x", padx=10, pady=10)
+
+        tiles = []
+        tile_vars = [ctk.IntVar(value=int(c) - 1) for c in seq]
+
+        def _draw_tile(tile_frame, idx):
+            for w in tile_frame.winfo_children():
+                w.destroy()
+            sv = tile_vars[idx].get()
+            sh = self.slots[sv]["hex"].get().lstrip("#") if sv < len(self.slots) else "888888"
+            try:
+                color = f"#{sh}" if sh else "#888888"
+                swatch = ctk.CTkLabel(tile_frame, text=f"T{sv+1}",
+                    fg_color=color, width=50, height=50, corner_radius=6,
+                    cursor="hand2", font=ctk.CTkFont(weight="bold"))
+                swatch.pack(padx=2, pady=2)
+                swatch.bind("<Button-1>", lambda e, i=idx: _cycle_tile(i))
+            except Exception:
+                pass
+
+        def _cycle_tile(idx):
+            tile_vars[idx].set((tile_vars[idx].get() + 1) % len(self.slots))
+            _draw_tile(tiles[idx], idx)
+
+        def _make_tile(parent, i):
+            tf = ctk.CTkFrame(parent, width=54, height=54, corner_radius=8)
+            tf.pack(side="left", padx=3)
+            tiles.append(tf)
+            _draw_tile(tf, i)
+
+        for i in range(len(seq)):
+            _make_tile(frame, i)
+
+        def _add_layer():
+            if len(tile_vars) < 10:
+                tile_vars.append(ctk.IntVar(value=0))
+                _make_tile(frame, len(tile_vars) - 1)
+
+        def _remove_layer():
+            if len(tile_vars) > 1:
+                tile_vars.pop()
+                tiles.pop().destroy()
+
+        ctrl = ctk.CTkFrame(win, fg_color="transparent")
+        ctrl.pack(fill="x", padx=10, pady=4)
+        ctk.CTkButton(ctrl, text="+ Layer", width=80, command=_add_layer).pack(side="left", padx=4)
+        ctk.CTkButton(ctrl, text="− Layer", width=80, command=_remove_layer).pack(side="left", padx=4)
+
+        def _save():
+            new_seq = "".join(str(tile_vars[i].get() + 1) for i in range(len(tile_vars)))
+            vf["sequence"] = new_seq
+            colors_lin = []
+            for ch in new_seq:
+                si = int(ch) - 1
+                hx = self.slots[si]["hex"].get().lstrip("#") if si < len(self.slots) else "808080"
+                try:
+                    r, g, b = (int(hx[0:2], 16) / 255,
+                                int(hx[2:4], 16) / 255,
+                                int(hx[4:6], 16) / 255)
+                    colors_lin.append((r ** 2.2, g ** 2.2, b ** 2.2))
+                except Exception:
+                    colors_lin.append((0.5, 0.5, 0.5))
+            if colors_lin:
+                avg = tuple(sum(c[i] for c in colors_lin) / len(colors_lin) for i in range(3))
+                avg_srgb = tuple(min(255, int((c ** (1 / 2.2)) * 255)) for c in avg)
+                vf["sim_hex"] = "#{:02X}{:02X}{:02X}".format(*avg_srgb)
+            self._refresh_virtual_grid()
+            win.destroy()
+
+        ctk.CTkButton(win, text="💾 Speichern", command=_save).pack(pady=8)
+
+    # ── FEATURE 13: LIGHT MODE TOGGLE ────────────────────────────────────────
+
+    def _toggle_appearance(self):
+        current = ctk.get_appearance_mode()
+        new_mode = "Light" if current == "Dark" else "Dark"
+        ctk.set_appearance_mode(new_mode)
+        icon = "🌙" if new_mode == "Dark" else "☀️"
+        if hasattr(self, "appearance_btn"):
+            self.appearance_btn.configure(text=icon)
 
 
 if __name__ == "__main__":
