@@ -1950,7 +1950,10 @@ class U1App(QMainWindow):
         opts_layout.addWidget(self._len_spin)
 
         self._auto_check = QCheckBox(self.t("auto_check").replace("\n", " "))
+        self._auto_check.setChecked(True)
+        self._auto_check.toggled.connect(lambda on: self._len_spin.setEnabled(not on))
         opts_layout.addWidget(self._auto_check)
+        self._len_spin.setEnabled(False)  # Auto ist Standard
 
         opts_layout.addWidget(QLabel("ΔE≤"))
         self._auto_thresh_spin = QDoubleSpinBox()
@@ -2910,10 +2913,13 @@ class U1App(QMainWindow):
             return
         self._undo_stack.append(copy.deepcopy(self._virtual))
         use_opt = self._optimizer_check.isChecked()
+        use_auto = self._auto_check.isChecked() if hasattr(self, "_auto_check") else True
+        thresh   = self._auto_thresh_spin.value() if hasattr(self, "_auto_thresh_spin") else 2.0
         for vf in self._virtual:
             result = self._calc_for_color(
                 vf["target_hex"], optimizer=use_opt,
-                seq_len=len(vf["sequence"]), auto=False)
+                seq_len=None if use_auto else len(vf["sequence"]),
+                auto=use_auto, auto_threshold=thresh)
             if result:
                 vf["sequence"] = result["sequence"]
                 vf["sim_hex"] = result["sim_hex"]
