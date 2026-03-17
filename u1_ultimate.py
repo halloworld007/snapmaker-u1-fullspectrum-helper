@@ -357,6 +357,36 @@ STRINGS = {
     "copy_all_btn": "Alles in Zwischenablage",
     # Gamut-Plot
     "btn_gamut_plot": "🎯 Gamut-Plot",
+    # Batch-Neuberechnung
+    "btn_recalc_all": "🔄 Alle neu berechnen",
+    "recalc_all_done": "{n} virtuelle Köpfe neu berechnet.",
+    # ΔE-Übersicht
+    "btn_de_overview": "📊 ΔE-Übersicht",
+    "de_overview_title": "ΔE-Übersicht — Alle virtuellen Köpfe",
+    "de_overview_col_id": "ID",
+    "de_overview_col_label": "Label",
+    "de_overview_col_seq": "Sequenz",
+    "de_overview_col_de": "ΔE",
+    "de_overview_col_quality": "Qualität",
+    "de_overview_col_tc": "WW/Zyklus",
+    # Farbrezept
+    "btn_recipe": "📜 Farbrezept",
+    "recipe_title": "Farbrezept-Export",
+    "recipe_copy_btn": "In Zwischenablage",
+    # Multi-Ziel-Optimizer
+    "btn_multitarget": "🎯 Multi-Ziel",
+    "mt_title": "Mehrfach-Zielfarben-Optimierung",
+    "mt_desc": "Findet die beste Sequenz, die mehrere Zielfarben gleichzeitig approximiert.",
+    "mt_target": "Ziel {n}:",
+    "mt_add_target": "+ Zielfarbe hinzufügen",
+    "mt_calc": "⚙  Optimieren",
+    "mt_result": "Beste Sequenz: {seq}   ΔE Ø {de:.1f}",
+    "mt_add_btn": "➕ Als virtuellen Kopf hinzufügen",
+    "mt_no_targets": "Bitte mindestens 2 Zielfarben angeben.",
+    # Slot geladen-Status
+    "slot_loaded": "Geladen",
+    # Werkzeugwechsel-Warnung pro V-Kopf
+    "tc_warn_badge": "⚠ {n}×WW",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
@@ -671,6 +701,36 @@ STRINGS = {
     "copy_all_btn": "Copy All to Clipboard",
     # Gamut plot
     "btn_gamut_plot": "🎯 Gamut Plot",
+    # Batch recalc
+    "btn_recalc_all": "🔄 Recalc All",
+    "recalc_all_done": "{n} virtual heads recalculated.",
+    # ΔE overview
+    "btn_de_overview": "📊 ΔE Overview",
+    "de_overview_title": "ΔE Overview — All Virtual Heads",
+    "de_overview_col_id": "ID",
+    "de_overview_col_label": "Label",
+    "de_overview_col_seq": "Sequence",
+    "de_overview_col_de": "ΔE",
+    "de_overview_col_quality": "Quality",
+    "de_overview_col_tc": "TC/Cycle",
+    # Color recipe
+    "btn_recipe": "📜 Recipe",
+    "recipe_title": "Color Recipe Export",
+    "recipe_copy_btn": "Copy to Clipboard",
+    # Multi-target optimizer
+    "btn_multitarget": "🎯 Multi-Target",
+    "mt_title": "Multi-Target Color Optimizer",
+    "mt_desc": "Finds the best sequence that approximates multiple target colors simultaneously.",
+    "mt_target": "Target {n}:",
+    "mt_add_target": "+ Add Target",
+    "mt_calc": "⚙  Optimize",
+    "mt_result": "Best sequence: {seq}   avg ΔE {de:.1f}",
+    "mt_add_btn": "➕ Add as Virtual Head",
+    "mt_no_targets": "Please specify at least 2 target colors.",
+    # Slot loaded status
+    "slot_loaded": "Loaded",
+    # Tool change warning per V-head
+    "tc_warn_badge": "⚠ {n}×TC",
 },
 }
 
@@ -1435,9 +1495,15 @@ class U1FullSpectrumApp(ctk.CTk):
             ctk.CTkLabel(row, text="TD:", font=("Segoe UI", 10)).pack(side="right", padx=(0, 4))
             td = ctk.CTkEntry(row, width=54, placeholder_text="5.0")
             td.pack(side="right", padx=(0, 4))
+            loaded_var = ctk.BooleanVar(value=True)
+            loaded_sw = ctk.CTkSwitch(row, text=self.t("slot_loaded"), variable=loaded_var,
+                                      width=80, font=("Segoe UI", 9),
+                                      onvalue=True, offvalue=False)
+            loaded_sw.pack(side="right", padx=(0, 6))
 
             self.slots.append({"brand": brand, "color": color,
-                                "hex": hx, "td": td, "preview": preview})
+                                "hex": hx, "td": td, "preview": preview,
+                                "loaded": loaded_var})
             self.update_menu(i)
 
         # Presets
@@ -1535,9 +1601,13 @@ class U1FullSpectrumApp(ctk.CTk):
                                               font=("Courier New", 13), height=46)
         self.hex_target_entry.grid(row=0, column=1, sticky="ew", padx=(0, 8))
         self.hex_target_entry.bind("<Return>", self._on_hex_target_enter)
+        self.hex_target_entry.bind("<KeyRelease>", self._on_hex_live)
         self.prev = ctk.CTkLabel(top, text="", width=46, height=46,
                                   fg_color="#1a1a1a", corner_radius=23)
         self.prev.grid(row=0, column=2)
+        self.live_de_label = ctk.CTkLabel(top, text="", font=("Segoe UI", 11, "bold"),
+                                           text_color="#94a3b8", width=80)
+        self.live_de_label.grid(row=0, column=3, padx=(6, 0))
 
         # Gamut-Warnung
         self.gamut_label = ctk.CTkLabel(
@@ -1858,6 +1928,22 @@ class U1FullSpectrumApp(ctk.CTk):
 
         ctk.CTkButton(btn_row2, text=self.t("btn_copy_all_cad"), fg_color="#0e7490",
                       command=self.open_copy_all_cadence, height=36).pack(side="left", padx=3)
+
+        ctk.CTkButton(btn_row2, text=self.t("btn_recalc_all"), fg_color="#065f46",
+                      hover_color="#047857", height=36, width=140,
+                      command=self.recalc_all_virtual).pack(side="left", padx=(4, 3))
+
+        ctk.CTkButton(btn_row2, text=self.t("btn_de_overview"), fg_color="#1e3a5f",
+                      height=36, width=130,
+                      command=self.open_de_overview).pack(side="left", padx=3)
+
+        ctk.CTkButton(btn_row2, text=self.t("btn_recipe"), fg_color="#374151",
+                      height=36, width=110,
+                      command=self.open_recipe_export).pack(side="left", padx=3)
+
+        ctk.CTkButton(btn_row2, text=self.t("btn_multitarget"), fg_color="#7c3aed",
+                      hover_color="#6d28d9", height=36, width=120,
+                      command=self.open_multitarget_optimizer).pack(side="left", padx=3)
 
         # Virtual Filament Grid Header
         gh = ctk.CTkFrame(self.main, fg_color="#1e293b", corner_radius=6)
@@ -2841,6 +2927,14 @@ class U1FullSpectrumApp(ctk.CTk):
                          font=("Segoe UI", 9, "bold"), text_color="#000000").pack(
                 side="left", padx=2)
 
+        # Werkzeugwechsel-Warnung: Anzahl Transitionen pro Zyklus
+        transitions = sum(1 for k in range(len(vf["sequence"]) - 1)
+                          if vf["sequence"][k] != vf["sequence"][k + 1])
+        if transitions > 2:
+            ctk.CTkLabel(info_row, text=self.t("tc_warn_badge", n=transitions),
+                         font=("Segoe UI", 8, "bold"), text_color="#f59e0b",
+                         fg_color="#292524", corner_radius=4).pack(side="left", padx=(0, 4))
+
         # Cadence-Hinweis
         pattern_str = "/".join(vf["sequence"])   # "1121" → "1/1/2/1"
 
@@ -2881,6 +2975,344 @@ class U1FullSpectrumApp(ctk.CTk):
         for i, v in enumerate(self.virtual_fils):
             v["vid"] = 5 + i
         self._refresh_virtual_grid()
+
+    # ── LIVE ΔE ────────────────────────────────────────────────────────────────
+
+    def _on_hex_live(self, event=None):
+        """Quick ΔE preview while the user types a hex code."""
+        raw = self.hex_target_entry.get().strip()
+        if not raw.startswith("#"):
+            raw = "#" + raw
+        if len(raw) != 7:
+            if hasattr(self, "live_de_label"):
+                self.live_de_label.configure(text="")
+            return
+        try:
+            hex_to_rgb(raw)
+        except Exception:
+            return
+        result = self._calc_for_color(raw, optimizer=False, seq_len=4, auto=False)
+        if result and hasattr(self, "live_de_label"):
+            de = result["de"]
+            self.live_de_label.configure(
+                text=f"≈ΔE {de:.1f}", text_color=de_color(de))
+
+    # ── BATCH-NEUBERECHNUNG ─────────────────────────────────────────────────────
+
+    def recalc_all_virtual(self):
+        """Berechnet alle virtuellen Köpfe mit den aktuellen Slot-Einstellungen neu."""
+        if not self.virtual_fils:
+            messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
+        self.virtual_undo.append(copy.deepcopy(self.virtual_fils))
+        use_opt = self.optimizer_var.get() if hasattr(self, "optimizer_var") else False
+        for vf in self.virtual_fils:
+            result = self._calc_for_color(vf["target_hex"], optimizer=use_opt,
+                                          seq_len=len(vf["sequence"]), auto=False)
+            if result:
+                vf["sequence"] = result["sequence"]
+                vf["sim_hex"]  = result["sim_hex"]
+                vf["de"]       = result["de"]
+        self._refresh_virtual_grid()
+        messagebox.showinfo(self.t("dlg_note"),
+                            self.t("recalc_all_done", n=len(self.virtual_fils)))
+
+    # ── ΔE-ÜBERSICHT ───────────────────────────────────────────────────────────
+
+    def open_de_overview(self):
+        """Zeigt eine Tabelle aller virtuellen Köpfe mit ΔE, Qualität und WW-Info."""
+        if not self.virtual_fils:
+            messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
+        import tkinter as _tk
+
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("de_overview_title"))
+        win.geometry("820x480")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text=self.t("de_overview_title"),
+                     font=("Segoe UI", 13, "bold"), text_color="#38bdf8").pack(pady=(14, 6))
+
+        cols = [
+            (self.t("de_overview_col_id"),      50),
+            (self.t("de_overview_col_label"),   160),
+            (self.t("de_overview_col_seq"),     110),
+            ("Ziel",                             46),
+            ("Sim",                              46),
+            (self.t("de_overview_col_de"),       60),
+            (self.t("de_overview_col_quality"), 110),
+            (self.t("de_overview_col_tc"),       80),
+        ]
+        hdr = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=6)
+        hdr.pack(fill="x", padx=14, pady=(0, 4))
+        for c, (txt, w) in enumerate(cols):
+            ctk.CTkLabel(hdr, text=txt, font=("Segoe UI", 10, "bold"),
+                         text_color="#64748b", width=w).grid(row=0, column=c, padx=6, pady=5)
+
+        sf = ctk.CTkScrollableFrame(win, fg_color="#0f172a", corner_radius=8)
+        sf.pack(fill="both", expand=True, padx=14, pady=4)
+
+        lh = safe_td(self.layer_height_entry.get()) if hasattr(self, "layer_height_entry") else 0.08
+        for vf in self.virtual_fils:
+            seq = vf["sequence"]
+            de  = vf.get("de", 0.0)
+            transitions = sum(1 for k in range(len(seq) - 1) if seq[k] != seq[k + 1])
+            if de < DE_GOOD:
+                q_text = "✓ " + ("ausgezeichnet" if self.lang == "de" else "excellent")
+                q_col  = "#4ade80"
+            elif de < DE_OK:
+                q_text = "~ " + ("gut" if self.lang == "de" else "good")
+                q_col  = "#fbbf24"
+            else:
+                q_text = "✗ " + ("sichtbar" if self.lang == "de" else "visible")
+                q_col  = "#f87171"
+
+            row_fr = ctk.CTkFrame(sf, fg_color="#1e293b", corner_radius=5)
+            row_fr.pack(fill="x", padx=4, pady=2)
+            vals = [
+                (f"V{vf['vid']}",     50,  "#a78bfa", None),
+                (vf.get("label",""),  160, "#e2e8f0", None),
+                (seq,                 110, "#4ade80", None),
+                ("",                   46, vf["target_hex"], vf["target_hex"]),
+                ("",                   46, vf["sim_hex"],    vf["sim_hex"]),
+                (f"{de:.1f}",          60, de_color(de),    None),
+                (q_text,              110, q_col,            None),
+                (str(transitions),     80,
+                 "#f59e0b" if transitions > 2 else "#94a3b8", None),
+            ]
+            for c, (txt, w, col, bg) in enumerate(vals):
+                kw = {"fg_color": bg, "corner_radius": 20} if bg else {}
+                ctk.CTkLabel(row_fr, text=txt, width=w,
+                             font=("Segoe UI", 10), text_color=col, **kw).grid(
+                    row=0, column=c, padx=6, pady=4)
+
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#374151",
+                      command=win.destroy, height=34).pack(pady=8, padx=20, fill="x")
+
+    # ── FARBREZEPT-EXPORT ──────────────────────────────────────────────────────
+
+    def open_recipe_export(self):
+        """Generiert ein menschenlesbares Farbrezept für alle virtuellen Köpfe."""
+        if not self.virtual_fils:
+            messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
+        import tkinter as _tk
+
+        lh  = safe_td(self.layer_height_entry.get()) if hasattr(self, "layer_height_entry") else 0.08
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        lines = [
+            "=" * 60,
+            f"  U1 FullSpectrum — Farbrezept",
+            f"  Erstellt: {now}   Schichthöhe: {lh} mm",
+            "=" * 60, "",
+        ]
+
+        slot_names = []
+        for i, s in enumerate(self.slots):
+            brand = s["brand"].get()
+            color = s["color"].get()
+            hx    = s["hex"].get()
+            name  = f"T{i+1}: {brand} {color} ({hx})"
+            slot_names.append(name)
+            lines.append(f"  {name}")
+        lines += ["", "-" * 60, ""]
+
+        fils_hex  = {i+1: self.slots[i]["hex"].get() for i in range(4)}
+        fils_name = {i+1: f"{self.slots[i]['brand'].get()} {self.slots[i]['color'].get()}"
+                     for i in range(4)}
+
+        for vf in self.virtual_fils:
+            seq  = vf["sequence"]
+            de   = vf.get("de", 0.0)
+            n_f  = seq_filament_count(seq)
+            runs = seq_to_runs(seq)
+            cad  = calc_cadence(seq, lh)
+            ids  = sorted(cad.keys())
+            label = vf.get("label", f"V{vf['vid']}")
+            q_str = ("ausgezeichnet" if de < DE_GOOD else "gut" if de < DE_OK else "sichtbar") \
+                    if self.lang == "de" else \
+                    ("excellent" if de < DE_GOOD else "good" if de < DE_OK else "visible")
+
+            lines.append(f"V{vf['vid']}  \"{label}\"")
+            lines.append(f"  Ziel: {vf['target_hex']}   Simuliert: {vf['sim_hex']}   ΔE = {de:.1f} ({q_str})")
+            lines.append(f"  Sequenz: {''.join(seq)}   ({len(seq)} Schichten je Wiederholung)")
+            for fid, cnt in runs:
+                lines.append(f"    T{fid} {fils_name.get(fid, '')}  × {cnt} Schicht{'en' if cnt > 1 else ''}")
+            if n_f == 1:
+                lines.append(f"  → Reine Farbe — kein Dithering nötig")
+            elif n_f == 2:
+                a = round(cad.get(ids[0], lh), 3)
+                b = round(cad.get(ids[1], lh) if len(ids) > 1 else lh, 3)
+                lines.append(f"  → Cadence A = {a} mm   B = {b} mm   Step = {lh} mm")
+            else:
+                lines.append(f"  → Pattern Mode: {''.join(seq)}   Step = {lh} mm")
+            lines.append("")
+
+        lines.append("=" * 60)
+        full_text = "\n".join(lines)
+
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("recipe_title"))
+        win.geometry("700x500")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text=self.t("recipe_title"),
+                     font=("Segoe UI", 13, "bold")).pack(pady=(14, 6))
+        txt_box = _tk.Text(win, bg="#0f172a", fg="#e2e8f0",
+                           font=("Courier New", 10), relief="flat", bd=0,
+                           wrap="none", padx=10, pady=6)
+        txt_box.pack(fill="both", expand=True, padx=16, pady=4)
+        txt_box.insert("1.0", full_text)
+        txt_box.configure(state="disabled")
+
+        def _copy():
+            self.clipboard_clear(); self.clipboard_append(full_text)
+        ctk.CTkButton(win, text=self.t("recipe_copy_btn"), fg_color="#0f766e",
+                      command=_copy, height=36).pack(pady=6, padx=20, fill="x")
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#374151",
+                      command=win.destroy, height=34).pack(pady=(0, 10), padx=20, fill="x")
+
+    # ── MEHRFACH-ZIELFARBEN-OPTIMIZER ──────────────────────────────────────────
+
+    def open_multitarget_optimizer(self):
+        """Optimiert eine Sequenz für mehrere Zielfarben gleichzeitig (Min. Ø-ΔE)."""
+        import tkinter as _tk
+        from itertools import product as _product
+
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("mt_title"))
+        win.geometry("600x560")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text=self.t("mt_title"),
+                     font=("Segoe UI", 13, "bold"), text_color="#38bdf8").pack(pady=(14, 4))
+        ctk.CTkLabel(win, text=self.t("mt_desc"),
+                     font=("Segoe UI", 10), text_color="#94a3b8",
+                     wraplength=560).pack(pady=(0, 8), padx=20)
+
+        target_frame = ctk.CTkScrollableFrame(win, height=180, fg_color="#0f172a", corner_radius=8)
+        target_frame.pack(fill="x", padx=16, pady=(0, 8))
+
+        targets = []  # list of {"hex": str, "preview": CTkLabel, "entry": CTkEntry}
+
+        def add_target_row(initial="#808080"):
+            row = ctk.CTkFrame(target_frame, fg_color="transparent")
+            row.pack(fill="x", pady=3)
+            n = len(targets) + 1
+            ctk.CTkLabel(row, text=self.t("mt_target", n=n),
+                         width=60, font=("Segoe UI", 10)).pack(side="left", padx=(4, 4))
+            entry = ctk.CTkEntry(row, width=100, font=("Courier New", 11),
+                                 placeholder_text="#RRGGBB")
+            entry.insert(0, initial)
+            entry.pack(side="left", padx=(0, 4))
+            prev = ctk.CTkLabel(row, text="", width=28, height=28,
+                                 fg_color=initial, corner_radius=14)
+            prev.pack(side="left", padx=(0, 4))
+
+            def _pick(e=entry, p=prev):
+                c = self._ask_color(initial=e.get(), title=self.t("target_picker_title"))
+                if c:
+                    e.delete(0, "end"); e.insert(0, c); p.configure(fg_color=c)
+            ctk.CTkButton(row, text="🎨", width=28, height=28, fg_color="#334155",
+                          command=_pick).pack(side="left")
+            targets.append({"entry": entry, "preview": prev})
+
+        add_target_row("#FF4444")
+        add_target_row("#44AAFF")
+
+        ctk.CTkButton(win, text=self.t("mt_add_target"), fg_color="#1e3a5f",
+                      command=add_target_row, height=30).pack(pady=4, padx=20, fill="x")
+
+        # Sequenzlänge
+        len_row = ctk.CTkFrame(win, fg_color="transparent")
+        len_row.pack(fill="x", padx=20, pady=4)
+        ctk.CTkLabel(len_row, text="Max. Länge:", font=("Segoe UI", 10)).pack(side="left")
+        len_var = ctk.StringVar(value="5")
+        ctk.CTkOptionMenu(len_row, variable=len_var,
+                          values=[str(n) for n in range(1, MAX_SEQ_LEN + 1)],
+                          width=80).pack(side="left", padx=8)
+
+        result_lbl = ctk.CTkLabel(win, text="", font=("Segoe UI", 11),
+                                   text_color="#4ade80", wraplength=560)
+        result_lbl.pack(pady=6, padx=20)
+
+        _mt_result = {"seq": None, "de": None, "sim_hex": None}
+
+        def _optimize():
+            hexes = []
+            for t in targets:
+                raw = t["entry"].get().strip()
+                if not raw.startswith("#"): raw = "#" + raw
+                if len(raw) == 7:
+                    t["preview"].configure(fg_color=raw)
+                    hexes.append(raw)
+            if len(hexes) < 2:
+                messagebox.showinfo(self.t("dlg_note"), self.t("mt_no_targets")); return
+
+            fils    = self._get_fils()
+            fids    = [f["id"] for f in fils]
+            t_labs  = [rgb_to_lab(hex_to_rgb(h)) for h in hexes]
+            max_len = int(len_var.get())
+
+            best_seq, best_avg_de, best_sim = None, float("inf"), None
+            for length in range(1, max_len + 1):
+                for combo in _product(fids, repeat=length):
+                    seq_list = list(combo)
+                    sim_lab  = self._simulate_mix(seq_list, fils)
+                    avg_de   = sum(delta_e(sim_lab, tl) for tl in t_labs) / len(t_labs)
+                    if avg_de < best_avg_de:
+                        best_avg_de = avg_de
+                        best_seq    = "".join(map(str, seq_list))
+                        best_sim    = lab_to_hex(sim_lab)
+
+            _mt_result["seq"]     = best_seq
+            _mt_result["de"]      = best_avg_de
+            _mt_result["sim_hex"] = best_sim
+            _mt_result["hexes"]   = hexes
+            result_lbl.configure(
+                text=self.t("mt_result", seq=best_seq, de=best_avg_de))
+            add_btn.configure(state="normal")
+
+        add_btn_frame = ctk.CTkFrame(win, fg_color="transparent")
+        add_btn_frame.pack(fill="x", padx=20, pady=4)
+        ctk.CTkButton(add_btn_frame, text=self.t("mt_calc"), fg_color="#7c3aed",
+                      hover_color="#6d28d9", height=40,
+                      command=_optimize).pack(side="left", expand=True, fill="x", padx=(0, 4))
+
+        add_btn = ctk.CTkButton(add_btn_frame, text=self.t("mt_add_btn"),
+                                fg_color="#065f46", hover_color="#047857",
+                                height=40, state="disabled",
+                                command=lambda: self._mt_add_result(_mt_result, win))
+        add_btn.pack(side="left", expand=True, fill="x", padx=(4, 0))
+
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#374151",
+                      command=win.destroy, height=34).pack(pady=(4, 12), padx=20, fill="x")
+
+    def _mt_add_result(self, result, win):
+        """Fügt das Multi-Target-Ergebnis als virtuellen Kopf hinzu."""
+        if not result.get("seq"): return
+        n_virts = len(self.virtual_fils)
+        max_v   = self.settings.get("max_virtual", MAX_VIRTUAL)
+        if n_virts >= max_v:
+            messagebox.showinfo(self.t("dlg_max_virtual"),
+                                self.t("dlg_max_virtual_msg", max_v=max_v)); return
+        vid     = 5 + n_virts
+        # Durchschnitt der Zielfarben als target_hex
+        hexes   = result.get("hexes", [result.get("sim_hex", "#808080")])
+        r_avg   = round(sum(hex_to_rgb(h)[0] for h in hexes) / len(hexes))
+        g_avg   = round(sum(hex_to_rgb(h)[1] for h in hexes) / len(hexes))
+        b_avg   = round(sum(hex_to_rgb(h)[2] for h in hexes) / len(hexes))
+        avg_hex = f"#{r_avg:02X}{g_avg:02X}{b_avg:02X}"
+        self.virtual_undo.append(copy.deepcopy(self.virtual_fils))
+        self.virtual_fils.append({
+            "vid":        vid,
+            "target_hex": avg_hex,
+            "sequence":   result["seq"],
+            "sim_hex":    result["sim_hex"],
+            "de":         result["de"],
+            "label":      f"MultiTarget V{vid}",
+        })
+        self._refresh_virtual_grid()
+        win.destroy()
 
     # ── 3MF ASSISTENT ──────────────────────────────────────────────────────────
 
