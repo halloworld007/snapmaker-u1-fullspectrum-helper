@@ -1917,10 +1917,11 @@ class U1FullSpectrumApp(ctk.CTk):
         self.len_slider.set(10)
         self.len_slider.grid(row=0, column=1, sticky="ew", padx=6)
 
-        self.auto_len_var = ctk.BooleanVar(value=False)
+        self.auto_len_var = ctk.BooleanVar(value=True)
         ctk.CTkCheckBox(lr, text=self.t("auto_check"), variable=self.auto_len_var,
                         font=("Segoe UI", 9),
                         command=self._on_auto_toggle).grid(row=0, column=2, padx=(8, 4))
+        self.len_slider.configure(state="disabled")  # Auto ist Standard
 
         ctk.CTkLabel(lr, text="ΔE≤", font=("Segoe UI", 10),
                      text_color="#64748b").grid(row=0, column=3, padx=(4, 0))
@@ -3269,10 +3270,13 @@ class U1FullSpectrumApp(ctk.CTk):
         if not self.virtual_fils:
             messagebox.showinfo(self.t("dlg_note"), self.t("orca_no_virtual")); return
         self.virtual_undo.append(copy.deepcopy(self.virtual_fils))
-        use_opt = self.optimizer_var.get() if hasattr(self, "optimizer_var") else False
+        use_opt  = self.optimizer_var.get() if hasattr(self, "optimizer_var") else False
+        use_auto = self.auto_len_var.get() if hasattr(self, "auto_len_var") else True
+        thresh   = safe_td(self.auto_thresh_entry.get()) if hasattr(self, "auto_thresh_entry") else 2.0
         for vf in self.virtual_fils:
             result = self._calc_for_color(vf["target_hex"], optimizer=use_opt,
-                                          seq_len=len(vf["sequence"]), auto=False)
+                                          seq_len=None if use_auto else len(vf["sequence"]),
+                                          auto=use_auto, auto_threshold=thresh)
             if result:
                 vf["sequence"] = result["sequence"]
                 vf["sim_hex"]  = result["sim_hex"]
