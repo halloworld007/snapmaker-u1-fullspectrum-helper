@@ -204,8 +204,8 @@ STRINGS = {
     "undo_empty": "Nichts zum Rückgängigmachen.",
     "tip_calculate": "Sequenz berechnen (Enter)",
     "tip_optimizer": "Testet alle 24 Filament-Reihenfolgen",
-    "tip_add_virtual": "Als virtuellen Druckkopf V5-V24 hinzufügen",
-    "tip_copy": "Sequenz in Zwischenablage kopieren",
+    "tip_add_virtual": "Als virtuellen Druckkopf V5-V24 hinzufügen (Ctrl+Enter)",
+    "tip_copy": "Sequenz in Zwischenablage kopieren (Ctrl+C)",
     "tip_export": "Als JSON oder TXT exportieren",
     "tip_random": "Zufällige Zielfarbe",
     "tip_img_pick": "Farbe aus Bild wählen",
@@ -414,6 +414,24 @@ STRINGS = {
     "btn_estimate_td": "TD schätzen",
     # DnD-Hint (Change 5)
     "dnd_hint": "← .3mf oder .u1proj hierher ziehen",
+    # Auto-found label (Change 5 UI)
+    "auto_found": "Auto: Länge {n} gefunden",
+    # Status bar strings
+    "status_ready": "Bereit",
+    "status_calculated": "Berechnet — ΔE {de:.1f} — Sequenz: {seq}",
+    "status_added": "V{vid} hinzugefügt",
+    "status_exported": "Exportiert: {f}",
+    "status_3mf": "3MF geladen — {n} Farben gefunden",
+    # Slot undo button
+    "btn_undo_slot": "↩ Slot",
+    # Virt sort/filter labels
+    "virt_sort_added": "Hinzugefügt",
+    "virt_sort_de_asc": "ΔE ↑",
+    "virt_sort_de_desc": "ΔE ↓",
+    "virt_sort_label": "Label A-Z",
+    "virt_filter_placeholder": "Filtern…",
+    # Click-to-copy hint
+    "click_to_copy": "(klick zum Kopieren)",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
@@ -574,8 +592,8 @@ STRINGS = {
     "undo_empty": "Nothing to undo.",
     "tip_calculate": "Calculate sequence (Enter)",
     "tip_optimizer": "Tests all 24 filament permutations",
-    "tip_add_virtual": "Add as virtual print head V5-V24",
-    "tip_copy": "Copy sequence to clipboard",
+    "tip_add_virtual": "Add as virtual print head V5-V24 (Ctrl+Enter)",
+    "tip_copy": "Copy sequence to clipboard (Ctrl+C)",
     "tip_export": "Export as JSON or TXT",
     "tip_random": "Random target color",
     "tip_img_pick": "Pick color from an image file",
@@ -778,6 +796,24 @@ STRINGS = {
     "btn_estimate_td": "Estimate TD",
     # DnD hint (Change 5)
     "dnd_hint": "← drop .3mf or .u1proj here",
+    # Auto-found label (Change 5 UI)
+    "auto_found": "Auto: length {n} found",
+    # Status bar strings
+    "status_ready": "Ready",
+    "status_calculated": "Calculated — ΔE {de:.1f} — Sequence: {seq}",
+    "status_added": "V{vid} added",
+    "status_exported": "Exported: {f}",
+    "status_3mf": "3MF loaded — {n} colors found",
+    # Slot undo button
+    "btn_undo_slot": "↩ Slot",
+    # Virt sort/filter labels
+    "virt_sort_added": "Added",
+    "virt_sort_de_asc": "ΔE ↑",
+    "virt_sort_de_desc": "ΔE ↓",
+    "virt_sort_label": "Label A-Z",
+    "virt_filter_placeholder": "Filter…",
+    # Click-to-copy hint
+    "click_to_copy": "(click to copy)",
 },
 }
 
@@ -1313,6 +1349,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self.presets       = {}
         self.virtual_fils  = []   # list of virtual filament dicts
         self.virtual_undo  = []   # undo stack for virtual heads
+        self._slot_undo_stack = []  # undo stack for slot changes
         self.last_result   = {}   # last calc() result for "hinzufügen"
         self._max_virtual  = int(self.settings.get("max_virtual", MAX_VIRTUAL))
         self.favorites     = []
@@ -1349,6 +1386,40 @@ class U1FullSpectrumApp(ctk.CTk):
     def _on_close(self):
         self._save_settings()
         self.destroy()
+
+    def _set_status(self, msg, duration=0):
+        """Update status bar text; auto-reset after duration ms if > 0."""
+        if hasattr(self, "_status_bar"):
+            self._status_bar.configure(text=msg)
+            if duration > 0:
+                self.after(duration, lambda: self._status_bar.configure(
+                    text=self.t("status_ready")) if hasattr(self, "_status_bar") else None)
+
+    def _toggle_slot(self, i):
+        """Accordion toggle for slot i."""
+        if not hasattr(self, "_slot_expanded"):
+            return
+        self._slot_expanded[i] = not self._slot_expanded[i]
+        expanded = self._slot_expanded[i]
+        body = self.slots[i].get("_body")
+        btn = self._slot_toggle_btns[i] if hasattr(self, "_slot_toggle_btns") else None
+        if body:
+            if expanded:
+                body.pack(fill="x")
+            else:
+                body.pack_forget()
+        if btn:
+            sym = "▼" if expanded else "▶"
+            # Try to show the current hex color in the header when collapsed
+            hex_val = ""
+            try:
+                hex_val = self.slots[i]["hex"].get().strip()
+            except Exception:
+                pass
+            if not expanded and hex_val:
+                btn.configure(text=f"{sym} T{i+1}  {hex_val}")
+            else:
+                btn.configure(text=f"{sym} T{i+1} — WERKZEUG {i+1}")
 
     def _on_dnd_drop(self, event):
         """Handle drag-and-drop of .3mf or .u1proj files onto the main window."""
@@ -1477,6 +1548,7 @@ class U1FullSpectrumApp(ctk.CTk):
                 project = json.load(f)
         except Exception as e:
             messagebox.showerror(self.t("dlg_error"), self.t("proj_err", e=e)); return
+        self._save_slot_snapshot()
         if hasattr(self, "layer_height_entry") and "layer_height" in project:
             self.layer_height_entry.delete(0, "end")
             self.layer_height_entry.insert(0, project["layer_height"])
@@ -1567,7 +1639,7 @@ class U1FullSpectrumApp(ctk.CTk):
     def tip(self, widget, key):
         """Tooltip hinzufügen wenn CTkToolTip verfügbar."""
         if _HAS_TOOLTIP:
-            _Tip(widget, message=self.t(key), delay=600)
+            _Tip(widget, message=self.t(key), delay=200)
 
     def de_label(self, de):
         return de_label_text(de, self.lang)
@@ -1659,6 +1731,48 @@ class U1FullSpectrumApp(ctk.CTk):
             if v["td"]:
                 s["td"].delete(0, "end"); s["td"].insert(0, v["td"])
 
+    def _save_slot_snapshot(self):
+        """Push current slot state onto the slot undo stack (max 10 entries)."""
+        if not hasattr(self, "slots"):
+            return
+        snap = []
+        for s in self.slots:
+            snap.append({
+                "brand": s["brand"].get(),
+                "color": s["color"].get(),
+                "hex":   s["hex"].get(),
+                "td":    s["td"].get(),
+            })
+        self._slot_undo_stack.append(snap)
+        if len(self._slot_undo_stack) > 10:
+            self._slot_undo_stack.pop(0)
+
+    def _undo_slot(self):
+        """Restore previous slot state from the slot undo stack."""
+        if not self._slot_undo_stack:
+            messagebox.showinfo(self.t("dlg_note"), self.t("undo_empty"))
+            return
+        snap = self._slot_undo_stack.pop()
+        for i, v in enumerate(snap):
+            s = self.slots[i]
+            if v["brand"] in self.library:
+                s["brand"].set(v["brand"])
+                self.update_menu(i)
+            col_val = v.get("color", "")
+            if col_val:
+                try:
+                    s["color"].set(col_val)
+                except Exception:
+                    pass
+            if v["hex"]:
+                s["hex"].delete(0, "end"); s["hex"].insert(0, v["hex"])
+                try:
+                    s["preview"].configure(fg_color=v["hex"])
+                except Exception:
+                    pass
+            if v["td"]:
+                s["td"].delete(0, "end"); s["td"].insert(0, v["td"])
+
     def toggle_lang(self):
         self._save_settings()
         slot_vals = self._save_slot_values()
@@ -1729,6 +1843,7 @@ class U1FullSpectrumApp(ctk.CTk):
                 project = json.load(f)
         except Exception as e:
             messagebox.showerror(self.t("dlg_error"), self.t("proj_err", e=e)); return
+        self._save_slot_snapshot()
         # Schichthöhe
         if hasattr(self, "layer_height_entry") and "layer_height" in project:
             self.layer_height_entry.delete(0, "end")
@@ -1809,6 +1924,7 @@ class U1FullSpectrumApp(ctk.CTk):
                     entries = BUILTIN_PRESETS.get(key)
                     break
         if entries is None: return
+        self._save_slot_snapshot()
         for i, entry in enumerate(entries[:4]):
             s = self.slots[i]
             brand = entry.get("brand", "")
@@ -1835,6 +1951,7 @@ class U1FullSpectrumApp(ctk.CTk):
     def setup_ui(self):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=0)
 
         # ── SIDEBAR: PHYSISCHE SLOTS ─────────────────────────────────────────
         self.sidebar = ctk.CTkScrollableFrame(self, width=430, corner_radius=0)
@@ -1869,14 +1986,39 @@ class U1FullSpectrumApp(ctk.CTk):
                      font=("Segoe UI", 10), text_color="#475569").pack(pady=(0, 10))
 
         self.slots = []
-        for i in range(4):
-            frame = ctk.CTkFrame(self.sidebar, border_width=1, border_color="#334155")
-            frame.pack(fill="x", padx=12, pady=5)
+        self._slot_expanded = [True, False, False, False]
+        self._slot_toggle_btns = []
 
-            hdr = ctk.CTkFrame(frame, fg_color="transparent")
-            hdr.pack(fill="x", padx=5, pady=(6, 0))
-            ctk.CTkLabel(hdr, text=self.t("tool_header", i=i+1),
-                         font=("Segoe UI", 12, "bold"), text_color="#94a3b8").pack(side="left", padx=5)
+        for i in range(4):
+            # Outer wrapper: colored left-border strip + main frame
+            wrapper = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+            wrapper.pack(fill="x", padx=12, pady=5)
+            wrapper.grid_columnconfigure(1, weight=1)
+
+            # Left color strip (Change 2)
+            color_strip = ctk.CTkFrame(wrapper, width=4, fg_color="#334155", corner_radius=2)
+            color_strip.grid(row=0, column=0, sticky="ns", padx=(0, 2))
+
+            frame = ctk.CTkFrame(wrapper, border_width=1, border_color="#334155")
+            frame.grid(row=0, column=1, sticky="ew")
+
+            # Toggle header button (Change 1)
+            toggle_symbol = "▼" if self._slot_expanded[i] else "▶"
+            toggle_btn = ctk.CTkButton(
+                frame, text=f"{toggle_symbol} T{i+1} — WERKZEUG {i+1}",
+                fg_color="transparent", hover_color="#1e293b",
+                anchor="w", font=("Segoe UI", 11, "bold"), text_color="#94a3b8",
+                height=32, command=lambda idx=i: self._toggle_slot(idx))
+            toggle_btn.pack(fill="x", padx=5, pady=(4, 0))
+            self._slot_toggle_btns.append(toggle_btn)
+
+            # Body frame (collapsible)
+            body = ctk.CTkFrame(frame, fg_color="transparent")
+            body.pack(fill="x")
+
+            # Header row with action buttons inside body
+            hdr = ctk.CTkFrame(body, fg_color="transparent")
+            hdr.pack(fill="x", padx=5, pady=(2, 0))
             ctk.CTkButton(hdr, text="+", width=26, height=20, fg_color="#15803d",
                           command=lambda idx=i: self.add_filament(idx)).pack(side="right", padx=2)
             ctk.CTkButton(hdr, text="💾", width=26, height=20,
@@ -1884,18 +2026,19 @@ class U1FullSpectrumApp(ctk.CTk):
             ctk.CTkButton(hdr, text="🔍", width=26, height=20, fg_color="#0e7490",
                           command=lambda idx=i: self.open_filament_search(idx)).pack(side="right", padx=2)
 
-            brand = ctk.CTkOptionMenu(frame, values=list(self.library.keys()),
+            brand = ctk.CTkOptionMenu(body, values=list(self.library.keys()),
                                        command=lambda x, idx=i: self.update_menu(idx))
             brand.pack(padx=10, pady=(3, 2), fill="x")
-            color = ctk.CTkOptionMenu(frame, values=["Lade..."],
+            color = ctk.CTkOptionMenu(body, values=["Lade..."],
                                        command=lambda x, idx=i: self.apply_f(idx))
             color.pack(padx=10, pady=2, fill="x")
 
-            row = ctk.CTkFrame(frame, fg_color="transparent")
+            row = ctk.CTkFrame(body, fg_color="transparent")
             row.pack(fill="x", pady=(3, 8))
             hx = ctk.CTkEntry(row, width=88, placeholder_text="#RRGGBB")
             hx.pack(side="left", padx=(10, 2))
-            preview = ctk.CTkLabel(row, text="", width=26, height=26,
+            # Change 2: larger preview (36×36)
+            preview = ctk.CTkLabel(row, text="", width=36, height=36,
                                    fg_color="#1e293b", corner_radius=5)
             preview.pack(side="left", padx=(0, 2))
             ctk.CTkButton(row, text="🎨", width=28, height=26, fg_color="#334155",
@@ -1911,8 +2054,14 @@ class U1FullSpectrumApp(ctk.CTk):
 
             self.slots.append({"brand": brand, "color": color,
                                 "hex": hx, "td": td, "preview": preview,
-                                "loaded": loaded_var})
+                                "loaded": loaded_var,
+                                "_body": body, "_strip": color_strip})
             self.update_menu(i)
+
+            # Apply initial collapsed state (T2-T4 collapsed)
+            if not self._slot_expanded[i]:
+                body.pack_forget()
+
 
         # Presets
         ctk.CTkLabel(self.sidebar, text=self.t("slot_presets"),
@@ -1925,11 +2074,14 @@ class U1FullSpectrumApp(ctk.CTk):
         self.preset_dropdown.pack(fill="x", padx=10, pady=(8, 4))
         pb = ctk.CTkFrame(pf, fg_color="transparent")
         pb.pack(fill="x", padx=10, pady=(0, 8))
-        pb.grid_columnconfigure((0, 1), weight=1)
+        pb.grid_columnconfigure((0, 1, 2), weight=1)
         ctk.CTkButton(pb, text=self.t("btn_load"), fg_color="#1e3a5f",
                       command=self.load_preset).grid(row=0, column=0, sticky="ew", padx=(0, 3))
         ctk.CTkButton(pb, text=self.t("btn_save"), fg_color="#1e3a5f",
-                      command=self.save_preset).grid(row=0, column=1, sticky="ew", padx=(3, 0))
+                      command=self.save_preset).grid(row=0, column=1, sticky="ew", padx=(3, 3))
+        ctk.CTkButton(pb, text=self.t("btn_undo_slot"), fg_color="#374151",
+                      command=self._undo_slot, height=28,
+                      font=("Segoe UI", 9)).grid(row=0, column=2, sticky="ew", padx=(3, 0))
         self._refresh_preset_dropdown()
 
         # Projekt speichern/laden
@@ -1988,6 +2140,12 @@ class U1FullSpectrumApp(ctk.CTk):
         )
         self.tabs.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
 
+        # ── STATUS BAR ────────────────────────────────────────────────────────
+        self._status_bar = ctk.CTkLabel(self, text=self.t("status_ready"),
+            font=("Segoe UI", 10), text_color="#64748b",
+            anchor="w", height=24, fg_color="#0a1628")
+        self._status_bar.grid(row=1, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 2))
+
         _t1_name = "🎨  " + self.t("tab_calculator")
         _t2_name = "🔲  " + self.t("tab_virtual")
         _t3_name = "🛠  " + self.t("tab_tools")
@@ -2005,7 +2163,7 @@ class U1FullSpectrumApp(ctk.CTk):
         tab2 = ctk.CTkFrame(self.tabs.tab(_t2_name), fg_color="transparent", corner_radius=0)
         tab2.pack(fill="both", expand=True)
         tab2.grid_columnconfigure(0, weight=1)
-        tab2.grid_rowconfigure(2, weight=1)
+        tab2.grid_rowconfigure(5, weight=1)
 
         tab3 = ctk.CTkScrollableFrame(self.tabs.tab(_t3_name),
                                        fg_color="transparent", corner_radius=0)
@@ -2081,16 +2239,23 @@ class U1FullSpectrumApp(ctk.CTk):
         self.colorinfo_label.grid(row=2, column=0, padx=20, pady=(0, 2), sticky="w")
 
         # Sequenz-Ergebnis + Kopier-Button
-        res_frame = ctk.CTkFrame(sec1, fg_color="transparent")
-        res_frame.grid(row=3, column=0, pady=(4, 2))
+        res_outer = ctk.CTkFrame(sec1, fg_color="transparent")
+        res_outer.grid(row=3, column=0, pady=(4, 0))
+        res_frame = ctk.CTkFrame(res_outer, fg_color="transparent")
+        res_frame.pack()
         self.res = ctk.CTkLabel(res_frame, text="----------",
-                                 font=("Courier New", 58, "bold"), text_color="#4ade80")
+                                 font=("Courier New", 58, "bold"), text_color="#4ade80",
+                                 cursor="hand2")
         self.res.pack(side="left")
+        self.res.bind("<Button-1>", self._copy_seq_flash)
         self._res_copy_btn = ctk.CTkButton(
             res_frame, text="📋", width=32, height=32,
             fg_color="#1e293b", hover_color="#334155",
             command=self._copy_sequence)
         self._res_copy_btn.pack(side="left", padx=(6, 0), anchor="s", pady=(0, 8))
+        self._res_copy_hint = ctk.CTkLabel(res_outer, text=self.t("click_to_copy"),
+            font=("Segoe UI", 9), text_color="#64748b")
+        self._res_copy_hint.pack(pady=(0, 2))
 
         # 10 Segmente
         sf = ctk.CTkFrame(sec1, fg_color="transparent")
@@ -2134,9 +2299,11 @@ class U1FullSpectrumApp(ctk.CTk):
         self._gamut_rects = []   # canvas rect IDs, filled lazily
 
         # Mix-Vorschau + ΔE
-        mf = ctk.CTkFrame(sec1, fg_color="#1e293b", corner_radius=8)
+        mf = ctk.CTkFrame(sec1, fg_color="#1e293b", corner_radius=8,
+                          border_width=2, border_color="#334155")
         mf.grid(row=7, column=0, padx=40, pady=6, sticky="ew")
         mf.grid_columnconfigure(1, weight=1)
+        self._result_frame = mf
 
         tgt_col = ctk.CTkFrame(mf, fg_color="transparent")
         tgt_col.grid(row=0, column=0, padx=(20, 8), pady=12)
@@ -2189,11 +2356,16 @@ class U1FullSpectrumApp(ctk.CTk):
         self.len_slider.set(10)
         self.len_slider.grid(row=0, column=1, sticky="ew", padx=6)
 
+        self._auto_found_label = ctk.CTkLabel(lr, text="Auto — Länge wird berechnet",
+                                               font=("Segoe UI", 9), text_color="#64748b")
+        self._auto_found_label.grid(row=0, column=1, sticky="ew", padx=6)
+
         self.auto_len_var = ctk.BooleanVar(value=True)
         ctk.CTkCheckBox(lr, text=self.t("auto_check"), variable=self.auto_len_var,
                         font=("Segoe UI", 9),
                         command=self._on_auto_toggle).grid(row=0, column=2, padx=(8, 4))
-        self.len_slider.configure(state="disabled")  # Auto ist Standard
+        # Auto is default — hide slider, show label
+        self.len_slider.grid_remove()
 
         ctk.CTkLabel(lr, text="ΔE≤", font=("Segoe UI", 10),
                      text_color="#64748b").grid(row=0, column=3, padx=(4, 0))
@@ -2207,8 +2379,9 @@ class U1FullSpectrumApp(ctk.CTk):
         bl.grid_columnconfigure(0, weight=1)
         calc_btn = ctk.CTkButton(bl, text=self.t("btn_calculate"), fg_color="#2563eb",
                       command=self.calc, height=46,
-                      font=("Segoe UI", 14, "bold"))
+                      font=("Segoe UI", 13, "bold"))
         calc_btn.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self._calc_btn = calc_btn
         self.tip(calc_btn, "tip_calculate")
 
         self.optimizer_var = ctk.BooleanVar(value=False)
@@ -2218,9 +2391,9 @@ class U1FullSpectrumApp(ctk.CTk):
         self.tip(opt_cb, "tip_optimizer")
 
         add_btn = ctk.CTkButton(bl, text=self.t("btn_add_virtual"),
-                      fg_color="#15803d", hover_color="#166534",
-                      command=self.add_to_virtual, height=46,
-                      font=("Segoe UI", 11, "bold"))
+                      fg_color="#16a34a", hover_color="#15803d",
+                      command=self.add_to_virtual, height=44,
+                      font=("Segoe UI", 13, "bold"))
         add_btn.grid(row=0, column=2, padx=(0, 6))
         self.tip(add_btn, "tip_add_virtual")
 
@@ -2353,9 +2526,28 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkButton(tb2, text=self.t("btn_copy_all_cad"), fg_color="#0e7490",
                       height=32, command=self.open_copy_all_cadence).pack(side="left", padx=(0, 8), pady=5)
 
+        # Sort / Filter bar for virtual heads
+        sf_bar = ctk.CTkFrame(tab2, fg_color="#1a2535", corner_radius=6)
+        sf_bar.grid(row=3, column=0, padx=8, pady=(0, 2), sticky="ew")
+        ctk.CTkLabel(sf_bar, text="🔍", font=("Segoe UI", 12),
+                     text_color="#64748b").pack(side="left", padx=(8, 2), pady=5)
+        self._virt_filter_var = ctk.StringVar()
+        _virt_filter_entry = ctk.CTkEntry(sf_bar, textvariable=self._virt_filter_var,
+                                           placeholder_text=self.t("virt_filter_placeholder"),
+                                           width=160, height=28)
+        _virt_filter_entry.pack(side="left", padx=(0, 8), pady=5)
+        self._virt_sort_var = ctk.StringVar(value=self.t("virt_sort_added"))
+        _sort_opts = [self.t("virt_sort_added"), self.t("virt_sort_de_asc"),
+                      self.t("virt_sort_de_desc"), self.t("virt_sort_label")]
+        _sort_menu = ctk.CTkOptionMenu(sf_bar, variable=self._virt_sort_var,
+                                        values=_sort_opts, width=130, height=28,
+                                        command=lambda _: self._refresh_virtual_grid())
+        _sort_menu.pack(side="left", padx=(0, 8), pady=5)
+        self._virt_filter_var.trace_add("write", lambda *a: self.after(200, self._refresh_virtual_grid))
+
         # Grid-Header
         gh = ctk.CTkFrame(tab2, fg_color="#1e293b", corner_radius=6)
-        gh.grid(row=3, column=0, padx=8, sticky="ew", pady=(0, 2))
+        gh.grid(row=4, column=0, padx=8, sticky="ew", pady=(0, 2))
         gh.grid_columnconfigure(4, weight=1)
         for col, (txt, w) in enumerate([("ID", 55), (self.t("grid_target"), 50),
                                          (self.t("grid_sequence"), 160), (self.t("grid_simulated"), 60),
@@ -2367,14 +2559,15 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Scrollbares Grid
         self.vgrid = ctk.CTkScrollableFrame(tab2, fg_color="#0f172a", corner_radius=8)
-        self.vgrid.grid(row=4, column=0, padx=8, sticky="nsew", pady=(0, 0))
-        tab2.grid_rowconfigure(4, weight=1)
+        self.vgrid.grid(row=5, column=0, padx=8, sticky="nsew", pady=(0, 0))
+        tab2.grid_rowconfigure(5, weight=1)
+        tab2.grid_rowconfigure(2, weight=0)
         self.vgrid.grid_columnconfigure(4, weight=1)
         self._refresh_virtual_grid()
 
         # DnD hint label + export hint label
         _hint_row = ctk.CTkFrame(tab2, fg_color="transparent")
-        _hint_row.grid(row=5, column=0, padx=8, pady=(2, 6), sticky="ew")
+        _hint_row.grid(row=6, column=0, padx=8, pady=(2, 6), sticky="ew")
         _hint_row.grid_columnconfigure(0, weight=1)
         if _HAS_DND:
             ctk.CTkLabel(_hint_row, text="← .3mf oder .u1proj hierher ziehen",
@@ -2442,15 +2635,28 @@ class U1FullSpectrumApp(ctk.CTk):
         self.slots[idx]["color"].set(cols[0])
         self.apply_f(idx)
 
+    def _update_slot_strip(self, idx):
+        """Update the colored left-border strip to match slot's current hex color."""
+        try:
+            strip = self.slots[idx].get("_strip")
+            hex_val = self.slots[idx]["hex"].get().strip() or "#334155"
+            if strip:
+                strip.configure(fg_color=hex_val)
+        except Exception:
+            pass
+
     def apply_f(self, idx):
         b = self.slots[idx]["brand"].get()
         n = self.slots[idx]["color"].get()
         if n in _SLOT_SKIP: return
         f = next((x for x in self.library.get(b, []) if x["name"] == n), None)
         if f is None: return
+        if not getattr(self, "_building_ui", False):
+            self._save_slot_snapshot()
         self.slots[idx]["hex"].delete(0, "end"); self.slots[idx]["hex"].insert(0, f["hex"])
         self.slots[idx]["td"].delete(0, "end");  self.slots[idx]["td"].insert(0, str(f["td"]))
         self.slots[idx]["preview"].configure(fg_color=f["hex"])
+        self._update_slot_strip(idx)
         if not getattr(self, "_building_ui", False):
             self._schedule_gamut_update()
 
@@ -2460,6 +2666,7 @@ class U1FullSpectrumApp(ctk.CTk):
         if h is None: return
         self.slots[idx]["hex"].delete(0, "end"); self.slots[idx]["hex"].insert(0, h)
         self.slots[idx]["preview"].configure(fg_color=h)
+        self._update_slot_strip(idx)
         cur_vals = [f["name"] for f in self.library.get(self.slots[idx]["brand"].get(), [])]
         manual = self.t("manual_color")
         self.slots[idx]["color"].configure(values=[manual] + cur_vals)
@@ -2564,9 +2771,15 @@ class U1FullSpectrumApp(ctk.CTk):
             else:      seg.pack_forget()
 
     def _on_auto_toggle(self):
-        # Slider deaktivieren wenn Auto aktiv
-        state = "disabled" if self.auto_len_var.get() else "normal"
-        self.len_slider.configure(state=state)
+        """Show/hide slider vs auto-found label depending on auto mode."""
+        if self.auto_len_var.get():
+            self.len_slider.grid_remove()
+            if hasattr(self, "_auto_found_label"):
+                self._auto_found_label.grid()
+        else:
+            if hasattr(self, "_auto_found_label"):
+                self._auto_found_label.grid_remove()
+            self.len_slider.grid()
 
     # ── BERECHNUNGS-KERN ────────────────────────────────────────────────────────
 
@@ -2824,94 +3037,112 @@ class U1FullSpectrumApp(ctk.CTk):
         if not hasattr(self, "target"):
             messagebox.showinfo(self.t("dlg_note"), self.t("dlg_select_color")); return
 
-        t_lab = rgb_to_lab(hex_to_rgb(self.target))
-        fils  = self._get_fils()
+        # Loading state
+        if hasattr(self, "_calc_btn"):
+            self._calc_btn.configure(text="⏳ Berechne…", state="disabled")
+            self.update_idletasks()
 
-        # Gamut
-        if min(delta_e(t_lab, f["lab"]) for f in fils) > GAMUT_WARN_DE:
-            self.gamut_label.grid(row=2, column=0, padx=20, pady=(0, 4), sticky="ew")
-        else:
-            self.gamut_label.grid_forget()
+        try:
+            t_lab = rgb_to_lab(hex_to_rgb(self.target))
+            fils  = self._get_fils()
 
-        auto      = self.auto_len_var.get()
-        threshold = safe_td(self.auto_thresh_entry.get()) if auto else 2.0
-        seq_len   = int(self.len_slider.get()) if not auto else None
-
-        result = self._calc_for_color(
-            self.target, self.optimizer_var.get(),
-            seq_len=seq_len, auto=auto, auto_threshold=threshold)
-        if result is None: return
-
-        seq = result["sequence"]
-        n   = result["seq_len"]
-
-        # Slider-Wert auf tatsächliche Länge setzen (bei Auto)
-        if auto:
-            self.len_slider.set(n)
-            self.len_label.configure(text=self.t("length_label", n=n))
-
-        self.res.configure(text=seq)
-
-        # Segmente dynamisch aktualisieren
-        fils_hex = {f["id"]: f["hex"] for f in fils}
-        for i, seg in enumerate(self.segs):
-            if i < n:
-                fid = int(seq[i])
-                bg  = fils_hex.get(fid, "#1e293b")
-                r_, g_, b_ = hex_to_rgb(bg)
-                lum = 0.299*r_ + 0.587*g_ + 0.114*b_
-                txt_col = "#111111" if lum > 140 else "#eeeeee"
-                seg.configure(fg_color=bg, text=f"T{fid}", text_color=txt_col,
-                               font=("Segoe UI", 10, "bold"))
-                seg.pack(side="left", expand=True, padx=2)
+            # Gamut
+            if min(delta_e(t_lab, f["lab"]) for f in fils) > GAMUT_WARN_DE:
+                self.gamut_label.grid(row=2, column=0, padx=20, pady=(0, 4), sticky="ew")
             else:
-                seg.pack_forget()
+                self.gamut_label.grid_forget()
 
-        self._last_sim_hex = result["sim_hex"]
-        self._last_de      = result["de"]
-        dv = result["de"]
+            auto      = self.auto_len_var.get()
+            threshold = safe_td(self.auto_thresh_entry.get()) if auto else 2.0
+            seq_len   = int(self.len_slider.get()) if not auto else None
 
-        # Farbsehschwäche-Simulation anwenden
-        mode = self.colorblind_var.get() if hasattr(self, "colorblind_var") else "normal"
-        sim_display = self._simulate_colorblind(result["sim_hex"], mode)
-        tgt_display = self._simulate_colorblind(self.target, mode)
-        self.sim_circle.configure(fg_color=sim_display)
-        self.target_circle.configure(fg_color=tgt_display)
-        self.de_disp.configure(text=f"ΔE  {dv:.1f}", text_color=de_color(dv))
-        if hasattr(self, "target_hex_lbl"):
-            self.target_hex_lbl.configure(text=self.target.upper())
-        if hasattr(self, "sim_hex_lbl"):
-            self.sim_hex_lbl.configure(text=result["sim_hex"].upper())
-        if hasattr(self, "de_quality_lbl"):
-            quality = "ausgezeichnet ✓" if dv < 3.0 else "gut" if dv < 6.0 else "sichtbar"
-            if self.lang == "en":
-                quality = "excellent ✓" if dv < 3.0 else "good" if dv < 6.0 else "visible"
-            self.de_quality_lbl.configure(text=quality, text_color=de_color(dv))
+            result = self._calc_for_color(
+                self.target, self.optimizer_var.get(),
+                seq_len=seq_len, auto=auto, auto_threshold=threshold)
+            if result is None: return
 
-        self.last_result = result
-        self._show_top3()
-        self._draw_seq_preview(seq)
+            seq = result["sequence"]
+            n   = result["seq_len"]
 
-        # Update recent colors
-        self._add_recent_color(self.target)
+            # Slider-Wert auf tatsächliche Länge setzen (bei Auto)
+            if auto:
+                self.len_slider.set(n)
+                self.len_label.configure(text=self.t("length_label", n=n))
+                if hasattr(self, "_auto_found_label"):
+                    self._auto_found_label.configure(text=self.t("auto_found", n=n))
 
-        # Feature 9: Auto-suggestion
-        if dv > 6:
-            self._check_auto_suggestion(self.target)
-        else:
-            if hasattr(self, "suggestion_label"):
-                self.suggestion_label.configure(text="")
+            self.res.configure(text=seq)
 
-        # Feature 10: Material compatibility warning
-        seq_ids = list(set(int(c) - 1 for c in seq))
-        mat_warn = self._check_material_compatibility(seq_ids)
-        if mat_warn and hasattr(self, "suggestion_label"):
-            cur = self.suggestion_label.cget("text")
-            combined = mat_warn if not cur else f"{cur}  |  {mat_warn}"
-            self.suggestion_label.configure(text=combined, text_color="#f59e0b")
+            # Segmente dynamisch aktualisieren
+            fils_hex = {f["id"]: f["hex"] for f in fils}
+            for i, seg in enumerate(self.segs):
+                if i < n:
+                    fid = int(seq[i])
+                    bg  = fils_hex.get(fid, "#1e293b")
+                    r_, g_, b_ = hex_to_rgb(bg)
+                    lum = 0.299*r_ + 0.587*g_ + 0.114*b_
+                    txt_col = "#111111" if lum > 140 else "#eeeeee"
+                    seg.configure(fg_color=bg, text=f"T{fid}", text_color=txt_col,
+                                   font=("Segoe UI", 10, "bold"))
+                    seg.pack(side="left", expand=True, padx=2)
+                else:
+                    seg.pack_forget()
 
-        # Update history
-        self._update_history(self.target, result["sim_hex"], result["de"], seq)
+            self._last_sim_hex = result["sim_hex"]
+            self._last_de      = result["de"]
+            dv = result["de"]
+
+            # Farbsehschwäche-Simulation anwenden
+            mode = self.colorblind_var.get() if hasattr(self, "colorblind_var") else "normal"
+            sim_display = self._simulate_colorblind(result["sim_hex"], mode)
+            tgt_display = self._simulate_colorblind(self.target, mode)
+            self.sim_circle.configure(fg_color=sim_display)
+            self.target_circle.configure(fg_color=tgt_display)
+            self.de_disp.configure(text=f"ΔE  {dv:.1f}", text_color=de_color(dv))
+            if hasattr(self, "target_hex_lbl"):
+                self.target_hex_lbl.configure(text=self.target.upper())
+            if hasattr(self, "sim_hex_lbl"):
+                self.sim_hex_lbl.configure(text=result["sim_hex"].upper())
+            if hasattr(self, "de_quality_lbl"):
+                quality = "ausgezeichnet ✓" if dv < 3.0 else "gut" if dv < 6.0 else "sichtbar"
+                if self.lang == "en":
+                    quality = "excellent ✓" if dv < 3.0 else "good" if dv < 6.0 else "visible"
+                self.de_quality_lbl.configure(text=quality, text_color=de_color(dv))
+
+            self.last_result = result
+            self._show_top3()
+            self._draw_seq_preview(seq)
+
+            # High ΔE visual warning on result border
+            self._set_result_border(dv)
+
+            # Update recent colors
+            self._add_recent_color(self.target)
+
+            # Feature 9: Auto-suggestion
+            if dv > 6:
+                self._check_auto_suggestion(self.target)
+            else:
+                if hasattr(self, "suggestion_label"):
+                    self.suggestion_label.configure(text="")
+
+            # Feature 10: Material compatibility warning
+            seq_ids = list(set(int(c) - 1 for c in seq))
+            mat_warn = self._check_material_compatibility(seq_ids)
+            if mat_warn and hasattr(self, "suggestion_label"):
+                cur = self.suggestion_label.cget("text")
+                combined = mat_warn if not cur else f"{cur}  |  {mat_warn}"
+                self.suggestion_label.configure(text=combined, text_color="#f59e0b")
+
+            # Update history
+            self._update_history(self.target, result["sim_hex"], result["de"], seq)
+
+            # Status bar update
+            self._set_status(self.t("status_calculated", de=dv, seq=seq), 5000)
+
+        finally:
+            if hasattr(self, "_calc_btn"):
+                self._calc_btn.configure(text=self.t("btn_calculate"), state="normal")
 
     # ── VIRTUELLE DRUCKKÖPFE ───────────────────────────────────────────────────
 
@@ -2920,6 +3151,44 @@ class U1FullSpectrumApp(ctk.CTk):
         if seq and seq != "----------":
             self.clipboard_clear()
             self.clipboard_append(seq)
+
+    def _copy_seq_flash(self, event=None):
+        """Click handler on result label — copy to clipboard and flash green."""
+        seq = self.res.cget("text")
+        if not seq or seq == "----------" or seq == "—":
+            return
+        self.clipboard_clear()
+        self.clipboard_append(seq)
+        try:
+            orig = self.res.cget("fg_color")
+            self.res.configure(fg_color="#166534")
+            self.after(600, lambda: self.res.configure(fg_color=orig))
+        except Exception:
+            pass
+
+    def _set_result_border(self, de):
+        """Set the result frame border color based on ΔE value."""
+        if not hasattr(self, "_result_frame"):
+            return
+        if de < DE_GOOD:
+            color = "#16a34a"
+        elif de < DE_OK:
+            color = "#d97706"
+        else:
+            color = "#dc2626"
+            self._pulse_result_border(3)
+        self._result_frame.configure(border_color=color, border_width=2)
+
+    def _pulse_result_border(self, n):
+        """Pulse the result border width n times for high ΔE warning."""
+        if n <= 0 or not hasattr(self, "_result_frame"):
+            return
+        try:
+            cur_w = self._result_frame.cget("border_width")
+            self._result_frame.configure(border_width=4 if cur_w == 2 else 2)
+            self.after(500, lambda: self._pulse_result_border(n - 1))
+        except Exception:
+            pass
 
     def _on_model_change(self):
         if hasattr(self, "target") and self.target:
@@ -2945,6 +3214,7 @@ class U1FullSpectrumApp(ctk.CTk):
             "label":      self.t("virtual_label_default", vid=vid),
         })
         self._refresh_virtual_grid()
+        self._set_status(self.t("status_added", vid=vid), 3000)
 
     def clear_virtual(self):
         if self.virtual_fils and messagebox.askyesno(
@@ -3401,7 +3671,32 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkButton(btm, text=self.t("batch_btn_cancel"), fg_color="#374151",
                       command=win.destroy, height=40).pack(side="right")
 
+    def _get_sorted_filtered_virtual(self):
+        """Return virtual_fils list filtered and sorted per UI controls."""
+        fils = list(self.virtual_fils)
+        # Filter
+        ftext = ""
+        if hasattr(self, "_virt_filter_var"):
+            ftext = self._virt_filter_var.get().lower().strip()
+        if ftext:
+            fils = [v for v in fils if ftext in v.get("label", "").lower()
+                    or ftext in v.get("sequence", "").lower()
+                    or ftext in v.get("target_hex", "").lower()]
+        # Sort
+        sk = ""
+        if hasattr(self, "_virt_sort_var"):
+            sk = self._virt_sort_var.get()
+        if "ΔE ↑" in sk:
+            fils.sort(key=lambda v: v.get("de", 99))
+        elif "ΔE ↓" in sk:
+            fils.sort(key=lambda v: v.get("de", 0), reverse=True)
+        elif "Label" in sk or "A-Z" in sk:
+            fils.sort(key=lambda v: v.get("label", ""))
+        return fils
+
     def _refresh_virtual_grid(self):
+        if not hasattr(self, "vgrid"):
+            return
         for w in self.vgrid.winfo_children():
             w.destroy()
         if not self.virtual_fils:
@@ -3412,7 +3707,7 @@ class U1FullSpectrumApp(ctk.CTk):
             return
 
         self.vgrid.grid_columnconfigure(4, weight=1)
-        for row_data in self.virtual_fils:
+        for row_data in self._get_sorted_filtered_virtual():
             self._build_virtual_row(row_data)
 
     def _build_virtual_row(self, vf):
@@ -4026,6 +4321,7 @@ class U1FullSpectrumApp(ctk.CTk):
                 added += 1
             win.destroy()
             messagebox.showinfo(self.t("dlg_3mf_title"), self.t("dlg_3mf_added", n=added))
+            self._set_status(self.t("status_3mf", n=added), 4000)
 
         btm = ctk.CTkFrame(win, fg_color="transparent")
         btm.pack(fill="x", padx=14, pady=(6, 14))
@@ -4190,6 +4486,7 @@ class U1FullSpectrumApp(ctk.CTk):
                     with open(path, "w", encoding="utf-8") as f:
                         f.write("\n".join(lines))
                 messagebox.showinfo(self.t("dlg_saved"), self.t("dlg_export_saved", path=path))
+                self._set_status(self.t("status_exported", f=os.path.basename(path)), 4000)
                 # Show slicer hint (Change 9)
                 if scope == "virtual":
                     self._show_export_hint_for_virtual()
@@ -5931,69 +6228,101 @@ class U1FullSpectrumApp(ctk.CTk):
 
         win = ctk.CTkToplevel(self)
         win.title("Filament suchen")
-        win.geometry("400x500")
+        win.geometry("420x560")
         self._search_wins[slot_idx] = win
         win.protocol("WM_DELETE_WINDOW", lambda: (self._search_wins.pop(slot_idx, None), win.destroy()))
 
+        # Brand filter row
+        brand_row = ctk.CTkFrame(win, fg_color="transparent")
+        brand_row.pack(fill="x", padx=8, pady=(8, 2))
+        brand_var = ctk.StringVar(value="Alle")
+        all_brands = ["Alle"] + list(self.library.keys())
+        brand_menu = ctk.CTkOptionMenu(brand_row, variable=brand_var, values=all_brands,
+                                        width=180)
+        brand_menu.pack(side="left")
+
         search_var = ctk.StringVar()
         entry = ctk.CTkEntry(win, textvariable=search_var, placeholder_text="Suchen...")
-        entry.pack(fill="x", padx=8, pady=8)
+        entry.pack(fill="x", padx=8, pady=(2, 4))
         entry.focus()
 
-        sf = ctk.CTkScrollableFrame(win, height=400)
-        sf.pack(fill="both", expand=True, padx=8, pady=4)
+        # Use tk.Listbox for keyboard navigation and double-click support
+        list_frame = ctk.CTkFrame(win, fg_color="#0f172a", corner_radius=6)
+        list_frame.pack(fill="both", expand=True, padx=8, pady=4)
+        listbox = tk.Listbox(list_frame, bg="#0f172a", fg="#e2e8f0",
+                             selectbackground="#2563eb", selectforeground="white",
+                             font=("Segoe UI", 11), borderwidth=0, highlightthickness=0,
+                             activestyle="none")
+        listbox_scroll = tk.Scrollbar(list_frame, orient="vertical", command=listbox.yview)
+        listbox.configure(yscrollcommand=listbox_scroll.set)
+        listbox_scroll.pack(side="right", fill="y")
+        listbox.pack(side="left", fill="both", expand=True, padx=4, pady=4)
+
+        # Store search results for apply
+        _results = []
+
+        def _apply_selected():
+            sel = listbox.curselection()
+            if not sel:
+                return
+            idx = sel[0]
+            if idx >= len(_results):
+                return
+            brand, fil = _results[idx]
+            self._save_slot_snapshot()
+            s = self.slots[slot_idx]
+            s["brand"].set(brand)
+            self.update_menu(slot_idx)
+            try:
+                s["color"].set(fil.get("name", ""))
+            except Exception:
+                pass
+            s["hex"].delete(0, "end")
+            s["hex"].insert(0, fil.get("hex", "#FFFFFF"))
+            s["td"].delete(0, "end")
+            s["td"].insert(0, str(fil.get("td", 5.0)))
+            try:
+                s["preview"].configure(fg_color=fil.get("hex", "#FFFFFF"))
+            except Exception:
+                pass
+            self._search_wins.pop(slot_idx, None)
+            win.destroy()
 
         _debounce_id = [None]
 
         def _schedule_update(*args):
             if _debounce_id[0]:
                 win.after_cancel(_debounce_id[0])
-            _debounce_id[0] = win.after(250, _update_results)
+            _debounce_id[0] = win.after(200, _update_results)
 
         def _update_results():
-            for w in sf.winfo_children():
-                w.destroy()
+            listbox.delete(0, "end")
+            _results.clear()
             q = search_var.get().lower()
+            brand_filter = brand_var.get()
             count = 0
             for brand, filaments in self.library.items():
+                if brand_filter != "Alle" and brand != brand_filter:
+                    continue
                 for fil in filaments:
-                    if q in brand.lower() or q in fil.get("name", "").lower():
-                        if count >= 100:
+                    if q in brand.lower() or q in fil.get("name", "").lower() or q in fil.get("hex", "").lower():
+                        if count >= 200:
                             break
                         count += 1
-                        row = ctk.CTkFrame(sf, fg_color="transparent")
-                        row.pack(fill="x", pady=1)
-                        hex_c = fil.get("hex", "#888888")
-                        try:
-                            swatch = ctk.CTkLabel(row, text="  ", width=28,
-                                                  fg_color=hex_c, corner_radius=3)
-                            swatch.pack(side="left", padx=3)
-                        except Exception:
-                            pass
-                        name_str = f"{brand} — {fil.get('name', '?')}"
-                        lbl = ctk.CTkLabel(row, text=name_str, cursor="hand2", anchor="w")
-                        lbl.pack(side="left", padx=3, fill="x", expand=True)
-                        def _load(b=brand, fi=fil, w=win):
-                            s = self.slots[slot_idx]
-                            s["brand"].set(b)
-                            self.update_menu(slot_idx)
-                            try:
-                                s["color"].set(fi.get("name", ""))
-                            except Exception:
-                                pass
-                            s["hex"].delete(0, "end")
-                            s["hex"].insert(0, fi.get("hex", "#FFFFFF").lstrip("#"))
-                            s["td"].delete(0, "end")
-                            s["td"].insert(0, str(fi.get("td", 5.0)))
-                            try:
-                                s["preview"].configure(fg_color=fi.get("hex", "#FFFFFF"))
-                            except Exception:
-                                pass
-                            self._search_wins.pop(slot_idx, None)
-                            w.destroy()
-                        lbl.bind("<Button-1>", lambda e, f=_load: f())
+                        _results.append((brand, fil))
+                        name_str = f"{brand} — {fil.get('name', '?')}  {fil.get('hex', '')}"
+                        listbox.insert("end", name_str)
 
+        listbox.bind("<Double-Button-1>", lambda e: _apply_selected())
+        listbox.bind("<Return>", lambda e: _apply_selected())
+        brand_var.trace_add("write", _schedule_update)
         search_var.trace_add("write", _schedule_update)
+
+        # OK button at bottom
+        ok_btn = ctk.CTkButton(win, text="✓ Übernehmen", fg_color="#15803d",
+                                command=_apply_selected)
+        ok_btn.pack(fill="x", padx=8, pady=(0, 8))
+
         _update_results()
 
     # ── FEATURE 8: FILAMENT DISTANCE MATRIX ──────────────────────────────────
