@@ -355,6 +355,8 @@ STRINGS = {
     "btn_copy_all_cad": "📋 Alle Cadence-Werte",
     "copy_all_title": "Alle Dithering-Werte",
     "copy_all_btn": "Alles in Zwischenablage",
+    # Tabs
+    "tab_tools": "Werkzeuge",
     # Gamut-Plot
     "btn_gamut_plot": "🎯 Gamut-Plot",
     # Batch-Neuberechnung
@@ -699,6 +701,8 @@ STRINGS = {
     "btn_copy_all_cad": "📋 All Cadence Values",
     "copy_all_title": "All Dithering Values",
     "copy_all_btn": "Copy All to Clipboard",
+    # Tabs
+    "tab_tools": "Werkzeuge",
     # Gamut plot
     "btn_gamut_plot": "🎯 Gamut Plot",
     # Batch recalc
@@ -1535,16 +1539,6 @@ class U1FullSpectrumApp(ctk.CTk):
                       height=32, command=self.load_project).grid(
             row=0, column=1, sticky="ew", padx=(3,6), pady=6)
 
-        # Sidebar-Tools
-        ctk.CTkButton(self.sidebar, text=self.t("btn_new_brand"), fg_color="#1e3a5f",
-                      command=self.add_brand).pack(fill="x", padx=12, pady=(8, 3))
-        ctk.CTkButton(self.sidebar, text=self.t("btn_library"), fg_color="#374151",
-                      command=self.open_library_manager).pack(fill="x", padx=12, pady=(3, 2))
-        web_btn = ctk.CTkButton(self.sidebar, text=self.t("btn_web_update"),
-                      fg_color="#164e63", hover_color="#155e75",
-                      command=self.web_update_library)
-        web_btn.pack(fill="x", padx=12, pady=(0, 8))
-        self.tip(web_btn, "tip_web_update")
 
         # Schichthöhe — global für Cadence-Berechnung
         lh_frame = ctk.CTkFrame(self.sidebar, fg_color="#0f172a", corner_radius=8)
@@ -1576,13 +1570,48 @@ class U1FullSpectrumApp(ctk.CTk):
                                command=self._on_model_change).pack(anchor="w", padx=16, pady=1)
         ctk.CTkLabel(model_frame, text="", height=4).pack()
 
-        # ── HAUPTBEREICH ─────────────────────────────────────────────────────
-        self.main = ctk.CTkScrollableFrame(self)
-        self.main.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
-        self.main.grid_columnconfigure(0, weight=1)
+        # ── HAUPTBEREICH: TABS ───────────────────────────────────────────────
+        self.tabs = ctk.CTkTabview(
+            self, corner_radius=8,
+            fg_color="#0a0f1e",
+            segmented_button_fg_color="#1e293b",
+            segmented_button_selected_color="#2563eb",
+            segmented_button_selected_hover_color="#1d4ed8",
+            segmented_button_unselected_color="#1e293b",
+            segmented_button_unselected_hover_color="#334155",
+            text_color="#e2e8f0",
+            text_color_disabled="#475569",
+        )
+        self.tabs.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
 
-        # ── ABSCHNITT 1: EINZELFARBEN-RECHNER ────────────────────────────────
-        sec1 = ctk.CTkFrame(self.main, fg_color="#0f172a", corner_radius=10)
+        _t1_name = "🎨  " + self.t("tab_calculator")
+        _t2_name = "🔲  " + self.t("tab_virtual")
+        _t3_name = "🛠  " + self.t("tab_tools")
+        self.tabs.add(_t1_name)
+        self.tabs.add(_t2_name)
+        self.tabs.add(_t3_name)
+
+        # scrollbare Container je Tab
+        tab1 = ctk.CTkScrollableFrame(self.tabs.tab(_t1_name),
+                                       fg_color="transparent", corner_radius=0)
+        tab1.pack(fill="both", expand=True)
+        tab1.grid_columnconfigure(0, weight=1)
+
+        # Tab2: normaler Frame, damit das innere vgrid allein scrollt
+        tab2 = ctk.CTkFrame(self.tabs.tab(_t2_name), fg_color="transparent", corner_radius=0)
+        tab2.pack(fill="both", expand=True)
+        tab2.grid_columnconfigure(0, weight=1)
+        tab2.grid_rowconfigure(2, weight=1)
+
+        tab3 = ctk.CTkScrollableFrame(self.tabs.tab(_t3_name),
+                                       fg_color="transparent", corner_radius=0)
+        tab3.pack(fill="both", expand=True)
+        tab3.grid_columnconfigure(0, weight=1)
+
+        # ────────────────────────────────────────────────────────────────────
+        # TAB 1 — EINZELFARBEN-RECHNER
+        # ────────────────────────────────────────────────────────────────────
+        sec1 = ctk.CTkFrame(tab1, fg_color="#0f172a", corner_radius=10)
         sec1.grid(row=0, column=0, padx=0, pady=(0, 12), sticky="ew")
         sec1.grid_columnconfigure(0, weight=1)
 
@@ -1609,11 +1638,28 @@ class U1FullSpectrumApp(ctk.CTk):
                                            text_color="#94a3b8", width=80)
         self.live_de_label.grid(row=0, column=3, padx=(6, 0))
 
+        rnd_btn = ctk.CTkButton(top, text=self.t("btn_random"), width=85, height=46,
+                      fg_color="#374151", font=("Segoe UI", 11),
+                      command=self.pick_random_color)
+        rnd_btn.grid(row=0, column=4, padx=(4, 0))
+        self.tip(rnd_btn, "tip_random")
+
+        img_btn = ctk.CTkButton(top, text=self.t("btn_img_pick"), width=100, height=46,
+                      fg_color="#374151", font=("Segoe UI", 11),
+                      command=self.pick_color_from_image)
+        img_btn.grid(row=0, column=5, padx=(4, 0))
+        self.tip(img_btn, "tip_img_pick")
+
         # Gamut-Warnung
         self.gamut_label = ctk.CTkLabel(
             sec1, text=self.t("gamut_warning"),
             fg_color="#7c2d12", corner_radius=6, text_color="#fcd34d",
             font=("Segoe UI", 10))
+
+        # Farbinfo-Label (RGB + Lab)
+        self.colorinfo_label = ctk.CTkLabel(sec1, text="",
+                                             font=("Segoe UI", 9), text_color="#475569")
+        self.colorinfo_label.grid(row=2, column=0, padx=20, pady=(0, 2), sticky="w")
 
         # Sequenz-Ergebnis + Kopier-Button
         res_frame = ctk.CTkFrame(sec1, fg_color="transparent")
@@ -1668,7 +1714,6 @@ class U1FullSpectrumApp(ctk.CTk):
         mf.grid(row=6, column=0, padx=40, pady=6, sticky="ew")
         mf.grid_columnconfigure(1, weight=1)
 
-        # Ziel-Seite
         tgt_col = ctk.CTkFrame(mf, fg_color="transparent")
         tgt_col.grid(row=0, column=0, padx=(20, 8), pady=12)
         ctk.CTkLabel(tgt_col, text=self.t("label_target"), font=("Segoe UI", 10),
@@ -1683,7 +1728,6 @@ class U1FullSpectrumApp(ctk.CTk):
             self.clipboard_clear(),
             self.clipboard_append(self.target_hex_lbl.cget("text"))))
 
-        # ΔE Mitte
         de_col = ctk.CTkFrame(mf, fg_color="transparent")
         de_col.grid(row=0, column=1, padx=20)
         self.de_disp = ctk.CTkLabel(de_col, text="ΔE  —",
@@ -1693,7 +1737,6 @@ class U1FullSpectrumApp(ctk.CTk):
                                             text_color="#475569")
         self.de_quality_lbl.pack()
 
-        # Simuliert-Seite
         sim_col = ctk.CTkFrame(mf, fg_color="transparent")
         sim_col.grid(row=0, column=2, padx=(8, 20), pady=12)
         ctk.CTkLabel(sim_col, text=self.t("label_simulated"), font=("Segoe UI", 10),
@@ -1733,24 +1776,6 @@ class U1FullSpectrumApp(ctk.CTk):
         self.auto_thresh_entry.insert(0, "2.0")
         self.auto_thresh_entry.grid(row=0, column=4, padx=(2, 14))
 
-        # Zielfarbe: Random + Bild-Picker Buttons
-        rnd_btn = ctk.CTkButton(top, text=self.t("btn_random"), width=85, height=46,
-                      fg_color="#374151", font=("Segoe UI", 11),
-                      command=self.pick_random_color)
-        rnd_btn.grid(row=0, column=3, padx=(4, 0))
-        self.tip(rnd_btn, "tip_random")
-
-        img_btn = ctk.CTkButton(top, text=self.t("btn_img_pick"), width=100, height=46,
-                      fg_color="#374151", font=("Segoe UI", 11),
-                      command=self.pick_color_from_image)
-        img_btn.grid(row=0, column=4, padx=(4, 0))
-        self.tip(img_btn, "tip_img_pick")
-
-        # Farbinfo-Label (RGB + Lab)
-        self.colorinfo_label = ctk.CTkLabel(sec1, text="",
-                                             font=("Segoe UI", 9), text_color="#475569")
-        self.colorinfo_label.grid(row=2, column=0, padx=20, pady=(0, 2), sticky="w")
-
         # Steuerleiste
         bl = ctk.CTkFrame(sec1, fg_color="transparent")
         bl.grid(row=8, column=0, padx=40, pady=(4, 16), sticky="ew")
@@ -1789,12 +1814,12 @@ class U1FullSpectrumApp(ctk.CTk):
         # Top-3 Sequenzen (nach Optimizer)
         self.top3_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
         self.top3_frame.grid(row=8, column=0, padx=40, pady=(0, 4), sticky="ew")
-        self.top3_frame.grid_remove()  # initially hidden
+        self.top3_frame.grid_remove()
 
         # Keyboard shortcut: Enter = Berechnen
         self.bind("<Return>", lambda e: self.calc())
 
-        # ── Dithering-Profile ─────────────────────────────────────────────────
+        # Dithering-Profile
         dp_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
         dp_frame.grid(row=10, column=0, padx=40, pady=(0, 6), sticky="ew")
         ctk.CTkLabel(dp_frame, text=self.t("dither_profiles"),
@@ -1809,7 +1834,7 @@ class U1FullSpectrumApp(ctk.CTk):
             b.pack(side="left", padx=3, pady=6)
             self.tip(b, "tip_" + key)
 
-        # ── Farbsehschwäche-Simulation + Extras ──────────────────────────────
+        # Farbsehschwäche-Simulation
         sim_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
         sim_frame.grid(row=11, column=0, padx=40, pady=(0, 12), sticky="ew")
         ctk.CTkLabel(sim_frame, text=self.t("colorblind_label"),
@@ -1821,133 +1846,74 @@ class U1FullSpectrumApp(ctk.CTk):
                                value=val, font=("Segoe UI", 10),
                                command=self._update_colorblind_preview).pack(side="left", padx=4, pady=6)
 
-        # Extra-Buttons (Lab-Plot, Swatch, Slicer-Guide)
-        extra_row = ctk.CTkFrame(sec1, fg_color="transparent")
-        extra_row.grid(row=12, column=0, padx=40, pady=(0, 14), sticky="ew")
-        lab_btn = ctk.CTkButton(extra_row, text=self.t("btn_lab_plot"), fg_color="#0f4c81",
-                                height=32, font=("Segoe UI", 11), command=self.show_lab_plot)
-        lab_btn.pack(side="left", padx=(0, 6))
-        self.tip(lab_btn, "tip_lab_plot")
-        sw_btn = ctk.CTkButton(extra_row, text=self.t("btn_swatch"), fg_color="#374151",
-                               height=32, font=("Segoe UI", 11), command=self.save_swatch)
-        sw_btn.pack(side="left", padx=(0, 6))
-        self.tip(sw_btn, "tip_swatch")
-        guide_btn = ctk.CTkButton(extra_row, text=self.t("btn_slicer_guide"), fg_color="#7c3aed",
-                                  height=32, font=("Segoe UI", 11), command=self.open_slicer_guide)
-        guide_btn.pack(side="left", padx=(0, 6))
-        grad_btn = ctk.CTkButton(extra_row, text=self.t("btn_gradient"), fg_color="#0e7490",
-                                 height=32, font=("Segoe UI", 11),
-                                 command=self.open_gradient_dialog)
-        grad_btn.pack(side="left", padx=(0, 6))
-        self.tip(grad_btn, "tip_gradient")
+        # ────────────────────────────────────────────────────────────────────
+        # TAB 2 — VIRTUELLE DRUCKKÖPFE
+        # ────────────────────────────────────────────────────────────────────
 
-        harm_btn = ctk.CTkButton(extra_row, text=self.t("btn_harmonies"), fg_color="#7c3aed",
-                                 height=32, font=("Segoe UI", 11),
-                                 command=self.open_harmonies_dialog)
-        harm_btn.pack(side="left", padx=(0, 6))
-        self.tip(harm_btn, "tip_harmonies")
-
-        pal_btn = ctk.CTkButton(extra_row, text=self.t("btn_palette"), fg_color="#374151",
-                                height=32, font=("Segoe UI", 11),
-                                command=self.import_palette_from_image)
-        pal_btn.pack(side="left", padx=(0, 6))
-        self.tip(pal_btn, "tip_palette")
-
-        tc_btn = ctk.CTkButton(extra_row, text=self.t("btn_tc_est"), fg_color="#374151",
-                               height=32, font=("Segoe UI", 11),
-                               command=self.open_tc_estimator)
-        tc_btn.pack(side="left", padx=(0, 6))
-
-        gamut_btn = ctk.CTkButton(extra_row, text=self.t("btn_gamut_plot"), fg_color="#0f4c81",
-                                   height=32, command=self.open_gamut_plot)
-        gamut_btn.pack(side="left", padx=3)
-
-        # ── ABSCHNITT 2: VIRTUELLE DRUCKKÖPFE ────────────────────────────────
-        sec2_hdr = ctk.CTkFrame(self.main, fg_color="transparent")
-        sec2_hdr.grid(row=1, column=0, padx=0, pady=(0, 4), sticky="ew")
-        sec2_hdr.grid_columnconfigure(0, weight=1)
-
-        # Zeile 0: Titel + Untertitel
-        title_row = ctk.CTkFrame(sec2_hdr, fg_color="transparent")
-        title_row.grid(row=0, column=0, sticky="ew")
-        ctk.CTkLabel(title_row,
-                     text=self.t("sec2_title"),
+        # Titel
+        v_title = ctk.CTkFrame(tab2, fg_color="transparent")
+        v_title.grid(row=0, column=0, padx=8, pady=(8, 4), sticky="ew")
+        ctk.CTkLabel(v_title, text=self.t("sec2_title"),
                      font=("Segoe UI", 15, "bold"), text_color="#a78bfa").pack(side="left")
-        ctk.CTkLabel(title_row,
-                     text="  " + self.t("sec2_desc", max_v=self._max_virtual),
+        ctk.CTkLabel(v_title, text="  " + self.t("sec2_desc", max_v=self._max_virtual),
                      font=("Segoe UI", 10), text_color="#64748b").pack(side="left")
 
-        # Zeile 1: alle Aktions-Buttons (volle Breite, kein Clipping)
-        btn_row2 = ctk.CTkFrame(sec2_hdr, fg_color="transparent")
-        btn_row2.grid(row=1, column=0, sticky="ew", pady=(4, 0))
-        tmf_btn = ctk.CTkButton(btn_row2, text=self.t("btn_3mf"), fg_color="#0f4c81",
-                      hover_color="#1e3a5f", height=36, width=150,
-                      font=("Segoe UI", 11, "bold"),
+        # Toolbar-Zeile 1: Kern-Operationen
+        tb1 = ctk.CTkFrame(tab2, fg_color="#1e293b", corner_radius=8)
+        tb1.grid(row=1, column=0, padx=8, pady=(0, 3), sticky="ew")
+
+        tmf_btn = ctk.CTkButton(tb1, text=self.t("btn_3mf"), fg_color="#0f4c81",
+                      hover_color="#1e3a5f", height=36, font=("Segoe UI", 11, "bold"),
                       command=self.open_3mf_assistant)
-        tmf_btn.pack(side="left", padx=(0, 4))
+        tmf_btn.pack(side="left", padx=(8, 4), pady=6)
         self.tip(tmf_btn, "tip_3mf")
 
-        bat_btn = ctk.CTkButton(btn_row2, text=self.t("btn_batch"), fg_color="#4338ca",
-                      hover_color="#3730a3", height=36, width=130,
-                      font=("Segoe UI", 11, "bold"),
+        bat_btn = ctk.CTkButton(tb1, text=self.t("btn_batch"), fg_color="#4338ca",
+                      hover_color="#3730a3", height=36, font=("Segoe UI", 11, "bold"),
                       command=self.open_batch_dialog)
-        bat_btn.pack(side="left", padx=(0, 4))
+        bat_btn.pack(side="left", padx=(0, 4), pady=6)
         self.tip(bat_btn, "tip_batch")
 
-        undo_btn = ctk.CTkButton(btn_row2, text=self.t("btn_undo"), fg_color="#374151",
-                      height=36, width=110, command=self.undo_virtual)
-        undo_btn.pack(side="left", padx=(0, 4))
-        self.tip(undo_btn, "tip_calculate")
+        undo_btn = ctk.CTkButton(tb1, text=self.t("btn_undo"), fg_color="#374151",
+                      height=36, command=self.undo_virtual)
+        undo_btn.pack(side="left", padx=(0, 4), pady=6)
 
-        ctk.CTkButton(btn_row2, text=self.t("btn_del_all"), fg_color="#7f1d1d",
-                      hover_color="#991b1b", height=36, width=110,
-                      command=self.clear_virtual).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(tb1, text=self.t("btn_del_all"), fg_color="#7f1d1d",
+                      hover_color="#991b1b", height=36,
+                      command=self.clear_virtual).pack(side="left", padx=(0, 4), pady=6)
 
-        ctk.CTkButton(btn_row2, text=self.t("btn_export_all"), fg_color="#374151",
-                      height=36, width=130,
-                      command=self.open_export_dialog).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(tb1, text=self.t("btn_recalc_all"), fg_color="#065f46",
+                      hover_color="#047857", height=36,
+                      command=self.recalc_all_virtual).pack(side="left", padx=(0, 8), pady=6)
 
-        orca_btn = ctk.CTkButton(btn_row2, text=self.t("btn_orca_export"), fg_color="#0f766e",
-                      hover_color="#0d6660", height=36, width=140,
-                      font=("Segoe UI", 11, "bold"),
+        # Toolbar-Zeile 2: Export & Analyse
+        tb2 = ctk.CTkFrame(tab2, fg_color="#1a2535", corner_radius=8)
+        tb2.grid(row=2, column=0, padx=8, pady=(0, 6), sticky="ew")
+
+        ctk.CTkButton(tb2, text=self.t("btn_export_all"), fg_color="#374151",
+                      height=32, command=self.open_export_dialog).pack(side="left", padx=(8, 4), pady=5)
+
+        orca_btn = ctk.CTkButton(tb2, text=self.t("btn_orca_export"), fg_color="#0f766e",
+                      hover_color="#0d6660", height=32, font=("Segoe UI", 10, "bold"),
                       command=self.open_orca_export_dialog)
-        orca_btn.pack(side="left", padx=(0, 4))
+        orca_btn.pack(side="left", padx=(0, 4), pady=5)
         self.tip(orca_btn, "tip_orca_export")
 
-        ctk.CTkButton(btn_row2, text=self.t("btn_3mf_write"), fg_color="#374151",
-                      height=36, width=130,
-                      command=self.write_3mf_colors).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(tb2, text=self.t("btn_3mf_write"), fg_color="#374151",
+                      height=32, command=self.write_3mf_colors).pack(side="left", padx=(0, 4), pady=5)
 
-        ctk.CTkButton(btn_row2, text=self.t("btn_slot_opt"), fg_color="#7c3aed",
-                      height=36, width=140,
-                      command=self.open_slot_optimizer).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(tb2, text=self.t("btn_de_overview"), fg_color="#1e3a5f",
+                      height=32, command=self.open_de_overview).pack(side="left", padx=(0, 4), pady=5)
 
-        ctk.CTkButton(btn_row2, text=self.t("btn_td_cal"), fg_color="#0f4c81",
-                      height=36, width=130,
-                      command=self.open_td_calibration).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(tb2, text=self.t("btn_recipe"), fg_color="#374151",
+                      height=32, command=self.open_recipe_export).pack(side="left", padx=(0, 4), pady=5)
 
-        ctk.CTkButton(btn_row2, text=self.t("btn_copy_all_cad"), fg_color="#0e7490",
-                      command=self.open_copy_all_cadence, height=36).pack(side="left", padx=3)
+        ctk.CTkButton(tb2, text=self.t("btn_copy_all_cad"), fg_color="#0e7490",
+                      height=32, command=self.open_copy_all_cadence).pack(side="left", padx=(0, 8), pady=5)
 
-        ctk.CTkButton(btn_row2, text=self.t("btn_recalc_all"), fg_color="#065f46",
-                      hover_color="#047857", height=36, width=140,
-                      command=self.recalc_all_virtual).pack(side="left", padx=(4, 3))
-
-        ctk.CTkButton(btn_row2, text=self.t("btn_de_overview"), fg_color="#1e3a5f",
-                      height=36, width=130,
-                      command=self.open_de_overview).pack(side="left", padx=3)
-
-        ctk.CTkButton(btn_row2, text=self.t("btn_recipe"), fg_color="#374151",
-                      height=36, width=110,
-                      command=self.open_recipe_export).pack(side="left", padx=3)
-
-        ctk.CTkButton(btn_row2, text=self.t("btn_multitarget"), fg_color="#7c3aed",
-                      hover_color="#6d28d9", height=36, width=120,
-                      command=self.open_multitarget_optimizer).pack(side="left", padx=3)
-
-        # Virtual Filament Grid Header
-        gh = ctk.CTkFrame(self.main, fg_color="#1e293b", corner_radius=6)
-        gh.grid(row=2, column=0, sticky="ew", pady=(0, 2))
+        # Grid-Header
+        gh = ctk.CTkFrame(tab2, fg_color="#1e293b", corner_radius=6)
+        gh.grid(row=3, column=0, padx=8, sticky="ew", pady=(0, 2))
         gh.grid_columnconfigure(4, weight=1)
         for col, (txt, w) in enumerate([("ID", 55), (self.t("grid_target"), 50),
                                          (self.t("grid_sequence"), 160), (self.t("grid_simulated"), 60),
@@ -1958,11 +1924,57 @@ class U1FullSpectrumApp(ctk.CTk):
                 row=0, column=col, padx=8, pady=6, sticky="w" if w == 0 else "")
 
         # Scrollbares Grid
-        self.vgrid = ctk.CTkScrollableFrame(self.main, height=380, fg_color="#0f172a",
-                                             corner_radius=8)
-        self.vgrid.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+        self.vgrid = ctk.CTkScrollableFrame(tab2, fg_color="#0f172a", corner_radius=8)
+        self.vgrid.grid(row=4, column=0, padx=8, sticky="nsew", pady=(0, 8))
+        tab2.grid_rowconfigure(4, weight=1)
         self.vgrid.grid_columnconfigure(4, weight=1)
         self._refresh_virtual_grid()
+
+        # ────────────────────────────────────────────────────────────────────
+        # TAB 3 — WERKZEUGE
+        # ────────────────────────────────────────────────────────────────────
+
+        def _tools_section(parent, title):
+            ctk.CTkLabel(parent, text=title, font=("Segoe UI", 11, "bold"),
+                         text_color="#64748b").pack(anchor="w", padx=16, pady=(14, 4))
+            f = ctk.CTkFrame(parent, fg_color="#1e293b", corner_radius=8)
+            f.pack(fill="x", padx=12, pady=(0, 6))
+            return f
+
+        def _tool_btn(parent, text, color, cmd, tip_key=None):
+            b = ctk.CTkButton(parent, text=text, fg_color=color, height=36,
+                              font=("Segoe UI", 11), command=cmd)
+            b.pack(side="left", padx=6, pady=8)
+            if tip_key:
+                self.tip(b, tip_key)
+            return b
+
+        # Farb-Visualisierung
+        f = _tools_section(tab3, "🔭  Analyse & Visualisierung")
+        _tool_btn(f, self.t("btn_lab_plot"), "#0f4c81", self.show_lab_plot, "tip_lab_plot")
+        _tool_btn(f, self.t("btn_gamut_plot"), "#0f4c81", self.open_gamut_plot)
+        _tool_btn(f, self.t("btn_swatch"), "#374151", self.save_swatch, "tip_swatch")
+        _tool_btn(f, self.t("btn_slicer_guide"), "#7c3aed", self.open_slicer_guide)
+        _tool_btn(f, self.t("btn_tc_est"), "#374151", self.open_tc_estimator)
+
+        # Farb-Generierung
+        f = _tools_section(tab3, "🌈  Farb-Generierung")
+        _tool_btn(f, self.t("btn_gradient"), "#0e7490", self.open_gradient_dialog, "tip_gradient")
+        _tool_btn(f, self.t("btn_harmonies"), "#7c3aed", self.open_harmonies_dialog, "tip_harmonies")
+        _tool_btn(f, self.t("btn_palette"), "#374151", self.import_palette_from_image, "tip_palette")
+        _tool_btn(f, self.t("btn_multitarget"), "#7c3aed", self.open_multitarget_optimizer)
+
+        # Optimierung
+        f = _tools_section(tab3, "🎯  Optimierung & Kalibrierung")
+        _tool_btn(f, self.t("btn_slot_opt"), "#7c3aed", self.open_slot_optimizer)
+        _tool_btn(f, self.t("btn_td_cal"), "#0f4c81", self.open_td_calibration)
+
+        # Bibliothek
+        f = _tools_section(tab3, "📚  Bibliothek & Datenbank")
+        _tool_btn(f, self.t("btn_new_brand"), "#1e3a5f", self.add_brand)
+        _tool_btn(f, self.t("btn_library"), "#374151", self.open_library_manager)
+        web_b = _tool_btn(f, self.t("btn_web_update"), "#164e63", self.web_update_library,
+                          "tip_web_update")
 
     # ── SLOT-LOGIK ─────────────────────────────────────────────────────────────
 
