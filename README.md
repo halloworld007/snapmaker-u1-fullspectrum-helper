@@ -24,34 +24,61 @@ This tool helps you:
 |---|---|
 | **4 Physical Slots** | Load your actual filaments (T1–T4) with brand, color, and TD value |
 | **Color Picker** | Choose target color visually or enter a hex code |
-| **Sequence Optimizer** | Tests all 24 permutations to find the lowest ΔE sequence |
+| **Sequence Optimizer** | Tests all permutations to find the lowest ΔE sequence |
 | **Variable Sequence Length** | Auto-mode or manual (1–10 layers), shorter = fewer tool changes |
+| **Top-3 Comparison** | Shows the 3 best sequences side-by-side with one-click add |
 | **20 Virtual Print Heads** | V5–V24, each = a FullSpectrum layer sequence |
+| **Color Model Toggle** | Switch between Additive (FullSpectrum-compatible), TD-weighted, or Subtractive (pigment) simulation |
+| **Gamut Strip** | Visual strip showing achievable colors with current filaments |
+| **Gamut Plot** | CIE a*b* diagram with reachable color space and convex hull |
+| **Gradient Generator** | Generate smooth color gradients as a batch of virtual heads |
+| **Color Harmonies** | Complement, triadic, analogous, split-complement via HSV |
 | **3MF Assistant** | Opens a `.3mf` file, extracts all colors, calculates sequences automatically |
-| **Filament Database** | Searchable library with presets for Bambu Lab, Prusament, Anycubic + custom entries |
+| **3MF Extruder Remap** | Remaps original extruder assignments to T1–T4 or virtual heads and writes back |
+| **Filament Database** | 226+ presets for Bambu Lab, Prusament, eSUN, Polymaker, Hatchbox, Snapmaker + custom entries |
+| **Online Update** | Fetch latest community filament database from GitHub |
+| **Slot Optimizer** | Finds the best 4-filament combination from your library for a set of target colors |
 | **Slot Presets** | Save and reload your favorite 4-slot configurations |
+| **Project Save/Load** | Save and restore complete sessions (slots + virtual heads) as `.u1proj` |
+| **TD Calibration** | Estimate TD values from a test print measurement |
+| **Palette from Image** | Extract dominant colors from any image file |
+| **Direct OrcaSlicer Export** | Write filament profiles directly into OrcaSlicer / Snapmaker_Orca |
 | **Export** | Export sequences as `.json` or `.txt` with OrcaSlicer-ready slicer hints |
+| **Copy All Cadence Values** | One-click copy of all virtual head dithering settings as formatted text |
+| **Tool Change Estimator** | Estimates tool changes, extra print time and purge volume |
 | **History** | Last 5 calculated sequences shown inline |
 
 ### Color Science
 
-- Colors are calculated in **CIE Lab color space** (perceptual, not RGB)
+- Simulation uses **gamma-corrected linear RGB averaging** — matches the visual result of alternating thin layers (same model as FilamentMixer / FullSpectrum slicer)
 - **ΔE (Delta E)** measures color distance: `< 3` = excellent, `< 6` = good, `≥ 6` = noticeable difference
-- **TD (Transmission Distance)** models filament opacity — lower TD = more opaque = dominates the mix
-- **Progressive layer weighting** — top layers weighted 1.5× vs bottom layers (1.0×) to match visual perception
+- **TD (Transmission Distance)** models filament opacity — available as optional weighting in the color model toggle
+- Optimization and ΔE calculations run in **CIE Lab color space** (perceptually uniform)
 - **Gamut warning** at ΔE > 25 (target color is outside the achievable range)
 
-### Slicer Integration (OrcaSlicer FullSpectrum)
+### Slicer Integration
 
-After calculating sequences, use the output in OrcaSlicer under **Others → Dithering**:
+#### FullSpectrum Slicer (Snapmaker_Orca)
+
+Export **T1–T4 only** (the tool warns you automatically). FullSpectrum generates Mixed Filaments from your physical slots automatically.
+
+| Filament count in sequence | FullSpectrum setting |
+|---|---|
+| 1 filament | Pure color — assign directly |
+| 2 filaments | Mixed Filament → set ratio to match sequence counts |
+| 3–4 filaments | Not directly supported — use standard OrcaSlicer instead |
+
+#### Standard OrcaSlicer
+
+Export T1–T4 **and** V5+ virtual heads. Assign virtual heads to objects, then configure under **Others → Dithering**:
 
 | Filament count in sequence | OrcaSlicer setting |
 |---|---|
 | 1 filament | Pure color — no mixing needed |
 | 2 filaments | **Cadence Height** A + B (in mm) |
-| 3–4 filaments | **Pattern Mode** — enter the pattern string (e.g. `1/1/2/1/3`) |
+| 3–4 filaments | **Pattern Mode** — enter the pattern string (e.g. `1121`) |
 
-The Dithering Step Size corresponds to your **layer height** (default: 0.2 mm — not the nozzle diameter).
+The Dithering Step Size corresponds to your **layer height** (recommended: **0.08 mm** — color layers become visually invisible at this height).
 
 ### Requirements
 
@@ -64,6 +91,11 @@ customtkinter
 pip install customtkinter
 ```
 
+Optional (for extra features):
+```bash
+pip install matplotlib scipy Pillow CTkColorPicker CTkToolTip
+```
+
 ### Usage
 
 ```bash
@@ -74,16 +106,18 @@ python u1_ultimate.py
 2. **Pick a target color** — use the color picker or type a hex code
 3. **Calculate** — click *Berechnen* (or *Optimieren* for full optimizer)
 4. **Add to virtual grid** — click *Zu Virtuell* to add the result as V5, V6, etc.
-5. **Export** — use the export dialog to generate `.json` or `.txt` for OrcaSlicer
+5. **Export** — use the OrcaSlicer export or copy all cadence values with one click
 
 For batch processing a `.3mf` file, click **3MF Assistent**.
+To remap a BambuStudio/OrcaSlicer `.3mf` for the U1, click **✏️ 3MF schreiben**.
 
 ### File Structure
 
 ```
-u1_ultimate.py      — main application (single file)
-filament_db.json    — your saved custom filaments (auto-created)
-presets.json        — your saved slot presets (auto-created)
+u1_ultimate.py          — main application (single file)
+filament_db.json        — your saved custom filaments (auto-created)
+presets.json            — your saved slot presets (auto-created)
+*.u1proj                — saved project files (slots + virtual heads)
 ```
 
 ---
@@ -108,34 +142,61 @@ Dieses Tool hilft dabei:
 |---|---|
 | **4 physische Slots** | Eigene Filamente (T1–T4) mit Marke, Farbe und TD-Wert hinterlegen |
 | **Farbwähler** | Zielfarbe visuell wählen oder Hex-Code eingeben |
-| **Sequenz-Optimizer** | Testet alle 24 Permutationen für das kleinste ΔE |
+| **Sequenz-Optimizer** | Testet alle Permutationen für das kleinste ΔE |
 | **Variable Sequenzlänge** | Auto-Modus oder manuell (1–10 Schichten) |
+| **Top-3-Vergleich** | Die 3 besten Sequenzen nebeneinander, mit Ein-Klick-Hinzufügen |
 | **20 virtuelle Druckköpfe** | V5–V24, jeder = eine FullSpectrum-Schichtsequenz |
+| **Farbmodell-Toggle** | Umschalten zwischen Additiv (FullSpectrum-kompatibel), TD-gewichtet und Subtraktiv |
+| **Gamut-Strip** | Horizontaler Streifen mit erreichbaren Farben der aktuellen Slots |
+| **Gamut-Plot** | CIE-a*b*-Diagramm mit erreichbarem Farbraum und konvexer Hülle |
+| **Gradient-Generator** | Farbverläufe als Batch virtueller Köpfe generieren |
+| **Farbharmonien** | Komplement, Triade, Analog, Split-Komplement per HSV |
 | **3MF-Assistent** | Öffnet `.3mf`, extrahiert alle Farben, berechnet Sequenzen automatisch |
-| **Filament-Datenbank** | Bibliothek mit Voreinstellungen für Bambu Lab, Prusament, Anycubic + eigene Einträge |
+| **3MF Extruder-Remap** | Remappt Extruder-Zuweisungen auf T1–T4 oder V-Köpfe und schreibt zurück |
+| **Filament-Datenbank** | 226+ Einträge für Bambu Lab, Prusament, eSUN, Polymaker, Hatchbox, Snapmaker + eigene |
+| **Online-Update** | Community-Filamentdatenbank von GitHub laden |
+| **Slot-Optimizer** | Findet die beste 4-Filament-Kombination aus der Bibliothek für Zielfarben |
 | **Slot-Presets** | Bevorzugte 4-Slot-Konfigurationen speichern und laden |
+| **Projekt speichern/laden** | Komplette Session (Slots + virtuelle Köpfe) als `.u1proj` sichern |
+| **TD-Kalibrierung** | TD-Wert aus Testdruck-Messung schätzen |
+| **Palette aus Bild** | Dominante Farben aus einer Bilddatei extrahieren |
+| **Direktexport → OrcaSlicer** | Filamentprofile direkt in OrcaSlicer / Snapmaker_Orca schreiben |
 | **Export** | Sequenzen als `.json` oder `.txt` mit OrcaSlicer-Hinweisen exportieren |
+| **Alle Cadence-Werte kopieren** | Ein-Klick-Kopie aller Dithering-Werte als formatierten Text |
+| **Werkzeugwechsel-Schätzer** | Schätzt Werkzeugwechsel, Zusatzzeit und Purge-Volumen |
 | **Verlauf** | Die letzten 5 berechneten Sequenzen werden direkt angezeigt |
 
 ### Farbwissenschaft
 
-- Berechnungen im **CIE-Lab-Farbraum** (wahrnehmungsbasiert, nicht RGB)
+- Die Simulation verwendet **gamma-korrigierten linearen RGB-Durchschnitt** — entspricht dem visuellen Eindruck alternierender dünner Schichten (identisch mit FilamentMixer / FullSpectrum-Slicer)
 - **ΔE (Delta E)** misst den Farbabstand: `< 3` = ausgezeichnet, `< 6` = gut, `≥ 6` = spürbar
-- **TD (Transmission Distance)** modelliert die Deckkraft des Filaments — niedriger TD = deckender = dominiert die Mischung
-- **Progressive Schichtgewichtung** — obere Schichten werden 1,5× stärker gewichtet als untere (1,0×)
+- **TD (Transmission Distance)** modelliert die Deckkraft — optional als TD-gewichtetes Farbmodell wählbar
+- Optimierung und ΔE-Berechnung laufen im **CIE-Lab-Farbraum** (wahrnehmungsgetreu)
 - **Gamut-Warnung** bei ΔE > 25 (Zielfarbe liegt außerhalb des erreichbaren Bereichs)
 
-### Slicer-Integration (OrcaSlicer FullSpectrum)
+### Slicer-Integration
 
-Nach der Berechnung die Ausgabe in OrcaSlicer unter **Others → Dithering** eingeben:
+#### FullSpectrum-Slicer (Snapmaker_Orca)
 
-| Filament-Anzahl in der Sequenz | OrcaSlicer-Einstellung |
+Nur **T1–T4 exportieren** (das Tool warnt automatisch). FullSpectrum generiert Mixed Filaments aus den physischen Slots selbst.
+
+| Filamentanzahl in der Sequenz | FullSpectrum-Einstellung |
+|---|---|
+| 1 Filament | Reine Farbe — direkt zuweisen |
+| 2 Filamente | Mixed Filament → Verhältnis aus Sequenz einstellen |
+| 3–4 Filamente | Nicht direkt unterstützt — Standard-OrcaSlicer verwenden |
+
+#### Standard-OrcaSlicer
+
+T1–T4 **und** V5+ exportieren. Virtuelle Köpfe den Objekten zuweisen, dann unter **Others → Dithering** konfigurieren:
+
+| Filamentanzahl in der Sequenz | OrcaSlicer-Einstellung |
 |---|---|
 | 1 Filament | Reine Farbe — kein Mix nötig |
 | 2 Filamente | **Cadence Height** A + B (in mm) |
-| 3–4 Filamente | **Pattern Mode** — Pattern-String eingeben (z.B. `1/1/2/1/3`) |
+| 3–4 Filamente | **Pattern Mode** — Ziffernkette eingeben (z.B. `1121`) |
 
-Der Dithering Step Size entspricht der **Schichthöhe** (Standard: 0,2 mm — nicht der Düsendurchmesser).
+Der Dithering Step Size entspricht der **Schichthöhe** (empfohlen: **0,08 mm** — Farbschichten werden bei dieser Höhe unsichtbar).
 
 ### Voraussetzungen
 
@@ -148,6 +209,11 @@ customtkinter
 pip install customtkinter
 ```
 
+Optional (für zusätzliche Funktionen):
+```bash
+pip install matplotlib scipy Pillow CTkColorPicker CTkToolTip
+```
+
 ### Verwendung
 
 ```bash
@@ -158,21 +224,23 @@ python u1_ultimate.py
 2. **Zielfarbe wählen** — Farbwähler verwenden oder Hex-Code eingeben
 3. **Berechnen** — *Berechnen* klicken (oder *Optimieren* für den vollständigen Optimizer)
 4. **Zum virtuellen Raster hinzufügen** — *Zu Virtuell* klicken, ergibt V5, V6, usw.
-5. **Exportieren** — Export-Dialog öffnen und `.json` oder `.txt` für OrcaSlicer erzeugen
+5. **Exportieren** — OrcaSlicer-Export nutzen oder alle Cadence-Werte mit einem Klick kopieren
 
 Für die Stapelverarbeitung einer `.3mf`-Datei den **3MF Assistent** verwenden.
+Zum Remappen einer BambuStudio/OrcaSlicer-`.3mf` für den U1: **✏️ 3MF schreiben** klicken.
 
 ### Dateistruktur
 
 ```
-u1_ultimate.py      — Hauptanwendung (einzelne Datei)
-filament_db.json    — Gespeicherte eigene Filamente (wird automatisch erstellt)
-presets.json        — Gespeicherte Slot-Presets (wird automatisch erstellt)
+u1_ultimate.py          — Hauptanwendung (einzelne Datei)
+filament_db.json        — Gespeicherte eigene Filamente (wird automatisch erstellt)
+presets.json            — Gespeicherte Slot-Presets (wird automatisch erstellt)
+*.u1proj                — Gespeicherte Projekt-Dateien (Slots + virtuelle Köpfe)
 ```
 
 ### Verwandte Projekte
 
-- [OrcaSlicer FullSpectrum](https://github.com/ratdoux/OrcaSlicer-FullSpectrum) — das Slicer-Plugin, für das dieses Tool gedacht ist
+- [OrcaSlicer FullSpectrum](https://github.com/ratdoux/OrcaSlicer-FullSpectrum) — der Slicer-Fork, für den dieses Tool entwickelt wurde
 - [Snapmaker Forum](https://forum.snapmaker.com) — Community-Support
 
 ## License / Lizenz
