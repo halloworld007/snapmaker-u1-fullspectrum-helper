@@ -469,6 +469,23 @@ STRINGS = {
     "wizard_close": "Schließen",
     "wizard_applied": "Beste 4 Filamente als T1–T4 gesetzt.",
     "wizard_coverage": "Farb-Abdeckung",
+    # FullSpectrum Direct 3MF Export
+    "fs_export_btn": "💉 FS 3MF Export",
+    "fs_export_title": "FullSpectrum Direct 3MF Export",
+    "fs_export_desc": "Schreibt alle virtuellen Druckköpfe als Mixed Filaments direkt in eine .3mf Datei. Im FullSpectrum Slicer öffnen — Cadence & Pattern bereits konfiguriert.",
+    "fs_src_label": "Quelldatei (.3mf):",
+    "fs_dst_label": "Ausgabedatei:",
+    "fs_overwrite": "Quelldatei überschreiben (Backup wird erstellt)",
+    "fs_save_as": "Neue Datei speichern",
+    "fs_lh_label": "Schichthöhe (mm):",
+    "fs_count": "{n} virtuelle Druckköpfe werden eingeschrieben",
+    "fs_preview_btn": "🔍 Vorschau",
+    "fs_write_btn": "💉 Einschreiben",
+    "fs_success": "Erfolgreich eingeschrieben:\n{path}",
+    "fs_no_virtual": "Keine virtuellen Druckköpfe definiert.",
+    "fs_no_src": "Bitte Quelldatei auswählen.",
+    "fs_warn_fullspectrum": "⚠ Nur für FullSpectrum Slicer (Snapmaker_Orca).\nStandard OrcaSlicer unterstützt mixed_filament_definitions nicht.",
+    "fs_guide_title": "Anleitung",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
@@ -888,6 +905,23 @@ STRINGS = {
     "wizard_close": "Close",
     "wizard_applied": "Best 4 filaments set as T1–T4.",
     "wizard_coverage": "Color Coverage",
+    # FullSpectrum Direct 3MF Export
+    "fs_export_btn": "💉 FS 3MF Export",
+    "fs_export_title": "FullSpectrum Direct 3MF Export",
+    "fs_export_desc": "Writes all virtual print heads as Mixed Filaments directly into a .3mf file. Open in FullSpectrum slicer — Cadence & Pattern already configured.",
+    "fs_src_label": "Source file (.3mf):",
+    "fs_dst_label": "Output file:",
+    "fs_overwrite": "Overwrite source file (backup will be created)",
+    "fs_save_as": "Save as new file",
+    "fs_lh_label": "Layer height (mm):",
+    "fs_count": "{n} virtual print heads will be written",
+    "fs_preview_btn": "🔍 Preview",
+    "fs_write_btn": "💉 Write",
+    "fs_success": "Successfully written:\n{path}",
+    "fs_no_virtual": "No virtual print heads defined.",
+    "fs_no_src": "Please select a source file.",
+    "fs_warn_fullspectrum": "⚠ For FullSpectrum Slicer (Snapmaker_Orca) only.\nStandard OrcaSlicer does not support mixed_filament_definitions.",
+    "fs_guide_title": "Instructions",
 },
 }
 
@@ -1479,6 +1513,192 @@ def calc_cadence(sequence, layer_height):
         result[fid] = round(layers * layer_height, 3)
     return result
 
+
+def build_mixed_filament_definitions(virtual_heads, layer_height=0.08):
+    """Build the mixed_filament_definitions string for FullSpectrum slicer.
+
+    Each virtual head becomes one row in the semicolon-delimited string.
+    Format per row: component_a,component_b,enabled,custom,mix_b_percent,
+                    pointillism,g<ids>,w<weights>,m<mode>,d<deleted>,
+                    o<origin>,u<stable_id>[,manual_pattern]
+
+    virtual_heads: list of dicts with keys:
+        vid (int), sequence (str of digit chars), target_hex (str),
+        sim_hex (str), de (float), label (str), stable_id (int, optional)
+
+    Returns: (definitions_string, extra_config_dict)
+    """
+    rows = []
+    extra_cfg = {}
+
+    # Collect cadence heights from all 2-filament heads
+    all_cadence_a = []
+    all_cadence_b = []
+
+    for i, vf in enumerate(virtual_heads):
+        seq = vf.get("sequence", "")
+        if not seq:
+            continue
+
+        stable_id = vf.get("stable_id", 1000 + i)
+        unique_ids = list(dict.fromkeys(int(c) for c in seq))  # preserve order, dedupe
+        n_unique = len(unique_ids)
+
+        if n_unique == 0:
+            continue
+        elif n_unique == 1:
+            # Pure color — single filament, no mix needed
+            fid = unique_ids[0]
+            row = f"{fid},{fid},1,1,0,0,g,w,m2,d0,o0,u{stable_id}"
+            rows.append(row)
+        elif n_unique == 2:
+            # 2-filament cadence mode
+            fid_a, fid_b = unique_ids[0], unique_ids[1]
+            count_a = seq.count(str(fid_a))
+            count_b = seq.count(str(fid_b))
+            total = count_a + count_b
+            mix_b_pct = round(count_b / total * 100) if total > 0 else 50
+
+            # Cadence heights using slicer formula
+            cad = calc_cadence(seq, layer_height)
+            ids_sorted = sorted(cad.keys())
+            if len(ids_sorted) >= 2:
+                ca = cad.get(fid_a, layer_height)
+                cb = cad.get(fid_b, layer_height)
+                all_cadence_a.append(ca)
+                all_cadence_b.append(cb)
+
+            row = f"{fid_a},{fid_b},1,1,{mix_b_pct},0,g,w,m2,d0,o0,u{stable_id}"
+            rows.append(row)
+        else:
+            # 3-4 filament: use manual pattern mode
+            grad_ids = "".join(str(x) for x in unique_ids)
+            total = len(seq)
+            weights = [round(seq.count(str(fid)) / total * 100) for fid in unique_ids]
+            # Normalize to sum 100
+            diff = 100 - sum(weights)
+            if diff != 0:
+                weights[0] += diff
+            grad_w = "/".join(str(w) for w in weights)
+
+            # Manual pattern: the sequence as comma-joined groups
+            pattern = ",".join(seq)
+
+            # Use first and last unique filament as component_a/b
+            fid_a, fid_b = unique_ids[0], unique_ids[-1]
+            mix_b_pct = weights[-1]
+
+            row = f"{fid_a},{fid_b},1,1,{mix_b_pct},0,g{grad_ids},w{grad_w},m2,d0,o0,u{stable_id},{pattern}"
+            rows.append(row)
+
+    # Global cadence heights: use median of all 2-filament heads
+    if all_cadence_a:
+        all_cadence_a.sort()
+        all_cadence_b.sort()
+        mid = len(all_cadence_a) // 2
+        extra_cfg["mixed_color_layer_height_a"] = str(all_cadence_a[mid])
+        extra_cfg["mixed_color_layer_height_b"] = str(all_cadence_b[mid])
+    else:
+        extra_cfg["mixed_color_layer_height_a"] = str(layer_height)
+        extra_cfg["mixed_color_layer_height_b"] = str(layer_height)
+
+    extra_cfg["dithering_z_step_size"] = "0.0"
+    extra_cfg["dithering_local_z_mode"] = "0"
+    extra_cfg["dithering_step_painted_zones_only"] = "1"
+    extra_cfg["mixed_filament_advanced_dithering"] = "0"
+    extra_cfg["mixed_filament_gradient_mode"] = "0"
+    extra_cfg["mixed_filament_height_lower_bound"] = "0.04"
+    extra_cfg["mixed_filament_height_upper_bound"] = str(round(layer_height * 4, 3))
+
+    return ";".join(rows), extra_cfg
+
+
+def inject_fullspectrum_into_3mf(input_path, output_path, virtual_heads,
+                                   physical_filaments, layer_height=0.08):
+    """Write FullSpectrum mixed_filament_definitions into a .3mf project file.
+
+    input_path:        path to existing .3mf file (or None to create minimal skeleton)
+    output_path:       path to write modified .3mf
+    virtual_heads:     list of virtual head dicts (from app._virtual / virtual_fils)
+    physical_filaments: list of 4 dicts with {hex, name, brand, td}
+    layer_height:      layer height in mm (default 0.08)
+
+    Returns: (success: bool, message: str)
+    """
+    import shutil
+
+    if not virtual_heads:
+        return False, "Keine virtuellen Druckköpfe definiert."
+
+    # Build the definitions string
+    defs_str, extra_cfg = build_mixed_filament_definitions(virtual_heads, layer_height)
+
+    # Physical filament colors for filament_colour array
+    phys_colors = [f.get("hex", "#808080") for f in physical_filaments if f.get("hex")]
+    while len(phys_colors) < 4:
+        phys_colors.append("#808080")
+    phys_colors = phys_colors[:4]
+
+    if input_path is None:
+        return False, "Keine .3mf Quelldatei — bitte zuerst eine .3mf Datei auswählen."
+
+    if not os.path.exists(input_path):
+        return False, f"Datei nicht gefunden: {input_path}"
+
+    # Create backup
+    backup_path = input_path + ".bak"
+    if input_path == output_path:
+        shutil.copy2(input_path, backup_path)
+
+    try:
+        with zipfile.ZipFile(input_path, 'r') as zin:
+            with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
+                config_written = False
+                for item in zin.infolist():
+                    data = zin.read(item.filename)
+
+                    if item.filename == 'Metadata/project_settings.config':
+                        # Parse existing config
+                        try:
+                            cfg = json.loads(data.decode('utf-8'))
+                        except Exception:
+                            cfg = {}
+
+                        # Inject settings
+                        cfg['mixed_filament_definitions'] = defs_str
+                        cfg['filament_colour'] = phys_colors
+                        cfg.update(extra_cfg)
+
+                        data = json.dumps(cfg, indent=4, ensure_ascii=False).encode('utf-8')
+                        config_written = True
+
+                    zout.writestr(item, data)
+
+                # If project_settings.config didn't exist, create it
+                if not config_written:
+                    cfg = {
+                        "version": "01.09.04.52",
+                        "name": "U1 FullSpectrum Export",
+                        "from": "project",
+                        "filament_colour": phys_colors,
+                        "mixed_filament_definitions": defs_str,
+                    }
+                    cfg.update(extra_cfg)
+                    zout.writestr(
+                        'Metadata/project_settings.config',
+                        json.dumps(cfg, indent=4, ensure_ascii=False).encode('utf-8')
+                    )
+
+        n_heads = len([v for v in virtual_heads if v.get("sequence")])
+        msg = f"✅ {n_heads} virtuelle Druckköpfe in .3mf eingeschrieben."
+        if input_path == output_path:
+            msg += f"\n(Backup: {backup_path})"
+        return True, msg
+
+    except Exception as e:
+        return False, f"Fehler beim Schreiben: {e}"
+
+
 def seq_filament_count(sequence):
     return len(set(sequence))
 
@@ -1854,6 +2074,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self.favorites     = []
         self._3mf_win      = None   # singleton for 3MF assistant window
         self._3mf_wizard_win = None  # singleton for 3MF Wizard
+        self._fs_export_win = None  # singleton for FS 3MF Export window
         self._recent_colors = []    # recent target colors (max 10)
         self.load_db()
         self.load_presets()
@@ -3053,7 +3274,11 @@ class U1FullSpectrumApp(ctk.CTk):
                       height=32, command=self.open_recipe_export).pack(side="left", padx=(0, 4), pady=5)
 
         ctk.CTkButton(tb2, text=self.t("btn_copy_all_cad"), fg_color="#0e7490",
-                      height=32, command=self.open_copy_all_cadence).pack(side="left", padx=(0, 8), pady=5)
+                      height=32, command=self.open_copy_all_cadence).pack(side="left", padx=(0, 4), pady=5)
+
+        ctk.CTkButton(tb2, text=self.t("fs_export_btn"), fg_color="#7c2d12",
+                      hover_color="#9a3412", height=32,
+                      command=self.open_fs_export_dialog).pack(side="left", padx=(0, 8), pady=5)
 
         # Sort / Filter bar for virtual heads
         sf_bar = ctk.CTkFrame(tab2, fg_color="#1a2535", corner_radius=6)
@@ -6443,6 +6668,195 @@ class U1FullSpectrumApp(ctk.CTk):
             self.clipboard_clear(); self.clipboard_append(full)
         ctk.CTkButton(win, text=self.t("copy_all_btn"), fg_color="#0f766e",
                       command=_copy_all, height=36).pack(pady=8, padx=20, fill="x")
+
+    # ── FULLSPECTRUM DIRECT 3MF EXPORT ────────────────────────────────────────
+
+    def open_fs_export_dialog(self):
+        """Open the FullSpectrum Direct 3MF Export dialog (singleton)."""
+        if self._fs_export_win is not None and self._fs_export_win.winfo_exists():
+            self._fs_export_win.lift()
+            self._fs_export_win.focus()
+            return
+
+        win = ctk.CTkToplevel(self)
+        self._fs_export_win = win
+        win.title(self.t("fs_export_title"))
+        win.geometry("700x620")
+        win.grab_set()
+
+        # Title
+        ctk.CTkLabel(win, text=self.t("fs_export_title"),
+                     font=("Segoe UI", 15, "bold"), text_color="#a78bfa").pack(
+                     anchor="w", padx=16, pady=(14, 2))
+        ctk.CTkLabel(win, text=self.t("fs_export_desc"),
+                     font=("Segoe UI", 10), text_color="#94a3b8",
+                     wraplength=660, justify="left").pack(
+                     anchor="w", padx=16, pady=(0, 8))
+
+        # Warning label
+        warn_lbl = ctk.CTkLabel(win, text=self.t("fs_warn_fullspectrum"),
+                                 font=("Segoe UI", 10), text_color="#fbbf24",
+                                 wraplength=660, justify="left")
+        warn_lbl.pack(anchor="w", padx=16, pady=(0, 8))
+
+        # Source file section
+        src_frame = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=8)
+        src_frame.pack(fill="x", padx=16, pady=(0, 6))
+        ctk.CTkLabel(src_frame, text=self.t("fs_src_label"),
+                     font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=10, pady=(8, 2))
+        src_row = ctk.CTkFrame(src_frame, fg_color="transparent")
+        src_row.pack(fill="x", padx=10, pady=(0, 8))
+        src_var = ctk.StringVar()
+        src_entry = ctk.CTkEntry(src_row, textvariable=src_var, width=490,
+                                  placeholder_text="*.3mf …")
+        src_entry.pack(side="left", padx=(0, 6))
+        def _browse_src():
+            p = filedialog.askopenfilename(
+                filetypes=[("3MF", "*.3mf"), ("*", "*.*")],
+                title=self.t("fs_src_label"))
+            if p:
+                src_var.set(p)
+                if not dst_var.get():
+                    dst_var.set(p)
+        ctk.CTkButton(src_row, text="📂 " + self.t("btn_load"), width=90,
+                      command=_browse_src).pack(side="left")
+
+        # Output file section
+        dst_frame = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=8)
+        dst_frame.pack(fill="x", padx=16, pady=(0, 6))
+        ctk.CTkLabel(dst_frame, text=self.t("fs_dst_label"),
+                     font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=10, pady=(8, 2))
+        overwrite_var = ctk.BooleanVar(value=True)
+        ctk.CTkRadioButton(dst_frame, text=self.t("fs_overwrite"),
+                            variable=overwrite_var, value=True).pack(
+                            anchor="w", padx=10, pady=1)
+        ctk.CTkRadioButton(dst_frame, text=self.t("fs_save_as"),
+                            variable=overwrite_var, value=False).pack(
+                            anchor="w", padx=10, pady=1)
+        dst_row = ctk.CTkFrame(dst_frame, fg_color="transparent")
+        dst_row.pack(fill="x", padx=10, pady=(4, 8))
+        dst_var = ctk.StringVar()
+        dst_entry = ctk.CTkEntry(dst_row, textvariable=dst_var, width=490,
+                                  placeholder_text="*.3mf …")
+        dst_entry.pack(side="left", padx=(0, 6))
+        def _browse_dst():
+            p = filedialog.asksaveasfilename(
+                defaultextension=".3mf",
+                filetypes=[("3MF", "*.3mf"), ("*", "*.*")],
+                title=self.t("fs_dst_label"))
+            if p:
+                dst_var.set(p)
+                overwrite_var.set(False)
+        ctk.CTkButton(dst_row, text="📂 " + self.t("fs_save_as"), width=140,
+                      command=_browse_dst).pack(side="left")
+
+        # Settings section
+        set_frame = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=8)
+        set_frame.pack(fill="x", padx=16, pady=(0, 6))
+        set_row = ctk.CTkFrame(set_frame, fg_color="transparent")
+        set_row.pack(fill="x", padx=10, pady=8)
+        ctk.CTkLabel(set_row, text=self.t("fs_lh_label"),
+                     font=("Segoe UI", 11)).pack(side="left", padx=(0, 6))
+        # Get current layer height
+        try:
+            cur_lh = float(self.layer_height_entry.get())
+        except Exception:
+            cur_lh = 0.08
+        lh_var = ctk.StringVar(value=str(cur_lh))
+        lh_entry = ctk.CTkEntry(set_row, textvariable=lh_var, width=70)
+        lh_entry.pack(side="left", padx=(0, 16))
+
+        n_virt = len([v for v in self.virtual_fils if v.get("sequence")])
+        count_lbl = ctk.CTkLabel(set_row,
+                                  text=self.t("fs_count", n=n_virt),
+                                  font=("Segoe UI", 10), text_color="#94a3b8")
+        count_lbl.pack(side="left")
+
+        # Preview area
+        prev_frame = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=8)
+        prev_frame.pack(fill="both", expand=True, padx=16, pady=(0, 6))
+        ctk.CTkLabel(prev_frame, text="mixed_filament_definitions preview:",
+                     font=("Segoe UI", 10), text_color="#64748b").pack(
+                     anchor="w", padx=10, pady=(6, 2))
+        import tkinter as _tk3
+        prev_text = _tk3.Text(prev_frame, bg="#0f172a", fg="#e2e8f0",
+                               font=("Courier New", 9), height=6, relief="flat",
+                               bd=0, wrap="none", padx=8, pady=4)
+        prev_text.pack(fill="both", expand=True, padx=10, pady=(0, 8))
+        prev_text.configure(state="disabled")
+
+        def _update_preview():
+            try:
+                lh = float(lh_var.get())
+            except Exception:
+                lh = 0.08
+            defs, _ = build_mixed_filament_definitions(self.virtual_fils, lh)
+            prev_text.configure(state="normal")
+            prev_text.delete("1.0", "end")
+            # Show each row on its own line for readability
+            for row in defs.split(";"):
+                prev_text.insert("end", row + "\n")
+            prev_text.configure(state="disabled")
+
+        # Button row
+        btn_row = ctk.CTkFrame(win, fg_color="transparent")
+        btn_row.pack(fill="x", padx=16, pady=(0, 12))
+
+        ctk.CTkButton(btn_row, text=self.t("fs_preview_btn"),
+                      fg_color="#374151", height=36,
+                      command=_update_preview).pack(side="left", padx=(0, 6))
+
+        def _do_write():
+            src = src_var.get().strip()
+            if not src:
+                messagebox.showwarning(self.t("dlg_note"), self.t("fs_no_src"))
+                return
+            try:
+                lh = float(lh_var.get())
+            except Exception:
+                lh = 0.08
+
+            if overwrite_var.get():
+                out = src
+            else:
+                out = dst_var.get().strip()
+                if not out:
+                    messagebox.showwarning(self.t("dlg_note"), self.t("fs_no_src"))
+                    return
+
+            # Collect physical filament data
+            phys = []
+            for i in range(4):
+                try:
+                    hx = self.slots[i]["hex"].get().strip()
+                    nm = self.slots[i]["color"].get() if "color" in self.slots[i] else ""
+                    br = self.slots[i]["brand"].get() if "brand" in self.slots[i] else ""
+                    td = float(self.slots[i]["td"].get())
+                except Exception:
+                    hx = "#808080"; nm = ""; br = ""; td = 5.0
+                phys.append({"hex": hx, "name": nm, "brand": br, "td": td})
+
+            ok, msg = inject_fullspectrum_into_3mf(
+                src, out, self.virtual_fils, phys, lh)
+            if ok:
+                messagebox.showinfo(self.t("dlg_saved"),
+                                    self.t("fs_success", path=out))
+                win.destroy()
+                self._fs_export_win = None
+            else:
+                messagebox.showerror(self.t("dlg_error"), msg)
+
+        ctk.CTkButton(btn_row, text=self.t("fs_write_btn"),
+                      fg_color="#7c2d12", hover_color="#9a3412",
+                      height=44, font=("Segoe UI", 12, "bold"),
+                      command=_do_write).pack(side="left", padx=(0, 6))
+
+        ctk.CTkButton(btn_row, text="✖ " + self.t("exp_cancel"),
+                      fg_color="#374151", height=36,
+                      command=win.destroy).pack(side="right")
+
+        # Initial preview
+        win.after(100, _update_preview)
 
     # ── PALETTEN-IMPORT ────────────────────────────────────────────────────────
 
