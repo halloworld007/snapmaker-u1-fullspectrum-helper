@@ -43,6 +43,7 @@ This tool helps you:
 | **TD Calibration** | Estimate TD values from a test print measurement |
 | **Palette from Image** | Extract dominant colors from any image file |
 | **Direct OrcaSlicer Export** | Write filament profiles directly into OrcaSlicer / Snapmaker_Orca |
+| **FullSpectrum Direct 3MF Export** | Inject virtual heads as `mixed_filament_definitions` directly into a `.3mf` file — Cadence and Pattern pre-configured |
 | **Export** | Export sequences as `.json` or `.txt` with OrcaSlicer-ready slicer hints |
 | **Copy All Cadence Values** | One-click copy of all virtual head dithering settings as formatted text |
 | **Tool Change Estimator** | Estimates tool changes, extra print time and purge volume |
@@ -79,6 +80,44 @@ Export T1–T4 **and** V5+ virtual heads. Assign virtual heads to objects, then 
 | 3–4 filaments | **Pattern Mode** — enter the pattern string (e.g. `1121`) |
 
 The Dithering Step Size corresponds to your **layer height** (recommended: **0.08 mm** — color layers become visually invisible at this height).
+
+### FullSpectrum Direct 3MF Export
+
+#### What it does
+
+Writes all virtual print heads (V5–V24) as `mixed_filament_definitions` directly into a `.3mf` project file. After injection, open the file in the FullSpectrum Slicer (Snapmaker_Orca) — Cadence heights and Pattern sequences are already configured. You only need to assign objects to the virtual heads and print.
+
+#### Step by step
+
+1. Configure filaments (T1–T4) in the physical slots
+2. Calculate target colors and add them as virtual print heads
+3. Click **"💉 FS 3MF Export"** in the Virtual Heads tab toolbar
+4. Select the source `.3mf` model file
+5. Click **"💉 Write"** — the modified `.3mf` is created
+6. Open the `.3mf` in FullSpectrum Slicer (Snapmaker_Orca)
+7. Assign objects to the virtual print heads (Mixed Filaments)
+8. Print — done!
+
+#### What gets configured automatically
+
+| Setting | Description |
+|---|---|
+| `mixed_filament_definitions` | All V5–V24 as Mixed Filament rows |
+| `mixed_color_layer_height_a` / `_b` | Cadence heights calculated from the sequence |
+| `dithering_z_step_size` | Set to 0.0 (local Z mode) |
+| `dithering_local_z_mode` | Enabled |
+| `filament_colour` | Physical filament colors T1–T4 |
+| `mixed_filament_height_lower_bound` / `_upper_bound` | Derived from layer height |
+
+#### Limitation
+
+Object painting (which surfaces get which print head) must still be done in the slicer. This tool configures the Mixed Filament parameters — assigning them to objects and surfaces is the slicer's job.
+
+#### FullSpectrum slicer only
+
+> `mixed_filament_definitions` is a FullSpectrum-specific extension. It is only supported by Snapmaker_Orca (FullSpectrum fork), not by standard OrcaSlicer.
+
+---
 
 ### Requirements
 
@@ -161,6 +200,7 @@ Dieses Tool hilft dabei:
 | **TD-Kalibrierung** | TD-Wert aus Testdruck-Messung schätzen |
 | **Palette aus Bild** | Dominante Farben aus einer Bilddatei extrahieren |
 | **Direktexport → OrcaSlicer** | Filamentprofile direkt in OrcaSlicer / Snapmaker_Orca schreiben |
+| **FullSpectrum Direct 3MF Export** | Virtuelle Köpfe als `mixed_filament_definitions` direkt in eine `.3mf` Datei einschreiben — Cadence und Pattern bereits konfiguriert |
 | **Export** | Sequenzen als `.json` oder `.txt` mit OrcaSlicer-Hinweisen exportieren |
 | **Alle Cadence-Werte kopieren** | Ein-Klick-Kopie aller Dithering-Werte als formatierten Text |
 | **Werkzeugwechsel-Schätzer** | Schätzt Werkzeugwechsel, Zusatzzeit und Purge-Volumen |
@@ -197,6 +237,44 @@ T1–T4 **und** V5+ exportieren. Virtuelle Köpfe den Objekten zuweisen, dann un
 | 3–4 Filamente | **Pattern Mode** — Ziffernkette eingeben (z.B. `1121`) |
 
 Der Dithering Step Size entspricht der **Schichthöhe** (empfohlen: **0,08 mm** — Farbschichten werden bei dieser Höhe unsichtbar).
+
+### FullSpectrum Direct 3MF Export
+
+#### Was es macht
+
+Schreibt alle virtuellen Druckköpfe (V5–V24) als `mixed_filament_definitions` direkt in eine `.3mf` Projektdatei. Nach dem Einschreiben die Datei im FullSpectrum Slicer (Snapmaker_Orca) öffnen — Cadence-Höhen und Pattern-Sequenzen sind bereits konfiguriert. Es müssen nur noch Objekte den virtuellen Köpfen zugewiesen werden.
+
+#### Schritt-für-Schritt
+
+1. Filamente (T1–T4) in den physischen Slots konfigurieren
+2. Zielfarben berechnen und als virtuelle Druckköpfe hinzufügen
+3. **"💉 FS 3MF Export"** im Toolbar der "Virtuelle Köpfe"-Registerkarte klicken
+4. Quelldatei (`.3mf` Modell) auswählen
+5. **"💉 Einschreiben"** klicken → modifizierte `.3mf` wird erzeugt
+6. `.3mf` im FullSpectrum Slicer (Snapmaker_Orca) öffnen
+7. Objekte den virtuellen Druckköpfen (Mixed Filaments) zuweisen
+8. Drucken — fertig!
+
+#### Was automatisch konfiguriert wird
+
+| Einstellung | Beschreibung |
+|---|---|
+| `mixed_filament_definitions` | Alle V5–V24 als Mixed-Filament-Zeilen |
+| `mixed_color_layer_height_a` / `_b` | Cadence-Höhen aus der berechneten Sequenz |
+| `dithering_z_step_size` | Auf 0.0 gesetzt (lokaler Z-Modus) |
+| `dithering_local_z_mode` | Aktiviert |
+| `filament_colour` | Physische Filamentfarben T1–T4 |
+| `mixed_filament_height_lower_bound` / `_upper_bound` | Abgeleitet aus der Schichthöhe |
+
+#### Einschränkung
+
+Die Objekt-Bemalung (welche Flächen welchen Kopf bekommen) muss weiterhin im Slicer gesetzt werden. Das Tool konfiguriert die Mixed-Filament-Parameter — die Zuweisung zu Objekten/Flächen ist Slicer-Aufgabe.
+
+#### Nur FullSpectrum Slicer
+
+> `mixed_filament_definitions` ist eine FullSpectrum-spezifische Erweiterung und wird nur von Snapmaker_Orca (FullSpectrum Fork) unterstützt, nicht von Standard-OrcaSlicer.
+
+---
 
 ### Voraussetzungen
 

@@ -311,6 +311,23 @@ STRINGS = {
     "wizard_close": "Schließen",
     "wizard_applied": "Beste 4 Filamente als T1–T4 gesetzt.",
     "wizard_coverage": "Farb-Abdeckung",
+    # FullSpectrum Direct 3MF Export
+    "fs_export_btn": "💉 FS 3MF Export",
+    "fs_export_title": "FullSpectrum Direct 3MF Export",
+    "fs_export_desc": "Schreibt alle virtuellen Druckköpfe als Mixed Filaments direkt in eine .3mf Datei. Im FullSpectrum Slicer öffnen — Cadence & Pattern bereits konfiguriert.",
+    "fs_src_label": "Quelldatei (.3mf):",
+    "fs_dst_label": "Ausgabedatei:",
+    "fs_overwrite": "Quelldatei überschreiben (Backup wird erstellt)",
+    "fs_save_as": "Neue Datei speichern",
+    "fs_lh_label": "Schichthöhe (mm):",
+    "fs_count": "{n} virtuelle Druckköpfe werden eingeschrieben",
+    "fs_preview_btn": "🔍 Vorschau",
+    "fs_write_btn": "💉 Einschreiben",
+    "fs_success": "Erfolgreich eingeschrieben:\n{path}",
+    "fs_no_virtual": "Keine virtuellen Druckköpfe definiert.",
+    "fs_no_src": "Bitte Quelldatei auswählen.",
+    "fs_warn_fullspectrum": "⚠ Nur für FullSpectrum Slicer (Snapmaker_Orca).\nStandard OrcaSlicer unterstützt mixed_filament_definitions nicht.",
+    "fs_guide_title": "Anleitung",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — PySide6 Edition",
@@ -582,6 +599,23 @@ STRINGS = {
     "wizard_close": "Close",
     "wizard_applied": "Best 4 filaments set as T1–T4.",
     "wizard_coverage": "Color Coverage",
+    # FullSpectrum Direct 3MF Export
+    "fs_export_btn": "💉 FS 3MF Export",
+    "fs_export_title": "FullSpectrum Direct 3MF Export",
+    "fs_export_desc": "Writes all virtual print heads as Mixed Filaments directly into a .3mf file. Open in FullSpectrum slicer — Cadence & Pattern already configured.",
+    "fs_src_label": "Source file (.3mf):",
+    "fs_dst_label": "Output file:",
+    "fs_overwrite": "Overwrite source file (backup will be created)",
+    "fs_save_as": "Save as new file",
+    "fs_lh_label": "Layer height (mm):",
+    "fs_count": "{n} virtual print heads will be written",
+    "fs_preview_btn": "🔍 Preview",
+    "fs_write_btn": "💉 Write",
+    "fs_success": "Successfully written:\n{path}",
+    "fs_no_virtual": "No virtual print heads defined.",
+    "fs_no_src": "Please select a source file.",
+    "fs_warn_fullspectrum": "⚠ For FullSpectrum Slicer (Snapmaker_Orca) only.\nStandard OrcaSlicer does not support mixed_filament_definitions.",
+    "fs_guide_title": "Instructions",
 },
 }
 
@@ -1056,6 +1090,192 @@ def calc_cadence(sequence, layer_height):
             layers = max(1, round(pct / minority_pct))
         result[fid] = round(layers * layer_height, 3)
     return result
+
+
+def build_mixed_filament_definitions(virtual_heads, layer_height=0.08):
+    """Build the mixed_filament_definitions string for FullSpectrum slicer.
+
+    Each virtual head becomes one row in the semicolon-delimited string.
+    Format per row: component_a,component_b,enabled,custom,mix_b_percent,
+                    pointillism,g<ids>,w<weights>,m<mode>,d<deleted>,
+                    o<origin>,u<stable_id>[,manual_pattern]
+
+    virtual_heads: list of dicts with keys:
+        vid (int), sequence (str of digit chars), target_hex (str),
+        sim_hex (str), de (float), label (str), stable_id (int, optional)
+
+    Returns: (definitions_string, extra_config_dict)
+    """
+    rows = []
+    extra_cfg = {}
+
+    # Collect cadence heights from all 2-filament heads
+    all_cadence_a = []
+    all_cadence_b = []
+
+    for i, vf in enumerate(virtual_heads):
+        seq = vf.get("sequence", "")
+        if not seq:
+            continue
+
+        stable_id = vf.get("stable_id", 1000 + i)
+        unique_ids = list(dict.fromkeys(int(c) for c in seq))  # preserve order, dedupe
+        n_unique = len(unique_ids)
+
+        if n_unique == 0:
+            continue
+        elif n_unique == 1:
+            # Pure color — single filament, no mix needed
+            fid = unique_ids[0]
+            row = f"{fid},{fid},1,1,0,0,g,w,m2,d0,o0,u{stable_id}"
+            rows.append(row)
+        elif n_unique == 2:
+            # 2-filament cadence mode
+            fid_a, fid_b = unique_ids[0], unique_ids[1]
+            count_a = seq.count(str(fid_a))
+            count_b = seq.count(str(fid_b))
+            total = count_a + count_b
+            mix_b_pct = round(count_b / total * 100) if total > 0 else 50
+
+            # Cadence heights using slicer formula
+            cad = calc_cadence(seq, layer_height)
+            ids_sorted = sorted(cad.keys())
+            if len(ids_sorted) >= 2:
+                ca = cad.get(fid_a, layer_height)
+                cb = cad.get(fid_b, layer_height)
+                all_cadence_a.append(ca)
+                all_cadence_b.append(cb)
+
+            row = f"{fid_a},{fid_b},1,1,{mix_b_pct},0,g,w,m2,d0,o0,u{stable_id}"
+            rows.append(row)
+        else:
+            # 3-4 filament: use manual pattern mode
+            grad_ids = "".join(str(x) for x in unique_ids)
+            total = len(seq)
+            weights = [round(seq.count(str(fid)) / total * 100) for fid in unique_ids]
+            # Normalize to sum 100
+            diff = 100 - sum(weights)
+            if diff != 0:
+                weights[0] += diff
+            grad_w = "/".join(str(w) for w in weights)
+
+            # Manual pattern: the sequence as comma-joined groups
+            pattern = ",".join(seq)
+
+            # Use first and last unique filament as component_a/b
+            fid_a, fid_b = unique_ids[0], unique_ids[-1]
+            mix_b_pct = weights[-1]
+
+            row = f"{fid_a},{fid_b},1,1,{mix_b_pct},0,g{grad_ids},w{grad_w},m2,d0,o0,u{stable_id},{pattern}"
+            rows.append(row)
+
+    # Global cadence heights: use median of all 2-filament heads
+    if all_cadence_a:
+        all_cadence_a.sort()
+        all_cadence_b.sort()
+        mid = len(all_cadence_a) // 2
+        extra_cfg["mixed_color_layer_height_a"] = str(all_cadence_a[mid])
+        extra_cfg["mixed_color_layer_height_b"] = str(all_cadence_b[mid])
+    else:
+        extra_cfg["mixed_color_layer_height_a"] = str(layer_height)
+        extra_cfg["mixed_color_layer_height_b"] = str(layer_height)
+
+    extra_cfg["dithering_z_step_size"] = "0.0"
+    extra_cfg["dithering_local_z_mode"] = "0"
+    extra_cfg["dithering_step_painted_zones_only"] = "1"
+    extra_cfg["mixed_filament_advanced_dithering"] = "0"
+    extra_cfg["mixed_filament_gradient_mode"] = "0"
+    extra_cfg["mixed_filament_height_lower_bound"] = "0.04"
+    extra_cfg["mixed_filament_height_upper_bound"] = str(round(layer_height * 4, 3))
+
+    return ";".join(rows), extra_cfg
+
+
+def inject_fullspectrum_into_3mf(input_path, output_path, virtual_heads,
+                                   physical_filaments, layer_height=0.08):
+    """Write FullSpectrum mixed_filament_definitions into a .3mf project file.
+
+    input_path:        path to existing .3mf file (or None to create minimal skeleton)
+    output_path:       path to write modified .3mf
+    virtual_heads:     list of virtual head dicts (from app._virtual / virtual_fils)
+    physical_filaments: list of 4 dicts with {hex, name, brand, td}
+    layer_height:      layer height in mm (default 0.08)
+
+    Returns: (success: bool, message: str)
+    """
+    import shutil
+
+    if not virtual_heads:
+        return False, "Keine virtuellen Druckköpfe definiert."
+
+    # Build the definitions string
+    defs_str, extra_cfg = build_mixed_filament_definitions(virtual_heads, layer_height)
+
+    # Physical filament colors for filament_colour array
+    phys_colors = [f.get("hex", "#808080") for f in physical_filaments if f.get("hex")]
+    while len(phys_colors) < 4:
+        phys_colors.append("#808080")
+    phys_colors = phys_colors[:4]
+
+    if input_path is None:
+        return False, "Keine .3mf Quelldatei — bitte zuerst eine .3mf Datei auswählen."
+
+    if not os.path.exists(input_path):
+        return False, f"Datei nicht gefunden: {input_path}"
+
+    # Create backup
+    backup_path = input_path + ".bak"
+    if input_path == output_path:
+        shutil.copy2(input_path, backup_path)
+
+    try:
+        with zipfile.ZipFile(input_path, 'r') as zin:
+            with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
+                config_written = False
+                for item in zin.infolist():
+                    data = zin.read(item.filename)
+
+                    if item.filename == 'Metadata/project_settings.config':
+                        # Parse existing config
+                        try:
+                            cfg = json.loads(data.decode('utf-8'))
+                        except Exception:
+                            cfg = {}
+
+                        # Inject settings
+                        cfg['mixed_filament_definitions'] = defs_str
+                        cfg['filament_colour'] = phys_colors
+                        cfg.update(extra_cfg)
+
+                        data = json.dumps(cfg, indent=4, ensure_ascii=False).encode('utf-8')
+                        config_written = True
+
+                    zout.writestr(item, data)
+
+                # If project_settings.config didn't exist, create it
+                if not config_written:
+                    cfg = {
+                        "version": "01.09.04.52",
+                        "name": "U1 FullSpectrum Export",
+                        "from": "project",
+                        "filament_colour": phys_colors,
+                        "mixed_filament_definitions": defs_str,
+                    }
+                    cfg.update(extra_cfg)
+                    zout.writestr(
+                        'Metadata/project_settings.config',
+                        json.dumps(cfg, indent=4, ensure_ascii=False).encode('utf-8')
+                    )
+
+        n_heads = len([v for v in virtual_heads if v.get("sequence")])
+        msg = f"✅ {n_heads} virtuelle Druckköpfe in .3mf eingeschrieben."
+        if input_path == output_path:
+            msg += f"\n(Backup: {backup_path})"
+        return True, msg
+
+    except Exception as e:
+        return False, f"Fehler beim Schreiben: {e}"
+
 
 def check_stripe_risk(sequence):
     """Check if a sequence has stripe risk based on FullSpectrum phase-shift formula.
@@ -1805,6 +2025,7 @@ class U1App(QMainWindow):
         self._last_de = None
         self._target_hex = None
         self._3mf_wizard = None  # singleton for 3MF Wizard
+        self._fs_export_dlg = None  # singleton for FS 3MF Export dialog
         self._gamut_timer = QTimer()
         self._gamut_timer.setSingleShot(True)
         self._gamut_timer.timeout.connect(self._run_gamut_update)
@@ -2912,6 +3133,7 @@ class U1App(QMainWindow):
         _mkbtn2(self.t("btn_copy_all_cad"), "#0e7490", self._open_copy_all_cadence)
         _mkbtn2(self.t("btn_de_overview"), "#1e3a5f", self._open_de_overview)
         _mkbtn2(self.t("btn_recalc_all"), "#065f46", self._recalc_all_virtual)
+        _mkbtn2(self.t("fs_export_btn"), "#7c2d12", self._open_fs_export_dialog)
         tb2_layout.addStretch()
         tab_layout.addWidget(tb2)
 
@@ -4908,6 +5130,18 @@ class U1App(QMainWindow):
         layout.addLayout(btn_row)
         dlg.exec()
 
+    # ── FULLSPECTRUM DIRECT 3MF EXPORT ────────────────────────────────────────
+
+    def _open_fs_export_dialog(self):
+        """Open the FullSpectrum Direct 3MF Export dialog (singleton)."""
+        if self._fs_export_dlg is not None and self._fs_export_dlg.isVisible():
+            self._fs_export_dlg.raise_()
+            self._fs_export_dlg.activateWindow()
+            return
+        dlg = FullSpectrumExportDialog(self)
+        self._fs_export_dlg = dlg
+        dlg.exec()
+
     # ── COPY ALL CADENCE ──────────────────────────────────────────────────────
 
     def _open_copy_all_cadence(self):
@@ -6726,6 +6960,192 @@ class ThreeMFWizardDialog(QDialog):
 
         QMessageBox.information(self, app.t("wizard_title"), app.t("wizard_applied"))
         self.accept()
+
+
+# ── FULLSPECTRUM EXPORT DIALOG ────────────────────────────────────────────────
+
+class FullSpectrumExportDialog(QDialog):
+    """Dialog for FullSpectrum Direct 3MF Export."""
+
+    def __init__(self, app):
+        super().__init__(app)
+        self._app = app
+        self.setWindowTitle(app.t("fs_export_title"))
+        self.resize(720, 660)
+        self._src_path = ""
+        self._dst_path = ""
+        self._build_ui()
+
+    def _build_ui(self):
+        app = self._app
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+        layout.setContentsMargins(16, 16, 16, 12)
+
+        # Title
+        title = QLabel(app.t("fs_export_title"))
+        title.setObjectName("section_title")
+        title.setStyleSheet("font-size: 15px; font-weight: bold; color: #a78bfa;")
+        layout.addWidget(title)
+
+        desc = QLabel(app.t("fs_export_desc"))
+        desc.setWordWrap(True)
+        desc.setStyleSheet("color: #94a3b8; font-size: 10px;")
+        layout.addWidget(desc)
+
+        warn = QLabel(app.t("fs_warn_fullspectrum"))
+        warn.setWordWrap(True)
+        warn.setStyleSheet("color: #fbbf24; font-size: 10px;")
+        layout.addWidget(warn)
+
+        # Source file
+        src_grp = QGroupBox(app.t("fs_src_label"))
+        src_grp_layout = QHBoxLayout(src_grp)
+        self._src_edit = QLineEdit()
+        self._src_edit.setPlaceholderText("*.3mf …")
+        self._src_edit.setReadOnly(False)
+        src_grp_layout.addWidget(self._src_edit, 1)
+        src_btn = QPushButton("📂 " + app.t("btn_load"))
+        src_btn.setFixedWidth(100)
+        src_btn.clicked.connect(self._browse_src)
+        src_grp_layout.addWidget(src_btn)
+        layout.addWidget(src_grp)
+
+        # Output file
+        dst_grp = QGroupBox(app.t("fs_dst_label"))
+        dst_grp_layout = QVBoxLayout(dst_grp)
+        self._radio_overwrite = QPushButton()  # placeholder
+        from PySide6.QtWidgets import QRadioButton as _QRB
+        self._rb_overwrite = _QRB(app.t("fs_overwrite"))
+        self._rb_overwrite.setChecked(True)
+        self._rb_save_as = _QRB(app.t("fs_save_as"))
+        dst_grp_layout.addWidget(self._rb_overwrite)
+        dst_grp_layout.addWidget(self._rb_save_as)
+        dst_row = QHBoxLayout()
+        self._dst_edit = QLineEdit()
+        self._dst_edit.setPlaceholderText("*.3mf …")
+        dst_row.addWidget(self._dst_edit, 1)
+        dst_btn = QPushButton("📂 " + app.t("fs_save_as"))
+        dst_btn.setFixedWidth(160)
+        dst_btn.clicked.connect(self._browse_dst)
+        dst_row.addWidget(dst_btn)
+        dst_grp_layout.addLayout(dst_row)
+        layout.addWidget(dst_grp)
+
+        # Settings
+        set_grp = QGroupBox(app.t("settings_title"))
+        set_layout = QHBoxLayout(set_grp)
+        set_layout.addWidget(QLabel(app.t("fs_lh_label")))
+        self._lh_spin = QDoubleSpinBox()
+        self._lh_spin.setRange(0.04, 0.30)
+        self._lh_spin.setSingleStep(0.04)
+        self._lh_spin.setDecimals(3)
+        # Get current layer height from app
+        try:
+            self._lh_spin.setValue(app._lh_spin.value())
+        except Exception:
+            self._lh_spin.setValue(0.08)
+        self._lh_spin.setFixedWidth(80)
+        set_layout.addWidget(self._lh_spin)
+        set_layout.addSpacing(16)
+        n_virt = len([v for v in app._virtual if v.get("sequence")])
+        self._count_lbl = QLabel(app.t("fs_count", n=n_virt))
+        self._count_lbl.setStyleSheet("color: #94a3b8;")
+        set_layout.addWidget(self._count_lbl)
+        set_layout.addStretch()
+        layout.addWidget(set_grp)
+
+        # Preview
+        prev_grp = QGroupBox("mixed_filament_definitions preview")
+        prev_layout = QVBoxLayout(prev_grp)
+        self._preview = QTextEdit()
+        self._preview.setReadOnly(True)
+        self._preview.setFont(QFont("Courier New", 9))
+        self._preview.setMinimumHeight(100)
+        prev_layout.addWidget(self._preview)
+        layout.addWidget(prev_grp, 1)
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        prev_btn = QPushButton(app.t("fs_preview_btn"))
+        prev_btn.clicked.connect(self._update_preview)
+        btn_row.addWidget(prev_btn)
+
+        write_btn = QPushButton(app.t("fs_write_btn"))
+        write_btn.setFixedHeight(44)
+        write_btn.setStyleSheet(
+            "background-color: #7c2d12; color: white; font-size: 13px; font-weight: bold;")
+        write_btn.clicked.connect(self._do_write)
+        btn_row.addWidget(write_btn)
+
+        close_btn = QPushButton(app.t("exp_cancel"))
+        close_btn.clicked.connect(self.reject)
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        # Initial preview
+        QTimer.singleShot(100, self._update_preview)
+
+    def _browse_src(self):
+        p, _ = QFileDialog.getOpenFileName(
+            self, self._app.t("fs_src_label"), "",
+            "3MF Files (*.3mf);;All Files (*.*)")
+        if p:
+            self._src_edit.setText(p)
+            if not self._dst_edit.text():
+                self._dst_edit.setText(p)
+
+    def _browse_dst(self):
+        p, _ = QFileDialog.getSaveFileName(
+            self, self._app.t("fs_dst_label"), "",
+            "3MF Files (*.3mf);;All Files (*.*)")
+        if p:
+            self._dst_edit.setText(p)
+            self._rb_save_as.setChecked(True)
+
+    def _update_preview(self):
+        lh = self._lh_spin.value()
+        defs, _ = build_mixed_filament_definitions(self._app._virtual, lh)
+        lines = [row for row in defs.split(";") if row]
+        self._preview.setPlainText("\n".join(lines))
+
+    def _do_write(self):
+        app = self._app
+        src = self._src_edit.text().strip()
+        if not src:
+            QMessageBox.warning(self, app.t("dlg_note"), app.t("fs_no_src"))
+            return
+
+        lh = self._lh_spin.value()
+
+        if self._rb_overwrite.isChecked():
+            out = src
+        else:
+            out = self._dst_edit.text().strip()
+            if not out:
+                QMessageBox.warning(self, app.t("dlg_note"), app.t("fs_no_src"))
+                return
+
+        # Collect physical filament data
+        phys = []
+        for s in getattr(app, "_slots", []):
+            try:
+                hx = s["hex_edit"].text().strip()
+                nm = s["fil_combo"].currentText()
+                br = s["brand_combo"].currentText()
+                td = s["td_spin"].value()
+            except Exception:
+                hx = "#808080"; nm = ""; br = ""; td = 5.0
+            phys.append({"hex": hx, "name": nm, "brand": br, "td": td})
+
+        ok, msg = inject_fullspectrum_into_3mf(
+            src, out, app._virtual, phys, lh)
+        if ok:
+            QMessageBox.information(self, app.t("dlg_saved"),
+                                    app.t("fs_success", path=out))
+            self.accept()
+        else:
+            QMessageBox.critical(self, app.t("dlg_error"), msg)
 
 
 # ── ENTRY POINT ───────────────────────────────────────────────────────────────
