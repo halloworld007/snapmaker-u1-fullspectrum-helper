@@ -1272,8 +1272,13 @@ def hex_to_rgb(hex_str):
     try:   return tuple(int(s[i:i+2], 16) for i in (0, 2, 4))
     except ValueError: return (128, 128, 128)
 
+_LAB_CACHE: dict = {}
+
 def rgb_to_lab(rgb):
-    r, g, b = [x / 255.0 for x in rgb]
+    key = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
+    if key in _LAB_CACHE:
+        return _LAB_CACHE[key]
+    r, g, b = [x / 255.0 for x in key]
     r = (r / 12.92) if r <= 0.04045 else ((r + 0.055) / 1.055) ** 2.4
     g = (g / 12.92) if g <= 0.04045 else ((g + 0.055) / 1.055) ** 2.4
     b = (b / 12.92) if b <= 0.04045 else ((b + 0.055) / 1.055) ** 2.4
@@ -1281,7 +1286,9 @@ def rgb_to_lab(rgb):
     y =  r * 0.2126 + g * 0.7152 + b * 0.0722
     z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883
     x, y, z = [v**(1/3) if v > 0.008856 else 7.787*v + 16/116 for v in [x, y, z]]
-    return (116*y - 16, 500*(x - y), 200*(y - z))
+    result = (116*y - 16, 500*(x - y), 200*(y - z))
+    _LAB_CACHE[key] = result
+    return result
 
 def lab_to_hex(lab):
     L, a, b = lab
@@ -2839,6 +2846,22 @@ class U1FullSpectrumApp(ctk.CTk):
                      font=("Segoe UI", 9), text_color="#475569").pack(side="left", padx=6)
         ctk.CTkLabel(lh_inner, text=self.t("lh_hint"),
                      font=("Segoe UI", 8), text_color="#f59e0b").pack(side="left", padx=(8, 0))
+        # Print height input (for statistics)
+        ph_inner = ctk.CTkFrame(lh_frame, fg_color="transparent")
+        ph_inner.pack(fill="x", padx=10, pady=(0, 6))
+        ctk.CTkLabel(ph_inner, text=("/ Druckhöhe:" if self.lang == "de" else "/ Print height:"),
+                     font=("Segoe UI", 11)).pack(side="left")
+        self._print_h_entry = ctk.CTkEntry(ph_inner, width=70, placeholder_text="0.0")
+        self._print_h_entry.insert(0, "0.0")
+        self._print_h_entry.pack(side="left", padx=(6, 0))
+        ctk.CTkLabel(ph_inner, text="mm", font=("Segoe UI", 10),
+                     text_color="#94a3b8").pack(side="left", padx=4)
+        ctk.CTkLabel(ph_inner,
+                     text=("Druckhöhe für Statistik (0 = deaktiviert)" if self.lang == "de"
+                            else "Print height for statistics (0 = disabled)"),
+                     font=("Segoe UI", 8), text_color="#64748b").pack(side="left", padx=(8, 0))
+        self._print_h_entry.bind("<KeyRelease>", lambda e: self.after(400, self._update_print_stats))
+        self._print_h_entry.bind("<FocusOut>", lambda e: self._update_print_stats())
 
         model_frame = ctk.CTkFrame(self.sidebar, fg_color="#0f172a", corner_radius=8)
         model_frame.pack(fill="x", padx=10, pady=(6,0))
@@ -3142,14 +3165,19 @@ class U1FullSpectrumApp(ctk.CTk):
         # Keyboard shortcut: Enter = Berechnen
         self.bind("<Return>", lambda e: self.calc())
 
+        # Print statistics label
+        self._stats_label = ctk.CTkLabel(sec1, text="", font=("Segoe UI", 9),
+                                          text_color="#94a3b8", wraplength=600, justify="left")
+        self._stats_label.grid(row=10, column=0, padx=40, pady=(0, 2), sticky="ew")
+
         # Stripe risk label (Change 4)
         self._stripe_label = ctk.CTkLabel(sec1, text="", font=("Segoe UI", 9),
                                           text_color="#64748b")
-        self._stripe_label.grid(row=10, column=0, padx=40, pady=(0, 2), sticky="ew")
+        self._stripe_label.grid(row=11, column=0, padx=40, pady=(0, 2), sticky="ew")
 
         # Layer schedule canvas (Change 8)
         _lsf = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=6)
-        _lsf.grid(row=10, column=0, padx=40, pady=(18, 2), sticky="ew")
+        _lsf.grid(row=12, column=0, padx=40, pady=(18, 2), sticky="ew")
         _lsf.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(_lsf, text="L1-12:", font=("Segoe UI", 8),
                      text_color="#475569").grid(row=0, column=0, padx=(8, 4), pady=3, sticky="w")
@@ -3159,7 +3187,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Dithering-Profile
         dp_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
-        dp_frame.grid(row=11, column=0, padx=40, pady=(0, 6), sticky="ew")
+        dp_frame.grid(row=13, column=0, padx=40, pady=(0, 6), sticky="ew")
         ctk.CTkLabel(dp_frame, text=self.t("dither_profiles"),
                      font=("Segoe UI", 10), text_color="#64748b").pack(side="left", padx=(12, 8))
         for key, fn in [("dither_fine", lambda: self._apply_dither_profile(2, False)),
@@ -3174,7 +3202,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Farbsehschwäche-Simulation
         sim_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
-        sim_frame.grid(row=12, column=0, padx=40, pady=(0, 12), sticky="ew")
+        sim_frame.grid(row=14, column=0, padx=40, pady=(0, 12), sticky="ew")
         ctk.CTkLabel(sim_frame, text=self.t("colorblind_label"),
                      font=("Segoe UI", 10), text_color="#64748b").pack(side="left", padx=(12, 6))
         self.colorblind_var = ctk.StringVar(value="normal")
@@ -3186,7 +3214,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Recent colors palette (Change 7)
         recent_outer = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
-        recent_outer.grid(row=13, column=0, padx=40, pady=(0, 4), sticky="ew")
+        recent_outer.grid(row=15, column=0, padx=40, pady=(0, 4), sticky="ew")
         ctk.CTkLabel(recent_outer, text="Zuletzt:", font=("Segoe UI", 9),
                      text_color="#64748b").pack(side="left", padx=(8, 4), pady=4)
         self._recent_frame = ctk.CTkFrame(recent_outer, fg_color="transparent")
@@ -3195,7 +3223,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Feature 5: History panel (last 10 calculations)
         hist_outer = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
-        hist_outer.grid(row=14, column=0, padx=40, pady=(0, 12), sticky="ew")
+        hist_outer.grid(row=16, column=0, padx=40, pady=(0, 12), sticky="ew")
         ctk.CTkLabel(hist_outer, text="🕘 Verlauf",
                      font=("Segoe UI", 10), text_color="#64748b").pack(anchor="w", padx=12, pady=(6, 2))
         self._history_frame = ctk.CTkScrollableFrame(hist_outer, height=100, fg_color="transparent")
@@ -3708,6 +3736,49 @@ class U1FullSpectrumApp(ctk.CTk):
             y1 = y0 + bar_h
             c.create_rectangle(0, y0, W, y1, fill=color, outline="")
 
+    def _update_print_stats(self):
+        """Recompute and display print statistics."""
+        if not hasattr(self, "_stats_label"):
+            return
+        seq_text = self.res.cget("text").strip() if hasattr(self, "res") else ""
+        if not seq_text or seq_text == "----------":
+            self._stats_label.configure(text="")
+            return
+        try:
+            lh = float(self.layer_height_entry.get()) if hasattr(self, "layer_height_entry") else 0.08
+        except (ValueError, AttributeError):
+            lh = 0.08
+        try:
+            ph = float(self._print_h_entry.get()) if hasattr(self, "_print_h_entry") else 0.0
+        except (ValueError, AttributeError):
+            ph = 0.0
+        if ph <= 0 or lh <= 0:
+            self._stats_label.configure(text="")
+            return
+        sequence = list(seq_text)
+        total_layers = max(1, round(ph / lh))
+        cycle_len = len(sequence)
+        full_cycles = total_layers // cycle_len
+        remainder = total_layers % cycle_len
+        extended = sequence * full_cycles + sequence[:remainder]
+        tool_changes = sum(1 for i in range(1, len(extended)) if extended[i] != extended[i-1])
+        from collections import Counter
+        counts = Counter(extended)
+        change_time_min = tool_changes * 30 / 60
+        if self.lang == "de":
+            parts = [f"📊 {total_layers} Schichten · {tool_changes} Werkzeugwechsel"]
+            for fid, cnt in sorted(counts.items()):
+                pct = 100.0 * cnt / total_layers
+                parts.append(f"  T{fid}: {cnt} Lagen ({pct:.0f}%)")
+            parts.append(f"  ~{change_time_min:.0f} min Wechselzeit (30s/Wechsel)")
+        else:
+            parts = [f"📊 {total_layers} layers · {tool_changes} tool changes"]
+            for fid, cnt in sorted(counts.items()):
+                pct = 100.0 * cnt / total_layers
+                parts.append(f"  T{fid}: {cnt} layers ({pct:.0f}%)")
+            parts.append(f"  ~{change_time_min:.0f} min change time (30s/change)")
+        self._stats_label.configure(text="\n".join(parts))
+
     def _draw_layer_schedule(self, sequence):
         """Draw colored squares for first 12 layers showing active filament (Change 8)."""
         if not hasattr(self, "_layer_sched_canvas"):
@@ -3918,6 +3989,7 @@ class U1FullSpectrumApp(ctk.CTk):
 
             # Layer schedule (Change 8)
             self._draw_layer_schedule(seq)
+            self._update_print_stats()
 
             # High ΔE visual warning on result border
             self._set_result_border(dv)
@@ -7290,7 +7362,7 @@ class U1FullSpectrumApp(ctk.CTk):
                                width=100).pack(pady=8)
                 return
 
-            if not isinstance(data, dict):
+            if not isinstance(data, (dict, list)):
                 lbl.configure(text=self.t("web_update_err", e="Invalid format"),
                                text_color="#f87171")
                 ctk.CTkButton(win, text="OK", command=win.destroy,
@@ -7300,14 +7372,34 @@ class U1FullSpectrumApp(ctk.CTk):
             new_count = 0
             n_brands  = 0
             n_fils    = 0
-            for brand, entries in data.items():
-                if brand == "Eigene Favoriten":
-                    continue
-                n_brands += 1
-                existing_names = {f["name"] for f in self.library.get(brand, [])}
-                for entry in entries:
+            if isinstance(data, dict):
+                # format: {"BrandName": [{name, hex, td}, ...], ...}
+                for brand, entries in data.items():
+                    if brand == "Eigene Favoriten":
+                        continue
+                    if not isinstance(entries, list):
+                        continue
+                    n_brands += 1
+                    existing_names = {f.get("name","") for f in self.library.get(brand, [])}
+                    for entry in entries:
+                        if not isinstance(entry, dict) or "name" not in entry or "hex" not in entry:
+                            continue
+                        n_fils += 1
+                        if entry.get("name") not in existing_names:
+                            self.library.setdefault(brand, []).append(entry)
+                            new_count += 1
+            elif isinstance(data, list):
+                # flat list format
+                all_names = {f.get("name","").lower()
+                             for fils in self.library.values() for f in fils}
+                for entry in data:
+                    if not isinstance(entry, dict) or "name" not in entry or "hex" not in entry:
+                        continue
                     n_fils += 1
-                    if entry.get("name") not in existing_names:
+                    if entry["name"].lower() not in all_names:
+                        brand = entry.get("brand", "Community")
+                        if brand not in (b for b in self.library):
+                            n_brands += 1
                         self.library.setdefault(brand, []).append(entry)
                         new_count += 1
 
