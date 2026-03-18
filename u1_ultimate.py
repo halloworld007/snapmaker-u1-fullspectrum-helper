@@ -1266,7 +1266,59 @@ def lab_to_hex(lab):
     return "#{:02X}{:02X}{:02X}".format(int(gamma(r)*255), int(gamma(g)*255), int(gamma(b_)*255))
 
 def delta_e(lab1, lab2):
-    return math.sqrt(sum((a - b)**2 for a, b in zip(lab1, lab2)))
+    """CIEDE2000 perceptual color difference — more accurate than simple ΔE76."""
+    L1, a1, b1 = lab1
+    L2, a2, b2 = lab2
+    C1 = math.sqrt(a1**2 + b1**2)
+    C2 = math.sqrt(a2**2 + b2**2)
+    C_avg = (C1 + C2) / 2.0
+    C_avg7 = C_avg**7
+    G = 0.5 * (1.0 - math.sqrt(C_avg7 / (C_avg7 + 6103515625.0)))  # 25^7
+    a1p = a1 * (1.0 + G);  a2p = a2 * (1.0 + G)
+    C1p = math.sqrt(a1p**2 + b1**2)
+    C2p = math.sqrt(a2p**2 + b2**2)
+    def _h(ap, bp):
+        if ap == 0.0 and bp == 0.0: return 0.0
+        v = math.degrees(math.atan2(bp, ap))
+        return v + 360.0 if v < 0.0 else v
+    h1p = _h(a1p, b1);  h2p = _h(a2p, b2)
+    dLp = L2 - L1
+    dCp = C2p - C1p
+    if C1p * C2p == 0.0:
+        dhp = 0.0
+    elif abs(h2p - h1p) <= 180.0:
+        dhp = h2p - h1p
+    elif h2p - h1p > 180.0:
+        dhp = h2p - h1p - 360.0
+    else:
+        dhp = h2p - h1p + 360.0
+    dHp = 2.0 * math.sqrt(C1p * C2p) * math.sin(math.radians(dhp / 2.0))
+    Lp_avg = (L1 + L2) / 2.0
+    Cp_avg = (C1p + C2p) / 2.0
+    if C1p * C2p == 0.0:
+        hp_avg = h1p + h2p
+    elif abs(h1p - h2p) <= 180.0:
+        hp_avg = (h1p + h2p) / 2.0
+    elif h1p + h2p < 360.0:
+        hp_avg = (h1p + h2p + 360.0) / 2.0
+    else:
+        hp_avg = (h1p + h2p - 360.0) / 2.0
+    T = (1.0
+         - 0.17 * math.cos(math.radians(hp_avg - 30.0))
+         + 0.24 * math.cos(math.radians(2.0 * hp_avg))
+         + 0.32 * math.cos(math.radians(3.0 * hp_avg + 6.0))
+         - 0.20 * math.cos(math.radians(4.0 * hp_avg - 63.0)))
+    SL = 1.0 + 0.015 * (Lp_avg - 50.0)**2 / math.sqrt(20.0 + (Lp_avg - 50.0)**2)
+    SC = 1.0 + 0.045 * Cp_avg
+    SH = 1.0 + 0.015 * Cp_avg * T
+    Cp_avg7 = Cp_avg**7
+    RC = 2.0 * math.sqrt(Cp_avg7 / (Cp_avg7 + 6103515625.0))
+    d_theta = 30.0 * math.exp(-((hp_avg - 275.0) / 25.0)**2)
+    RT = -math.sin(math.radians(2.0 * d_theta)) * RC
+    return math.sqrt(
+        (dLp / SL)**2 + (dCp / SC)**2 + (dHp / SH)**2
+        + RT * (dCp / SC) * (dHp / SH)
+    )
 
 def find_best_4_filaments(target_labs, library_fils, progress_cb=None):
     """Find best 4 filaments from library to cover target_labs.
@@ -7460,6 +7512,11 @@ class ThreeMFWizard(ctk.CTkToplevel):
                                                          fg_color="#0f172a")
         self._p1_swatch_frame.pack(fill="x", padx=24, pady=(0, 8))
 
+        self._p1_spinner_lbl = ctk.CTkLabel(self._container, text="",
+                                              font=("Segoe UI", 10),
+                                              text_color="#94a3b8")
+        self._p1_spinner_lbl.pack(pady=(2, 0))
+
         self._p1_next_btn = ctk.CTkButton(self._container, text=t("wizard_next"),
                                            fg_color="#15803d", hover_color="#166534",
                                            height=42, font=("Segoe UI", 13, "bold"),
@@ -7467,7 +7524,10 @@ class ThreeMFWizard(ctk.CTkToplevel):
                                            command=self._show_page2)
         self._p1_next_btn.pack(pady=(8, 16), padx=24, fill="x")
 
+        self._loader_result = None  # set by background thread
+
     def _load_file(self):
+        import threading
         app = self._app
         path = filedialog.askopenfilename(
             filetypes=[("3MF-Dateien" if app.lang == "de" else "3MF Files", "*.3mf"),
@@ -7475,24 +7535,44 @@ class ThreeMFWizard(ctk.CTkToplevel):
             title=app.t("wizard_load_btn"))
         if not path:
             return
-        colors, err = parse_3mf_colors(path)
+
+        # Show spinner, disable next
+        self._p1_path_lbl.configure(text=os.path.basename(path))
+        self._p1_count_lbl.configure(text="")
+        self._p1_spinner_lbl.configure(text="⏳ Lade & analysiere 3MF …")
+        self._p1_next_btn.configure(state="disabled")
+        for w in self._p1_swatch_frame.winfo_children():
+            w.destroy()
+        self._loader_result = None
+
+        def _worker():
+            colors, err = parse_3mf_colors(path)
+            self._loader_result = (colors or [], err or "")
+
+        threading.Thread(target=_worker, daemon=True).start()
+        self._poll_loader()
+
+    def _poll_loader(self):
+        if self._loader_result is None:
+            self.after(80, self._poll_loader)
+            return
+        colors, err = self._loader_result
+        self._p1_spinner_lbl.configure(text="")
+        app = self._app
         if not colors:
-            messagebox.showinfo(app.t("wizard_title"),
-                                err if err else app.t("wizard_no_file"))
+            self._p1_count_lbl.configure(
+                text=f"⚠ {err}" if err else app.t("wizard_no_file"))
             return
         self._colors = colors
-        self._p1_path_lbl.configure(text=os.path.basename(path))
         self._p1_count_lbl.configure(
             text=app.t("wizard_colors_found", n=len(colors)))
-        # Draw swatches
         for w in self._p1_swatch_frame.winfo_children():
             w.destroy()
         row_f = ctk.CTkFrame(self._p1_swatch_frame, fg_color="transparent")
         row_f.pack(fill="x")
         for i, hex_c in enumerate(colors[:24]):
             ctk.CTkLabel(row_f, text="", width=26, height=26,
-                         fg_color=hex_c, corner_radius=4,
-                         tooltip_text=hex_c if False else "").grid(
+                         fg_color=hex_c, corner_radius=4).grid(
                 row=i // 12, column=i % 12, padx=3, pady=3)
         self._p1_next_btn.configure(state="normal")
 
