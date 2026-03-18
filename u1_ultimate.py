@@ -442,6 +442,25 @@ STRINGS = {
     "virt_filter_placeholder": "Filtern…",
     # Click-to-copy hint
     "click_to_copy": "(klick zum Kopieren)",
+    # 3MF Farb-Wizard
+    "wizard_btn": "🧙 3MF Wizard",
+    "wizard_title": "3MF Farb-Wizard",
+    "wizard_step1": "Schritt 1 / 3 — 3MF Datei laden",
+    "wizard_step2": "Schritt 2 / 3 — Beste 4 Filamente suchen",
+    "wizard_step3": "Schritt 3 / 3 — Ergebnis",
+    "wizard_load_btn": "📂 3MF Datei öffnen",
+    "wizard_no_file": "Keine Datei geladen",
+    "wizard_colors_found": "{n} Farbe(n) im Modell gefunden",
+    "wizard_next": "Weiter →",
+    "wizard_info": "Durchsuche {n_lib} Filamente nach bester Kombination für {n_col} Zielfarben.",
+    "wizard_start": "Optimierung starten",
+    "wizard_checking": "Prüfe Kombination {i}/{total}…",
+    "wizard_avg_de": "Durchschnittliche ΔE: {de:.1f}",
+    "wizard_apply": "✅ Als T1–T4 übernehmen",
+    "wizard_add_virtual": "Virtuelle Köpfe für alle Modellfarben berechnen",
+    "wizard_close": "Schließen",
+    "wizard_applied": "Beste 4 Filamente als T1–T4 gesetzt.",
+    "wizard_coverage": "Farb-Abdeckung",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — Pro Edition",
@@ -834,6 +853,25 @@ STRINGS = {
     "virt_filter_placeholder": "Filter…",
     # Click-to-copy hint
     "click_to_copy": "(click to copy)",
+    # 3MF Color Wizard
+    "wizard_btn": "🧙 3MF Wizard",
+    "wizard_title": "3MF Color Wizard",
+    "wizard_step1": "Step 1 / 3 — Load 3MF File",
+    "wizard_step2": "Step 2 / 3 — Find Best 4 Filaments",
+    "wizard_step3": "Step 3 / 3 — Result",
+    "wizard_load_btn": "📂 Open 3MF File",
+    "wizard_no_file": "No file loaded",
+    "wizard_colors_found": "{n} color(s) found in model",
+    "wizard_next": "Next →",
+    "wizard_info": "Searching {n_lib} filaments for best combination for {n_col} target colors.",
+    "wizard_start": "Start Optimization",
+    "wizard_checking": "Checking combination {i}/{total}…",
+    "wizard_avg_de": "Average ΔE: {de:.1f}",
+    "wizard_apply": "✅ Apply as T1–T4",
+    "wizard_add_virtual": "Calculate virtual heads for all model colors",
+    "wizard_close": "Close",
+    "wizard_applied": "Best 4 filaments set as T1–T4.",
+    "wizard_coverage": "Color Coverage",
 },
 }
 
@@ -1214,6 +1252,66 @@ def lab_to_hex(lab):
 def delta_e(lab1, lab2):
     return math.sqrt(sum((a - b)**2 for a, b in zip(lab1, lab2)))
 
+def find_best_4_filaments(target_labs, library_fils, progress_cb=None):
+    """Find best 4 filaments from library to cover target_labs (list of Lab tuples).
+
+    Algorithm: k-medoids inspired greedy search
+    1. For each target color, find top-20 closest library filaments
+    2. Build candidate pool from union of all top-20 lists
+    3. Try all C(candidate_pool, 4) combinations (usually <5000)
+    4. For each combo: score = avg of min_delta_e per target across 4 slots
+    5. Return best combo
+
+    library_fils: list of {"name": str, "hex": str, "td": float, "brand": str, "lab": tuple}
+    Returns: (best_4_list, avg_de, scores_per_target)
+    """
+    if not target_labs or not library_fils:
+        return [], 99.0, []
+
+    # Step 1: for each target, find top-20 closest library filaments
+    candidate_ids = set()
+    for t_lab in target_labs:
+        distances = [(i, delta_e(t_lab, f["lab"])) for i, f in enumerate(library_fils)]
+        distances.sort(key=lambda x: x[1])
+        for idx, _ in distances[:20]:
+            candidate_ids.add(idx)
+
+    candidates = [library_fils[i] for i in sorted(candidate_ids)]
+
+    # Step 2: try all C(candidates, 4) combos
+    from itertools import combinations as _combs
+    best_combo = None
+    best_score = float("inf")
+    combos = list(_combs(range(len(candidates)), 4))
+
+    for ci, combo_idxs in enumerate(combos):
+        if progress_cb and ci % 100 == 0:
+            progress_cb(ci, len(combos))
+        combo = [candidates[i] for i in combo_idxs]
+        combo_labs = [f["lab"] for f in combo]
+        total_de = 0.0
+        for t_lab in target_labs:
+            min_de = min(delta_e(t_lab, c_lab) for c_lab in combo_labs)
+            total_de += min_de
+        avg_de = total_de / len(target_labs)
+        if avg_de < best_score:
+            best_score = avg_de
+            best_combo = combo
+
+    if best_combo is None:
+        best_combo = candidates[:4] if len(candidates) >= 4 else candidates
+
+    # Compute per-target scores for display
+    scores = []
+    if best_combo:
+        combo_labs = [f["lab"] for f in best_combo]
+        for t_lab in target_labs:
+            min_de = min(delta_e(t_lab, c_lab) for c_lab in combo_labs)
+            scores.append(min_de)
+
+    return best_combo, best_score, scores
+
+
 def safe_td(value):
     try:
         v = float(str(value).strip())
@@ -1506,6 +1604,7 @@ class U1FullSpectrumApp(ctk.CTk):
         self._max_virtual  = int(self.settings.get("max_virtual", MAX_VIRTUAL))
         self.favorites     = []
         self._3mf_win      = None   # singleton for 3MF assistant window
+        self._3mf_wizard_win = None  # singleton for 3MF Wizard
         self._recent_colors = []    # recent target colors (max 10)
         self.load_db()
         self.load_presets()
@@ -2653,6 +2752,11 @@ class U1FullSpectrumApp(ctk.CTk):
                       command=self.open_3mf_assistant)
         tmf_btn.pack(side="left", padx=(8, 4), pady=6)
         self.tip(tmf_btn, "tip_3mf")
+
+        wizard_btn = ctk.CTkButton(tb1, text=self.t("wizard_btn"), fg_color="#7c3aed",
+                      hover_color="#6d28d9", height=36, font=("Segoe UI", 11, "bold"),
+                      command=self.open_3mf_wizard)
+        wizard_btn.pack(side="left", padx=(0, 4), pady=6)
 
         bat_btn = ctk.CTkButton(tb1, text=self.t("btn_batch"), fg_color="#4338ca",
                       hover_color="#3730a3", height=36, font=("Segoe UI", 11, "bold"),
@@ -4557,6 +4661,42 @@ class U1FullSpectrumApp(ctk.CTk):
                       font=("Segoe UI", 12, "bold")).pack(side="left")
         ctk.CTkButton(btm, text=self.t("3mf_btn_cancel"), fg_color="#374151",
                       command=win.destroy, height=42).pack(side="right")
+
+    # ── 3MF FARB-WIZARD ────────────────────────────────────────────────────────
+
+    def _get_all_library_fils(self):
+        """Returns all filaments from DEFAULT_LIBRARY + user DB as list of dicts with lab."""
+        result = []
+        all_data = {}
+        for brand, fils in DEFAULT_LIBRARY.items():
+            all_data[brand] = fils[:]
+        for brand, fils in self.library.items():
+            if brand not in all_data:
+                all_data[brand] = []
+            all_data[brand] = all_data[brand] + [f for f in fils if f not in all_data[brand]]
+        for brand, fils in all_data.items():
+            for f in fils:
+                try:
+                    lab = rgb_to_lab(hex_to_rgb(f["hex"]))
+                    result.append({
+                        "brand": brand,
+                        "name": f["name"],
+                        "hex": f["hex"],
+                        "td": f.get("td", DEFAULT_TD),
+                        "lab": lab,
+                    })
+                except Exception:
+                    pass
+        return result
+
+    def open_3mf_wizard(self):
+        if self._3mf_wizard_win and self._3mf_wizard_win.winfo_exists():
+            self._3mf_wizard_win.focus_force()
+            return
+        win = ThreeMFWizard(self)
+        self._3mf_wizard_win = win
+        win.protocol("WM_DELETE_WINDOW",
+                     lambda: (setattr(self, "_3mf_wizard_win", None), win.destroy()))
 
     # ── EXPORT ─────────────────────────────────────────────────────────────────
 
@@ -6901,6 +7041,316 @@ class U1FullSpectrumApp(ctk.CTk):
         icon = "🌙" if new_mode == "Dark" else "☀️"
         if hasattr(self, "appearance_btn"):
             self.appearance_btn.configure(text=icon)
+
+
+# ── 3MF FARB-WIZARD (CTkToplevel) ─────────────────────────────────────────────
+
+class ThreeMFWizard(ctk.CTkToplevel):
+    """3-step wizard: load 3MF → optimize 4 filaments → show result & apply."""
+
+    def __init__(self, app):
+        super().__init__(app)
+        self._app = app
+        self.title(app.t("wizard_title"))
+        self.geometry("700x560")
+        self.resizable(True, True)
+        self.grab_set()
+
+        # State
+        self._colors = []         # hex strings from 3MF
+        self._best4 = []
+        self._avg_de = 0.0
+        self._scores = []
+        self._thread = None
+        self._thread_result = None  # (best4, avg_de, scores) when done
+        self._add_virtual_var = ctk.BooleanVar(value=False)
+
+        # Container that holds pages
+        self._container = ctk.CTkFrame(self, fg_color="transparent")
+        self._container.pack(fill="both", expand=True, padx=0, pady=0)
+
+        self._page1 = None
+        self._page2 = None
+        self._page3 = None
+        self._show_page1()
+
+    # ── PAGE 1 ─────────────────────────────────────────────────────────────────
+
+    def _show_page1(self):
+        self._clear_container()
+        app = self._app
+        t = app.t
+
+        ctk.CTkLabel(self._container, text=t("wizard_step1"),
+                     font=("Segoe UI", 16, "bold"), text_color="#38bdf8").pack(pady=(18, 8))
+
+        # Drop zone / load button
+        load_frame = ctk.CTkFrame(self._container, fg_color="#1e293b",
+                                   corner_radius=12, height=100)
+        load_frame.pack(fill="x", padx=24, pady=6)
+        load_frame.pack_propagate(False)
+        load_btn = ctk.CTkButton(load_frame, text=t("wizard_load_btn"),
+                                  fg_color="#0f4c81", hover_color="#1e3a5f",
+                                  height=52, font=("Segoe UI", 13, "bold"),
+                                  command=self._load_file)
+        load_btn.pack(expand=True)
+
+        self._p1_path_lbl = ctk.CTkLabel(self._container, text=t("wizard_no_file"),
+                                          font=("Segoe UI", 10), text_color="#64748b")
+        self._p1_path_lbl.pack(pady=(4, 2))
+
+        self._p1_count_lbl = ctk.CTkLabel(self._container, text="",
+                                           font=("Segoe UI", 12, "bold"), text_color="#4ade80")
+        self._p1_count_lbl.pack(pady=(0, 8))
+
+        # Swatch frame
+        self._p1_swatch_frame = ctk.CTkScrollableFrame(self._container, height=120,
+                                                         fg_color="#0f172a")
+        self._p1_swatch_frame.pack(fill="x", padx=24, pady=(0, 8))
+
+        self._p1_next_btn = ctk.CTkButton(self._container, text=t("wizard_next"),
+                                           fg_color="#15803d", hover_color="#166534",
+                                           height=42, font=("Segoe UI", 13, "bold"),
+                                           state="disabled",
+                                           command=self._show_page2)
+        self._p1_next_btn.pack(pady=(8, 16), padx=24, fill="x")
+
+    def _load_file(self):
+        app = self._app
+        path = filedialog.askopenfilename(
+            filetypes=[("3MF-Dateien" if app.lang == "de" else "3MF Files", "*.3mf"),
+                       ("*", "*.*")],
+            title=app.t("wizard_load_btn"))
+        if not path:
+            return
+        colors, err = parse_3mf_colors(path)
+        if not colors:
+            messagebox.showinfo(app.t("wizard_title"),
+                                err if err else app.t("wizard_no_file"))
+            return
+        self._colors = colors
+        self._p1_path_lbl.configure(text=os.path.basename(path))
+        self._p1_count_lbl.configure(
+            text=app.t("wizard_colors_found", n=len(colors)))
+        # Draw swatches
+        for w in self._p1_swatch_frame.winfo_children():
+            w.destroy()
+        row_f = ctk.CTkFrame(self._p1_swatch_frame, fg_color="transparent")
+        row_f.pack(fill="x")
+        for i, hex_c in enumerate(colors[:24]):
+            ctk.CTkLabel(row_f, text="", width=26, height=26,
+                         fg_color=hex_c, corner_radius=4,
+                         tooltip_text=hex_c if False else "").grid(
+                row=i // 12, column=i % 12, padx=3, pady=3)
+        self._p1_next_btn.configure(state="normal")
+
+    # ── PAGE 2 ─────────────────────────────────────────────────────────────────
+
+    def _show_page2(self):
+        self._clear_container()
+        app = self._app
+        t = app.t
+
+        lib = app._get_all_library_fils()
+        self._lib_fils = lib
+
+        ctk.CTkLabel(self._container, text=t("wizard_step2"),
+                     font=("Segoe UI", 16, "bold"), text_color="#38bdf8").pack(pady=(18, 4))
+
+        info_txt = t("wizard_info", n_lib=len(lib), n_col=len(self._colors))
+        ctk.CTkLabel(self._container, text=info_txt,
+                     font=("Segoe UI", 10), text_color="#94a3b8",
+                     wraplength=600).pack(pady=(0, 12))
+
+        self._p2_progress = ctk.CTkProgressBar(self._container, width=500)
+        self._p2_progress.set(0)
+        self._p2_progress.pack(pady=(0, 6))
+
+        self._p2_status_lbl = ctk.CTkLabel(self._container, text="",
+                                             font=("Segoe UI", 10), text_color="#64748b")
+        self._p2_status_lbl.pack(pady=(0, 16))
+
+        btn_row = ctk.CTkFrame(self._container, fg_color="transparent")
+        btn_row.pack(fill="x", padx=24, pady=4)
+
+        self._p2_start_btn = ctk.CTkButton(btn_row, text=t("wizard_start"),
+                                            fg_color="#2563eb", hover_color="#1d4ed8",
+                                            height=42, font=("Segoe UI", 13, "bold"),
+                                            command=self._start_optimization)
+        self._p2_start_btn.pack(side="left", expand=True, fill="x", padx=(0, 6))
+
+        self._p2_next_btn = ctk.CTkButton(btn_row, text=t("wizard_next"),
+                                           fg_color="#15803d", hover_color="#166534",
+                                           height=42, font=("Segoe UI", 13, "bold"),
+                                           state="disabled",
+                                           command=self._show_page3)
+        self._p2_next_btn.pack(side="left", expand=True, fill="x")
+
+    def _start_optimization(self):
+        import threading
+        self._p2_start_btn.configure(state="disabled")
+        self._p2_next_btn.configure(state="disabled")
+        self._p2_progress.set(0)
+        self._thread_result = None
+        target_labs = [rgb_to_lab(hex_to_rgb(h)) for h in self._colors]
+        lib = self._lib_fils
+
+        def worker():
+            def progress_cb(i, total):
+                self._thread_progress = (i, total)
+            best4, avg_de, scores = find_best_4_filaments(target_labs, lib, progress_cb)
+            self._thread_result = (best4, avg_de, scores)
+
+        self._thread_progress = (0, 1)
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
+        self._poll_thread(t)
+
+    def _poll_thread(self, t):
+        app = self._app
+        if t.is_alive():
+            i, total = getattr(self, "_thread_progress", (0, 1))
+            if total > 0:
+                self._p2_progress.set(i / total)
+                self._p2_status_lbl.configure(
+                    text=app.t("wizard_checking", i=i, total=total))
+            self.after(50, lambda: self._poll_thread(t))
+        else:
+            self._p2_progress.set(1.0)
+            if self._thread_result:
+                best4, avg_de, scores = self._thread_result
+                self._best4 = best4
+                self._avg_de = avg_de
+                self._scores = scores
+                self._p2_status_lbl.configure(
+                    text=app.t("wizard_avg_de", de=avg_de))
+                self._p2_next_btn.configure(state="normal")
+            else:
+                self._p2_start_btn.configure(state="normal")
+
+    # ── PAGE 3 ─────────────────────────────────────────────────────────────────
+
+    def _show_page3(self):
+        self._clear_container()
+        app = self._app
+        t = app.t
+
+        ctk.CTkLabel(self._container, text=t("wizard_step3"),
+                     font=("Segoe UI", 16, "bold"), text_color="#38bdf8").pack(pady=(14, 6))
+
+        # 4 filament cards
+        cards_frame = ctk.CTkFrame(self._container, fg_color="#1e293b", corner_radius=8)
+        cards_frame.pack(fill="x", padx=20, pady=(0, 8))
+        slot_labels = ["T1", "T2", "T3", "T4"]
+        best4 = self._best4 if len(self._best4) >= 4 else (self._best4 + [None] * 4)[:4]
+        for i, fil in enumerate(best4):
+            card = ctk.CTkFrame(cards_frame, fg_color="#0f172a", corner_radius=6)
+            card.grid(row=0, column=i, padx=6, pady=8, sticky="nsew")
+            cards_frame.grid_columnconfigure(i, weight=1)
+            if fil:
+                ctk.CTkLabel(card, text="", width=40, height=40,
+                             fg_color=fil.get("hex", "#808080"),
+                             corner_radius=6).pack(pady=(8, 4))
+                ctk.CTkLabel(card, text=fil.get("brand", ""),
+                             font=("Segoe UI", 8), text_color="#94a3b8").pack()
+                ctk.CTkLabel(card, text=fil.get("name", ""),
+                             font=("Segoe UI", 10, "bold"),
+                             text_color="#e2e8f0", wraplength=110).pack(padx=4)
+                ctk.CTkLabel(card, text=f"TD={fil.get('td', DEFAULT_TD):.1f}",
+                             font=("Segoe UI", 9), text_color="#64748b").pack()
+            ctk.CTkLabel(card, text=f"→ {slot_labels[i]}",
+                         font=("Segoe UI", 11, "bold"), text_color="#a78bfa").pack(pady=(2, 8))
+
+        # Summary
+        de_col = de_color(self._avg_de)
+        ctk.CTkLabel(self._container,
+                     text=t("wizard_avg_de", de=self._avg_de),
+                     font=("Segoe UI", 13, "bold"),
+                     text_color=de_col).pack(pady=(2, 6))
+
+        # Coverage table
+        ctk.CTkLabel(self._container, text=t("wizard_coverage"),
+                     font=("Segoe UI", 11, "bold"), text_color="#94a3b8").pack()
+        cov_scroll = ctk.CTkScrollableFrame(self._container, height=140,
+                                             fg_color="#0f172a")
+        cov_scroll.pack(fill="x", padx=20, pady=(2, 8))
+        for i, (hex_c, sc) in enumerate(zip(self._colors, self._scores)):
+            row = ctk.CTkFrame(cov_scroll, fg_color="#1e293b", corner_radius=4)
+            row.pack(fill="x", padx=2, pady=1)
+            ctk.CTkLabel(row, text="", width=20, height=20,
+                         fg_color=hex_c, corner_radius=3).pack(side="left", padx=6, pady=4)
+            ctk.CTkLabel(row, text=hex_c,
+                         font=("Courier New", 10), text_color="#94a3b8").pack(side="left", padx=4)
+            sc_lbl = f"ΔE {sc:.1f}"
+            ctk.CTkLabel(row, text=sc_lbl,
+                         font=("Segoe UI", 10, "bold"),
+                         text_color=de_color(sc)).pack(side="right", padx=10)
+
+        # Checkbox: also add virtual heads
+        ctk.CTkCheckBox(self._container,
+                        text=t("wizard_add_virtual"),
+                        variable=self._add_virtual_var,
+                        font=("Segoe UI", 10)).pack(pady=(0, 6))
+
+        # Buttons
+        btn_row = ctk.CTkFrame(self._container, fg_color="transparent")
+        btn_row.pack(fill="x", padx=20, pady=(0, 14))
+        ctk.CTkButton(btn_row, text=t("wizard_apply"),
+                      fg_color="#15803d", hover_color="#166534",
+                      height=42, font=("Segoe UI", 12, "bold"),
+                      command=self._apply_and_close).pack(side="left", expand=True,
+                                                          fill="x", padx=(0, 6))
+        ctk.CTkButton(btn_row, text=t("wizard_close"),
+                      fg_color="#374151",
+                      height=42,
+                      command=self.destroy).pack(side="left", expand=True, fill="x")
+
+    def _apply_and_close(self):
+        app = self._app
+        best4 = self._best4
+        # Apply up to 4 filaments to slots T1-T4
+        for i, fil in enumerate(best4[:4]):
+            if fil is None:
+                continue
+            brand = fil.get("brand", "")
+            name = fil.get("name", "")
+            hex_c = fil.get("hex", "#808080")
+            td = fil.get("td", DEFAULT_TD)
+            s = app.slots[i]
+            # Try to set via library lookup
+            if brand in app.library:
+                match = next((f for f in app.library[brand] if f["name"] == name), None)
+                if match:
+                    s["brand"].set(brand)
+                    app.update_menu(i)
+                    s["color"].set(name)
+                    app.apply_f(i)
+                    continue
+            # Fallback: set hex + td directly
+            s["hex"].delete(0, "end")
+            s["hex"].insert(0, hex_c)
+            s["td"].delete(0, "end")
+            s["td"].insert(0, str(td))
+            s["preview"].configure(fg_color=hex_c)
+
+        # Optionally add virtual heads for all model colors
+        if self._add_virtual_var.get():
+            for hex_c in self._colors:
+                if len(app.virtual_fils) >= app._max_virtual:
+                    break
+                result = app._calc_for_color(hex_c, auto=True)
+                if result:
+                    app.add_to_virtual(result)
+
+        messagebox.showinfo(app.t("wizard_title"), app.t("wizard_applied"))
+        self.destroy()
+        setattr(app, "_3mf_wizard_win", None)
+
+    # ── HELPERS ────────────────────────────────────────────────────────────────
+
+    def _clear_container(self):
+        for w in self._container.winfo_children():
+            w.destroy()
 
 
 if __name__ == "__main__":

@@ -285,6 +285,25 @@ STRINGS = {
     "btn_slicer_guide": "📖 Slicer-Guide",
     "open_3mf_title": "3MF-Datei öffnen",
     "save_dialog_title": "Speichern",
+    # 3MF Farb-Wizard
+    "wizard_btn": "🧙 3MF Wizard",
+    "wizard_title": "3MF Farb-Wizard",
+    "wizard_step1": "Schritt 1 / 3 — 3MF Datei laden",
+    "wizard_step2": "Schritt 2 / 3 — Beste 4 Filamente suchen",
+    "wizard_step3": "Schritt 3 / 3 — Ergebnis",
+    "wizard_load_btn": "📂 3MF Datei öffnen",
+    "wizard_no_file": "Keine Datei geladen",
+    "wizard_colors_found": "{n} Farbe(n) im Modell gefunden",
+    "wizard_next": "Weiter →",
+    "wizard_info": "Durchsuche {n_lib} Filamente nach bester Kombination für {n_col} Zielfarben.",
+    "wizard_start": "Optimierung starten",
+    "wizard_checking": "Prüfe Kombination {i}/{total}…",
+    "wizard_avg_de": "Durchschnittliche ΔE: {de:.1f}",
+    "wizard_apply": "✅ Als T1–T4 übernehmen",
+    "wizard_add_virtual": "Virtuelle Köpfe für alle Modellfarben berechnen",
+    "wizard_close": "Schließen",
+    "wizard_applied": "Beste 4 Filamente als T1–T4 gesetzt.",
+    "wizard_coverage": "Farb-Abdeckung",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — PySide6 Edition",
@@ -530,6 +549,25 @@ STRINGS = {
     "btn_slicer_guide": "📖 Slicer Guide",
     "open_3mf_title": "Open 3MF File",
     "save_dialog_title": "Save",
+    # 3MF Color Wizard
+    "wizard_btn": "🧙 3MF Wizard",
+    "wizard_title": "3MF Color Wizard",
+    "wizard_step1": "Step 1 / 3 — Load 3MF File",
+    "wizard_step2": "Step 2 / 3 — Find Best 4 Filaments",
+    "wizard_step3": "Step 3 / 3 — Result",
+    "wizard_load_btn": "📂 Open 3MF File",
+    "wizard_no_file": "No file loaded",
+    "wizard_colors_found": "{n} color(s) found in model",
+    "wizard_next": "Next →",
+    "wizard_info": "Searching {n_lib} filaments for best combination for {n_col} target colors.",
+    "wizard_start": "Start Optimization",
+    "wizard_checking": "Checking combination {i}/{total}…",
+    "wizard_avg_de": "Average ΔE: {de:.1f}",
+    "wizard_apply": "✅ Apply as T1–T4",
+    "wizard_add_virtual": "Calculate virtual heads for all model colors",
+    "wizard_close": "Close",
+    "wizard_applied": "Best 4 filaments set as T1–T4.",
+    "wizard_coverage": "Color Coverage",
 },
 }
 
@@ -798,6 +836,66 @@ def lab_to_hex(lab):
 
 def delta_e(lab1, lab2):
     return math.sqrt(sum((a - b)**2 for a, b in zip(lab1, lab2)))
+
+def find_best_4_filaments(target_labs, library_fils, progress_cb=None):
+    """Find best 4 filaments from library to cover target_labs (list of Lab tuples).
+
+    Algorithm: k-medoids inspired greedy search
+    1. For each target color, find top-20 closest library filaments
+    2. Build candidate pool from union of all top-20 lists
+    3. Try all C(candidate_pool, 4) combinations (usually <5000)
+    4. For each combo: score = avg of min_delta_e per target across 4 slots
+    5. Return best combo
+
+    library_fils: list of {"name": str, "hex": str, "td": float, "brand": str, "lab": tuple}
+    Returns: (best_4_list, avg_de, scores_per_target)
+    """
+    if not target_labs or not library_fils:
+        return [], 99.0, []
+
+    # Step 1: for each target, find top-20 closest library filaments
+    candidate_ids = set()
+    for t_lab in target_labs:
+        distances = [(i, delta_e(t_lab, f["lab"])) for i, f in enumerate(library_fils)]
+        distances.sort(key=lambda x: x[1])
+        for idx, _ in distances[:20]:
+            candidate_ids.add(idx)
+
+    candidates = [library_fils[i] for i in sorted(candidate_ids)]
+
+    # Step 2: try all C(candidates, 4) combos
+    from itertools import combinations as _combs
+    best_combo = None
+    best_score = float("inf")
+    combos = list(_combs(range(len(candidates)), 4))
+
+    for ci, combo_idxs in enumerate(combos):
+        if progress_cb and ci % 100 == 0:
+            progress_cb(ci, len(combos))
+        combo = [candidates[i] for i in combo_idxs]
+        combo_labs = [f["lab"] for f in combo]
+        total_de = 0.0
+        for t_lab in target_labs:
+            min_de = min(delta_e(t_lab, c_lab) for c_lab in combo_labs)
+            total_de += min_de
+        avg_de = total_de / len(target_labs)
+        if avg_de < best_score:
+            best_score = avg_de
+            best_combo = combo
+
+    if best_combo is None:
+        best_combo = candidates[:4] if len(candidates) >= 4 else candidates
+
+    # Compute per-target scores for display
+    scores = []
+    if best_combo:
+        combo_labs = [f["lab"] for f in best_combo]
+        for t_lab in target_labs:
+            min_de = min(delta_e(t_lab, c_lab) for c_lab in combo_labs)
+            scores.append(min_de)
+
+    return best_combo, best_score, scores
+
 
 def safe_td(value):
     try:
@@ -1453,6 +1551,7 @@ class U1App(QMainWindow):
         self._last_sim_hex = None
         self._last_de = None
         self._target_hex = None
+        self._3mf_wizard = None  # singleton for 3MF Wizard
         self._gamut_timer = QTimer()
         self._gamut_timer.setSingleShot(True)
         self._gamut_timer.timeout.connect(self._run_gamut_update)
@@ -2530,6 +2629,7 @@ class U1App(QMainWindow):
             return btn
 
         _mkbtn(self.t("btn_3mf"), "#0f4c81", self._open_3mf_assistant)
+        _mkbtn(self.t("wizard_btn"), "#7c3aed", self._open_3mf_wizard)
         _mkbtn(self.t("btn_batch"), "#4338ca", self._open_batch_dialog)
         _mkbtn(self.t("btn_undo"), "#374151", self._undo_last)
         _mkbtn(self.t("btn_del_all"), "#7f1d1d", self._clear_virtual)
@@ -3818,6 +3918,43 @@ class U1App(QMainWindow):
         btn_row.addWidget(cancel_btn)
         layout.addLayout(btn_row)
         dlg.exec()
+
+    # ── 3MF FARB-WIZARD ────────────────────────────────────────────────────────
+
+    def _get_all_library_fils(self):
+        """Returns all filaments from DEFAULT_LIBRARY + user DB as list of dicts with lab."""
+        result = []
+        all_data = {}
+        for brand, fils in DEFAULT_LIBRARY.items():
+            all_data[brand] = fils[:]
+        for brand, fils in self.library.items():
+            if brand not in all_data:
+                all_data[brand] = []
+            all_data[brand] = all_data[brand] + [f for f in fils if f not in all_data[brand]]
+        for brand, fils in all_data.items():
+            for f in fils:
+                try:
+                    lab = rgb_to_lab(hex_to_rgb(f["hex"]))
+                    result.append({
+                        "brand": brand,
+                        "name": f["name"],
+                        "hex": f["hex"],
+                        "td": f.get("td", DEFAULT_TD),
+                        "lab": lab,
+                    })
+                except Exception:
+                    pass
+        return result
+
+    def _open_3mf_wizard(self):
+        if self._3mf_wizard is not None and self._3mf_wizard.isVisible():
+            self._3mf_wizard.raise_()
+            self._3mf_wizard.activateWindow()
+            return
+        dlg = ThreeMFWizardDialog(self)
+        self._3mf_wizard = dlg
+        dlg.finished.connect(lambda: setattr(self, "_3mf_wizard", None))
+        dlg.show()
 
     # ── EXPORT DIALOG ─────────────────────────────────────────────────────────
 
@@ -5762,6 +5899,387 @@ class U1App(QMainWindow):
             self._apply_target(hx)
         except Exception as e:
             QMessageBox.warning(self, "", str(e))
+
+
+# ── 3MF FARB-WIZARD (QDialog) ─────────────────────────────────────────────────
+
+class WizardOptimizerWorker(QThread):
+    progress = Signal(int, int)   # current, total
+    finished = Signal(list, float, list)  # best_4, avg_de, scores
+
+    def __init__(self, target_labs, library_fils):
+        super().__init__()
+        self._target_labs = target_labs
+        self._library_fils = library_fils
+
+    def run(self):
+        def progress_cb(i, total):
+            self.progress.emit(i, total)
+        best4, avg_de, scores = find_best_4_filaments(
+            self._target_labs, self._library_fils, progress_cb)
+        self.finished.emit(best4, avg_de, scores)
+
+
+class ThreeMFWizardDialog(QDialog):
+    """3-step wizard: load 3MF → optimize 4 filaments → show result & apply."""
+
+    def __init__(self, app):
+        super().__init__(app)
+        self._app = app
+        self.setWindowTitle(app.t("wizard_title"))
+        self.resize(720, 580)
+        self.setModal(False)
+
+        self._colors = []
+        self._best4 = []
+        self._avg_de = 0.0
+        self._scores = []
+        self._worker = None
+
+        self._main_layout = QVBoxLayout(self)
+        self._main_layout.setContentsMargins(0, 0, 0, 0)
+
+        self._stack = QStackedWidget()
+        self._main_layout.addWidget(self._stack)
+
+        self._page1 = self._build_page1()
+        self._page2 = self._build_page2()
+        self._page3 = self._build_page3()
+        self._stack.addWidget(self._page1)
+        self._stack.addWidget(self._page2)
+        self._stack.addWidget(self._page3)
+        self._stack.setCurrentIndex(0)
+
+    # ── PAGE 1 ─────────────────────────────────────────────────────────────────
+
+    def _build_page1(self):
+        app = self._app
+        t = app.t
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
+
+        title = QLabel(t("wizard_step1"))
+        title.setObjectName("section_title")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        load_btn = QPushButton(t("wizard_load_btn"))
+        load_btn.setFixedHeight(52)
+        load_btn.setStyleSheet("background-color: #0f4c81; font-weight: bold; font-size: 13px;")
+        load_btn.clicked.connect(self._load_file)
+        layout.addWidget(load_btn)
+
+        self._p1_path_lbl = QLabel(t("wizard_no_file"))
+        self._p1_path_lbl.setObjectName("hint")
+        self._p1_path_lbl.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self._p1_path_lbl)
+
+        self._p1_count_lbl = QLabel("")
+        self._p1_count_lbl.setAlignment(Qt.AlignCenter)
+        self._p1_count_lbl.setStyleSheet("color: #4ade80; font-weight: bold; font-size: 12px;")
+        layout.addWidget(self._p1_count_lbl)
+
+        # Swatches area
+        swatch_scroll = QScrollArea()
+        swatch_scroll.setWidgetResizable(True)
+        swatch_scroll.setFixedHeight(120)
+        swatch_container = QWidget()
+        self._p1_swatch_grid = QGridLayout(swatch_container)
+        self._p1_swatch_grid.setSpacing(4)
+        swatch_scroll.setWidget(swatch_container)
+        layout.addWidget(swatch_scroll)
+
+        layout.addStretch()
+
+        self._p1_next_btn = QPushButton(t("wizard_next"))
+        self._p1_next_btn.setFixedHeight(42)
+        self._p1_next_btn.setEnabled(False)
+        self._p1_next_btn.setStyleSheet(
+            "background-color: #15803d; font-weight: bold; font-size: 13px;")
+        self._p1_next_btn.clicked.connect(self._go_page2)
+        layout.addWidget(self._p1_next_btn)
+
+        return page
+
+    def _load_file(self):
+        app = self._app
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            app.t("wizard_load_btn"), "",
+            "3MF Files (*.3mf);;All Files (*.*)")
+        if not path:
+            return
+        colors, err = _parse_3mf_colors(path)
+        if not colors:
+            QMessageBox.information(self, app.t("wizard_title"),
+                                    err if err else app.t("wizard_no_file"))
+            return
+        self._colors = colors
+        self._p1_path_lbl.setText(os.path.basename(path))
+        self._p1_count_lbl.setText(app.t("wizard_colors_found", n=len(colors)))
+        # Draw swatches
+        while self._p1_swatch_grid.count():
+            item = self._p1_swatch_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        for i, hex_c in enumerate(colors[:24]):
+            swatch = QLabel()
+            swatch.setFixedSize(24, 24)
+            try:
+                r, g, b = hex_to_rgb(hex_c)
+                swatch.setStyleSheet(
+                    f"background-color: rgb({r},{g},{b}); border-radius: 3px;")
+            except Exception:
+                pass
+            swatch.setToolTip(hex_c)
+            self._p1_swatch_grid.addWidget(swatch, i // 12, i % 12)
+        self._p1_next_btn.setEnabled(True)
+
+    def _go_page2(self):
+        self._update_page2_info()
+        self._stack.setCurrentIndex(1)
+
+    # ── PAGE 2 ─────────────────────────────────────────────────────────────────
+
+    def _build_page2(self):
+        app = self._app
+        t = app.t
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
+
+        title = QLabel(t("wizard_step2"))
+        title.setObjectName("section_title")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        self._p2_info_lbl = QLabel("")
+        self._p2_info_lbl.setObjectName("hint")
+        self._p2_info_lbl.setWordWrap(True)
+        self._p2_info_lbl.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self._p2_info_lbl)
+
+        self._p2_progress = QProgressBar()
+        self._p2_progress.setRange(0, 100)
+        self._p2_progress.setValue(0)
+        layout.addWidget(self._p2_progress)
+
+        self._p2_status_lbl = QLabel("")
+        self._p2_status_lbl.setObjectName("hint")
+        self._p2_status_lbl.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self._p2_status_lbl)
+
+        layout.addStretch()
+
+        btn_row = QHBoxLayout()
+        self._p2_start_btn = QPushButton(t("wizard_start"))
+        self._p2_start_btn.setFixedHeight(42)
+        self._p2_start_btn.setStyleSheet(
+            "background-color: #2563eb; font-weight: bold; font-size: 13px;")
+        self._p2_start_btn.clicked.connect(self._start_optimization)
+        btn_row.addWidget(self._p2_start_btn)
+
+        self._p2_next_btn = QPushButton(t("wizard_next"))
+        self._p2_next_btn.setFixedHeight(42)
+        self._p2_next_btn.setEnabled(False)
+        self._p2_next_btn.setStyleSheet(
+            "background-color: #15803d; font-weight: bold; font-size: 13px;")
+        self._p2_next_btn.clicked.connect(self._go_page3)
+        btn_row.addWidget(self._p2_next_btn)
+
+        layout.addLayout(btn_row)
+        return page
+
+    def _update_page2_info(self):
+        app = self._app
+        lib = app._get_all_library_fils()
+        self._lib_fils = lib
+        self._p2_info_lbl.setText(
+            app.t("wizard_info", n_lib=len(lib), n_col=len(self._colors)))
+
+    def _start_optimization(self):
+        app = self._app
+        self._p2_start_btn.setEnabled(False)
+        self._p2_next_btn.setEnabled(False)
+        self._p2_progress.setValue(0)
+        target_labs = [rgb_to_lab(hex_to_rgb(h)) for h in self._colors]
+        self._worker = WizardOptimizerWorker(target_labs, self._lib_fils)
+        self._worker.progress.connect(self._on_worker_progress)
+        self._worker.finished.connect(self._on_worker_finished)
+        self._worker.start()
+
+    def _on_worker_progress(self, i, total):
+        app = self._app
+        pct = int(i / total * 100) if total > 0 else 0
+        self._p2_progress.setValue(pct)
+        self._p2_status_lbl.setText(
+            app.t("wizard_checking", i=i, total=total))
+
+    def _on_worker_finished(self, best4, avg_de, scores):
+        app = self._app
+        self._best4 = best4
+        self._avg_de = avg_de
+        self._scores = scores
+        self._p2_progress.setValue(100)
+        self._p2_status_lbl.setText(app.t("wizard_avg_de", de=avg_de))
+        self._p2_next_btn.setEnabled(True)
+
+    def _go_page3(self):
+        self._rebuild_page3()
+        self._stack.setCurrentIndex(2)
+
+    # ── PAGE 3 ─────────────────────────────────────────────────────────────────
+
+    def _build_page3(self):
+        # Placeholder; rebuilt dynamically in _rebuild_page3
+        page = QWidget()
+        page.setLayout(QVBoxLayout())
+        return page
+
+    def _rebuild_page3(self):
+        app = self._app
+        t = app.t
+        # Replace old page3 widget
+        old_page = self._stack.widget(2)
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(20, 14, 20, 14)
+        layout.setSpacing(8)
+
+        title = QLabel(t("wizard_step3"))
+        title.setObjectName("section_title")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        # 4 filament cards
+        cards_row = QHBoxLayout()
+        slot_labels = ["T1", "T2", "T3", "T4"]
+        best4 = (self._best4 + [None] * 4)[:4]
+        for i, fil in enumerate(best4):
+            card = QGroupBox(slot_labels[i])
+            card_layout = QVBoxLayout(card)
+            card_layout.setSpacing(3)
+            if fil:
+                hex_c = fil.get("hex", "#808080")
+                swatch = QLabel()
+                swatch.setFixedSize(40, 40)
+                try:
+                    r, g, b = hex_to_rgb(hex_c)
+                    swatch.setStyleSheet(
+                        f"background-color: rgb({r},{g},{b}); border-radius: 5px;")
+                except Exception:
+                    pass
+                swatch.setAlignment(Qt.AlignCenter)
+                card_layout.addWidget(swatch)
+                brand_lbl = QLabel(fil.get("brand", ""))
+                brand_lbl.setObjectName("hint")
+                brand_lbl.setWordWrap(True)
+                brand_lbl.setAlignment(Qt.AlignCenter)
+                card_layout.addWidget(brand_lbl)
+                name_lbl = QLabel(fil.get("name", ""))
+                name_lbl.setWordWrap(True)
+                name_lbl.setAlignment(Qt.AlignCenter)
+                name_lbl.setStyleSheet("font-weight: bold;")
+                card_layout.addWidget(name_lbl)
+                td_lbl = QLabel(f"TD={fil.get('td', DEFAULT_TD):.1f}")
+                td_lbl.setObjectName("hint")
+                td_lbl.setAlignment(Qt.AlignCenter)
+                card_layout.addWidget(td_lbl)
+            cards_row.addWidget(card)
+        layout.addLayout(cards_row)
+
+        # Summary
+        de_lbl = QLabel(t("wizard_avg_de", de=self._avg_de))
+        de_lbl.setAlignment(Qt.AlignCenter)
+        de_lbl.setStyleSheet(
+            f"color: {de_color(self._avg_de)}; font-weight: bold; font-size: 13px;")
+        layout.addWidget(de_lbl)
+
+        # Coverage table
+        cov_title = QLabel(t("wizard_coverage"))
+        cov_title.setObjectName("hint")
+        cov_title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(cov_title)
+
+        table = QTableWidget(len(self._colors), 4)
+        table.setHorizontalHeaderLabels(["Color", "Hex", "ΔE", "Quality"])
+        table.horizontalHeader().setStretchLastSection(True)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        table.setFixedHeight(130)
+        for i, (hex_c, sc) in enumerate(zip(self._colors, self._scores)):
+            color_item = QTableWidgetItem("")
+            try:
+                r, g, b = hex_to_rgb(hex_c)
+                color_item.setBackground(QColor(r, g, b))
+            except Exception:
+                pass
+            table.setItem(i, 0, color_item)
+            table.setItem(i, 1, QTableWidgetItem(hex_c))
+            de_item = QTableWidgetItem(f"{sc:.1f}")
+            de_item.setForeground(QColor(de_color(sc)))
+            table.setItem(i, 2, de_item)
+            q = ("✓" if sc < DE_GOOD else "~" if sc < DE_OK else "✗")
+            table.setItem(i, 3, QTableWidgetItem(q))
+        layout.addWidget(table)
+
+        # Add virtual heads checkbox
+        self._p3_add_virtual_chk = QCheckBox(t("wizard_add_virtual"))
+        layout.addWidget(self._p3_add_virtual_chk)
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        apply_btn = QPushButton(t("wizard_apply"))
+        apply_btn.setFixedHeight(42)
+        apply_btn.setStyleSheet(
+            "background-color: #15803d; font-weight: bold; font-size: 12px;")
+        apply_btn.clicked.connect(self._apply_and_close)
+        btn_row.addWidget(apply_btn)
+
+        close_btn = QPushButton(t("wizard_close"))
+        close_btn.setFixedHeight(42)
+        close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        # Swap widget in stack
+        self._stack.removeWidget(old_page)
+        old_page.deleteLater()
+        self._page3 = page
+        self._stack.insertWidget(2, page)
+
+    def _apply_and_close(self):
+        app = self._app
+        best4 = self._best4
+        for i, fil in enumerate(best4[:4]):
+            if fil is None:
+                continue
+            brand = fil.get("brand", "")
+            name = fil.get("name", "")
+            hex_c = fil.get("hex", "#808080")
+            td = fil.get("td", DEFAULT_TD)
+            # Use _apply_slot
+            app._apply_slot(i, {
+                "brand": brand,
+                "filament": name,
+                "name": name,
+                "hex": hex_c,
+                "td": td,
+            })
+
+        # Optionally calculate virtual heads for all model colors
+        if hasattr(self, "_p3_add_virtual_chk") and self._p3_add_virtual_chk.isChecked():
+            for hex_c in self._colors:
+                if len(app._virtual) >= app._max_virtual:
+                    break
+                result = app._calc_for_color(hex_c, auto=True)
+                if result:
+                    app.add_virtual(result)
+
+        QMessageBox.information(self, app.t("wizard_title"), app.t("wizard_applied"))
+        self.accept()
 
 
 # ── ENTRY POINT ───────────────────────────────────────────────────────────────
