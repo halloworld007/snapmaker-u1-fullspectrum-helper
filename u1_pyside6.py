@@ -1911,87 +1911,302 @@ def _parse_3mf_colors(filepath):
 class FilamentSearchDialog(QDialog):
     filament_selected = Signal(int, dict)  # slot_idx, filament_dict
 
-    def __init__(self, slot_idx, library, parent=None):
+    def __init__(self, slot_idx, library, parent=None, slot_hex=None):
         super().__init__(parent)
         self.slot_idx = slot_idx
-        self.library = library
+        self.slot_hex = slot_hex  # pre-fill color from slot
+        # deep-copy so orca imports don't mutate parent library
+        self.library = {k: list(v) for k, v in library.items()}
+        self._filter_hex = None   # active color filter
         self.setWindowTitle(f"Filament Search — Slot T{slot_idx + 1}")
-        self.resize(420, 500)
+        self.resize(500, 560)
         self._build_ui()
+        if slot_hex:
+            self._set_color_filter(slot_hex)
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
+        layout.setSpacing(5)
 
-        # Search input
+        # ── Color filter row ──────────────────────────────────────────────
+        color_row = QHBoxLayout()
+        color_lbl = QLabel("Farbfilter:")
+        color_row.addWidget(color_lbl)
+
+        self._color_swatch = QPushButton()
+        self._color_swatch.setFixedSize(28, 28)
+        self._color_swatch.setToolTip("Farbe wählen (Ergebnisse nach ΔE sortiert)")
+        self._color_swatch.clicked.connect(self._pick_color)
+        color_row.addWidget(self._color_swatch)
+
+        self._color_hex_edit = QLineEdit()
+        self._color_hex_edit.setPlaceholderText("#RRGGBB  (leer = kein Filter)")
+        self._color_hex_edit.setMaximumWidth(120)
+        self._color_hex_edit.textChanged.connect(self._on_color_hex_changed)
+        color_row.addWidget(self._color_hex_edit)
+
+        slot_btn = QPushButton("🎯 Slot-Farbe")
+        slot_btn.setToolTip("Farbe aus aktuellem Slot übernehmen")
+        slot_btn.clicked.connect(self._use_slot_color)
+        color_row.addWidget(slot_btn)
+
+        clear_btn = QPushButton("✕")
+        clear_btn.setFixedWidth(28)
+        clear_btn.setToolTip("Farbfilter löschen")
+        clear_btn.clicked.connect(self._clear_color_filter)
+        color_row.addWidget(clear_btn)
+        color_row.addStretch()
+        layout.addLayout(color_row)
+
+        # ── Text search row ───────────────────────────────────────────────
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("Search filaments...")
+        self.search_edit.setPlaceholderText("Name / Brand suchen...")
         layout.addWidget(self.search_edit)
 
-        # Brand filter
+        # ── Brand filter ──────────────────────────────────────────────────
         brand_row = QHBoxLayout()
         brand_row.addWidget(QLabel("Brand:"))
         self.brand_combo = QComboBox()
-        self.brand_combo.addItem("All Brands")
+        self.brand_combo.addItem("Alle Brands")
         for brand in sorted(self.library.keys()):
             self.brand_combo.addItem(brand)
         brand_row.addWidget(self.brand_combo, 1)
+
+        orca_btn = QPushButton("📂 OrcaSlicer importieren")
+        orca_btn.setToolTip("Lokale OrcaSlicer-Profile in Suche laden")
+        orca_btn.clicked.connect(self._import_orca_profiles)
+        brand_row.addWidget(orca_btn)
         layout.addLayout(brand_row)
 
-        # Results list
+        # ── Results list ─────────────────────────────────────────────────
         self.results_list = QListWidget()
         self.results_list.setAlternatingRowColors(True)
         layout.addWidget(self.results_list, 1)
 
-        # Buttons
+        # ── Status label ─────────────────────────────────────────────────
+        self._status_lbl = QLabel("")
+        self._status_lbl.setObjectName("hint")
+        layout.addWidget(self._status_lbl)
+
+        # ── Buttons ───────────────────────────────────────────────────────
         btn_row = QHBoxLayout()
-        self.select_btn = QPushButton("Select")
+        self.select_btn = QPushButton("Auswählen")
         self.select_btn.setObjectName("btn_green")
-        cancel_btn = QPushButton("Cancel")
+        cancel_btn = QPushButton("Abbrechen")
         btn_row.addWidget(self.select_btn)
         btn_row.addWidget(cancel_btn)
         layout.addLayout(btn_row)
 
-        # Connections
+        # ── Connections ───────────────────────────────────────────────────
         self._debounce = QTimer()
         self._debounce.setSingleShot(True)
         self._debounce.timeout.connect(self._update_results)
-        self.search_edit.textChanged.connect(lambda: self._debounce.start(250))
+        self.search_edit.textChanged.connect(lambda: self._debounce.start(200))
         self.brand_combo.currentIndexChanged.connect(self._update_results)
         self.results_list.itemDoubleClicked.connect(self._on_select)
         self.select_btn.clicked.connect(self._on_select)
         cancel_btn.clicked.connect(self.reject)
 
+        self._refresh_swatch()
         self._update_results()
+
+    # ── Color filter helpers ─────────────────────────────────────────────
+
+    def _refresh_swatch(self):
+        if self._filter_hex:
+            self._color_swatch.setStyleSheet(
+                f"background:{self._filter_hex}; border:2px solid #888; border-radius:4px;")
+        else:
+            self._color_swatch.setStyleSheet(
+                "background:#444; border:2px solid #888; border-radius:4px;")
+
+    def _pick_color(self):
+        initial = QColor(self._filter_hex) if self._filter_hex else QColor("#808080")
+        col = QColorDialog.getColor(initial, self, "Zielfarbe wählen")
+        if col.isValid():
+            self._set_color_filter(col.name().upper())
+
+    def _set_color_filter(self, hex_color):
+        self._filter_hex = hex_color
+        self._color_hex_edit.blockSignals(True)
+        self._color_hex_edit.setText(hex_color)
+        self._color_hex_edit.blockSignals(False)
+        self._refresh_swatch()
+        self._update_results()
+
+    def _on_color_hex_changed(self, text):
+        text = text.strip()
+        if not text.startswith("#"):
+            text = "#" + text
+        if len(text) == 7:
+            try:
+                QColor(text)
+                self._filter_hex = text.upper()
+                self._refresh_swatch()
+                self._debounce.start(300)
+                return
+            except Exception:
+                pass
+        if not text or text == "#":
+            self._filter_hex = None
+            self._refresh_swatch()
+            self._debounce.start(300)
+
+    def _clear_color_filter(self):
+        self._filter_hex = None
+        self._color_hex_edit.blockSignals(True)
+        self._color_hex_edit.clear()
+        self._color_hex_edit.blockSignals(False)
+        self._refresh_swatch()
+        self._update_results()
+
+    def _use_slot_color(self):
+        if self.slot_hex:
+            self._set_color_filter(self.slot_hex)
+        else:
+            QMessageBox.information(self, "Info", "Kein Slot-Farbwert verfügbar.")
+
+    # ── OrcaSlicer local import ──────────────────────────────────────────
+
+    def _find_orca_dirs(self):
+        import platform
+        found = []
+        seen = set()
+        def add(path):
+            norm = os.path.normcase(os.path.normpath(path))
+            if norm not in seen and os.path.isdir(path):
+                seen.add(norm)
+                found.append(path)
+        if platform.system() == "Windows":
+            appdata = os.environ.get("APPDATA", "")
+            if appdata and os.path.isdir(appdata):
+                for entry in os.scandir(appdata):
+                    if not entry.is_dir(): continue
+                    if any(x in entry.name.lower() for x in ["orca", "snapmaker_orca", "bambu"]):
+                        for sub in ["user/default/filament", "user/filament"]:
+                            add(os.path.join(entry.path, sub))
+        elif platform.system() == "Darwin":
+            base = os.path.expanduser("~/Library/Application Support")
+            if os.path.isdir(base):
+                for entry in os.scandir(base):
+                    if entry.is_dir() and "orca" in entry.name.lower():
+                        for sub in ["user/default/filament", "user/filament"]:
+                            add(os.path.join(entry.path, sub))
+        else:
+            base = os.path.expanduser("~/.config")
+            if os.path.isdir(base):
+                for entry in os.scandir(base):
+                    if entry.is_dir() and "orca" in entry.name.lower():
+                        add(os.path.join(entry.path, "user", "default", "filament"))
+        return found
+
+    def _import_orca_profiles(self):
+        dirs = self._find_orca_dirs()
+        if not dirs:
+            QMessageBox.information(self, "OrcaSlicer", "Keine OrcaSlicer-Installation gefunden.")
+            return
+        brand = "OrcaSlicer (lokal)"
+        imported = []
+        for d in dirs:
+            for fname in os.listdir(d):
+                if not fname.endswith(".json"):
+                    continue
+                try:
+                    with open(os.path.join(d, fname), "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    name = data.get("filament_settings_id") or data.get("name") or fname[:-5]
+                    if isinstance(name, list): name = name[0]
+                    colors = data.get("filament_colour", ["#808080"])
+                    if isinstance(colors, list) and colors:
+                        hex_c = colors[0].strip()
+                    else:
+                        hex_c = "#808080"
+                    if not hex_c.startswith("#"):
+                        hex_c = "#" + hex_c
+                    td_raw = data.get("filament_density", [None])
+                    if isinstance(td_raw, list): td_raw = td_raw[0]
+                    try:
+                        td = float(td_raw) if td_raw and td_raw != "nil" else 1.24
+                    except Exception:
+                        td = 1.24
+                    imported.append({"name": name, "hex": hex_c, "td": td})
+                except Exception:
+                    continue
+        if not imported:
+            QMessageBox.information(self, "OrcaSlicer", "Keine Profile gefunden.")
+            return
+        self.library[brand] = imported
+        # add to brand combo if not present
+        existing = [self.brand_combo.itemText(i) for i in range(self.brand_combo.count())]
+        if brand not in existing:
+            self.brand_combo.addItem(brand)
+        self._status_lbl.setText(f"✅ {len(imported)} OrcaSlicer-Profile geladen")
+        self._update_results()
+
+    # ── Results ──────────────────────────────────────────────────────────
 
     def _update_results(self):
         self.results_list.clear()
-        q = self.search_edit.text().lower()
+        q = self.search_edit.text().lower().strip()
         brand_filter = self.brand_combo.currentText()
-        count = 0
+
+        # Compute target lab if color filter active
+        target_lab = None
+        if self._filter_hex:
+            try:
+                target_lab = rgb_to_lab(hex_to_rgb(self._filter_hex))
+            except Exception:
+                target_lab = None
+
+        # Collect matching candidates
+        candidates = []
         for brand, filaments in self.library.items():
-            if brand_filter != "All Brands" and brand != brand_filter:
+            if brand_filter != "Alle Brands" and brand != brand_filter:
                 continue
             for fil in filaments:
                 name = fil.get("name", "")
                 if q and q not in brand.lower() and q not in name.lower():
                     continue
-                if count >= 200:
-                    break
-                count += 1
-                display = f"{brand} — {name}  ({fil.get('hex', '')})"
-                item = QListWidgetItem(display)
-                item.setData(Qt.UserRole, {"brand": brand, **fil})
-                hex_c = fil.get("hex", "#808080")
-                try:
-                    r, g, b = hex_to_rgb(hex_c)
-                    item.setBackground(QColor(r, g, b))
-                    lum = 0.299 * r + 0.587 * g + 0.114 * b
-                    item.setForeground(QColor("#111111" if lum > 128 else "#eeeeee"))
-                except Exception:
-                    pass
-                self.results_list.addItem(item)
+                de = None
+                if target_lab:
+                    try:
+                        fil_lab = rgb_to_lab(hex_to_rgb(fil.get("hex", "#808080")))
+                        de = delta_e(target_lab, fil_lab)
+                    except Exception:
+                        de = 9999.0
+                candidates.append((de, brand, fil))
+
+        # Sort: by ΔE if color filter active, else by brand+name
+        if target_lab:
+            candidates.sort(key=lambda x: (x[0] if x[0] is not None else 9999))
+        else:
+            candidates.sort(key=lambda x: (x[1].lower(), x[2].get("name", "").lower()))
+
+        for i, (de, brand, fil) in enumerate(candidates[:300]):
+            name = fil.get("name", "")
+            hex_c = fil.get("hex", "#808080")
+            if de is not None:
+                display = f"ΔE {de:5.1f}  {brand} — {name}  ({hex_c})"
+            else:
+                display = f"{brand} — {name}  ({hex_c})"
+            item = QListWidgetItem(display)
+            item.setData(Qt.UserRole, {"brand": brand, **fil})
+            try:
+                r, g, b = hex_to_rgb(hex_c)
+                item.setBackground(QColor(r, g, b))
+                lum = 0.299 * r + 0.587 * g + 0.114 * b
+                item.setForeground(QColor("#111111" if lum > 128 else "#eeeeee"))
+            except Exception:
+                pass
+            self.results_list.addItem(item)
+
+        total = len(candidates)
+        shown = min(300, total)
+        if target_lab:
+            self._status_lbl.setText(f"{shown}/{total} Filamente — sortiert nach ΔE (CIEDE2000)")
+        else:
+            self._status_lbl.setText(f"{shown}/{total} Filamente")
 
     def _on_select(self):
         item = self.results_list.currentItem()
@@ -4017,7 +4232,13 @@ class U1App(QMainWindow):
             existing.raise_()
             existing.activateWindow()
             return
-        dlg = FilamentSearchDialog(slot_idx, self.library, self)
+        # get current slot hex to pre-fill color filter
+        slot_hex = None
+        if hasattr(self, "_slots") and slot_idx < len(self._slots):
+            h = self._slots[slot_idx]["hex_edit"].text().strip()
+            if len(h.lstrip("#")) == 6:
+                slot_hex = h if h.startswith("#") else "#" + h
+        dlg = FilamentSearchDialog(slot_idx, self.library, self, slot_hex=slot_hex)
         dlg.filament_selected.connect(self._on_filament_search_select)
         self._search_wins[slot_idx] = dlg
         dlg.show()
