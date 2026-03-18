@@ -849,7 +849,60 @@ def lab_to_hex(lab):
     return "#{:02X}{:02X}{:02X}".format(int(gamma(r)*255), int(gamma(g)*255), int(gamma(b_)*255))
 
 def delta_e(lab1, lab2):
-    return math.sqrt(sum((a - b)**2 for a, b in zip(lab1, lab2)))
+    """CIEDE2000 perceptual color difference — more accurate than simple ΔE76."""
+    L1, a1, b1 = lab1
+    L2, a2, b2 = lab2
+    # C*ab
+    C1 = math.sqrt(a1**2 + b1**2)
+    C2 = math.sqrt(a2**2 + b2**2)
+    C_avg = (C1 + C2) / 2.0
+    C_avg7 = C_avg**7
+    G = 0.5 * (1.0 - math.sqrt(C_avg7 / (C_avg7 + 6103515625.0)))  # 25^7
+    a1p = a1 * (1.0 + G);  a2p = a2 * (1.0 + G)
+    C1p = math.sqrt(a1p**2 + b1**2)
+    C2p = math.sqrt(a2p**2 + b2**2)
+    def _h(ap, bp):
+        if ap == 0.0 and bp == 0.0: return 0.0
+        v = math.degrees(math.atan2(bp, ap))
+        return v + 360.0 if v < 0.0 else v
+    h1p = _h(a1p, b1);  h2p = _h(a2p, b2)
+    dLp = L2 - L1
+    dCp = C2p - C1p
+    if C1p * C2p == 0.0:
+        dhp = 0.0
+    elif abs(h2p - h1p) <= 180.0:
+        dhp = h2p - h1p
+    elif h2p - h1p > 180.0:
+        dhp = h2p - h1p - 360.0
+    else:
+        dhp = h2p - h1p + 360.0
+    dHp = 2.0 * math.sqrt(C1p * C2p) * math.sin(math.radians(dhp / 2.0))
+    Lp_avg = (L1 + L2) / 2.0
+    Cp_avg = (C1p + C2p) / 2.0
+    if C1p * C2p == 0.0:
+        hp_avg = h1p + h2p
+    elif abs(h1p - h2p) <= 180.0:
+        hp_avg = (h1p + h2p) / 2.0
+    elif h1p + h2p < 360.0:
+        hp_avg = (h1p + h2p + 360.0) / 2.0
+    else:
+        hp_avg = (h1p + h2p - 360.0) / 2.0
+    T = (1.0
+         - 0.17 * math.cos(math.radians(hp_avg - 30.0))
+         + 0.24 * math.cos(math.radians(2.0 * hp_avg))
+         + 0.32 * math.cos(math.radians(3.0 * hp_avg + 6.0))
+         - 0.20 * math.cos(math.radians(4.0 * hp_avg - 63.0)))
+    SL = 1.0 + 0.015 * (Lp_avg - 50.0)**2 / math.sqrt(20.0 + (Lp_avg - 50.0)**2)
+    SC = 1.0 + 0.045 * Cp_avg
+    SH = 1.0 + 0.015 * Cp_avg * T
+    Cp_avg7 = Cp_avg**7
+    RC = 2.0 * math.sqrt(Cp_avg7 / (Cp_avg7 + 6103515625.0))
+    d_theta = 30.0 * math.exp(-((hp_avg - 275.0) / 25.0)**2)
+    RT = -math.sin(math.radians(2.0 * d_theta)) * RC
+    return math.sqrt(
+        (dLp / SL)**2 + (dCp / SC)**2 + (dHp / SH)**2
+        + RT * (dCp / SC) * (dHp / SH)
+    )
 
 def find_best_4_filaments(target_labs, library_fils, progress_cb=None):
     """Find best 4 filaments from library to cover target_labs.
@@ -6261,6 +6314,19 @@ class U1App(QMainWindow):
 
 # ── 3MF FARB-WIZARD (QDialog) ─────────────────────────────────────────────────
 
+class ThreeMFLoaderWorker(QThread):
+    """Loads and parses a .3mf file in background — keeps UI responsive."""
+    finished = Signal(list, str)   # colors, error_msg
+
+    def __init__(self, path):
+        super().__init__()
+        self._path = path
+
+    def run(self):
+        colors, err = _parse_3mf_colors(self._path)
+        self.finished.emit(colors or [], err or "")
+
+
 class WizardOptimizerWorker(QThread):
     progress = Signal(int, int)   # current, total
     finished = Signal(list, float, list)  # best_4, avg_de, scores
@@ -6351,6 +6417,11 @@ class ThreeMFWizardDialog(QDialog):
 
         layout.addStretch()
 
+        self._p1_spinner_lbl = QLabel("")
+        self._p1_spinner_lbl.setAlignment(Qt.AlignCenter)
+        self._p1_spinner_lbl.setStyleSheet("color: #94a3b8; font-size: 11px;")
+        layout.addWidget(self._p1_spinner_lbl)
+
         self._p1_next_btn = QPushButton(t("wizard_next"))
         self._p1_next_btn.setFixedHeight(42)
         self._p1_next_btn.setEnabled(False)
@@ -6359,6 +6430,7 @@ class ThreeMFWizardDialog(QDialog):
         self._p1_next_btn.clicked.connect(self._go_page2)
         layout.addWidget(self._p1_next_btn)
 
+        self._p1_load_btn = None   # filled in after build
         return page
 
     def _load_file(self):
@@ -6369,19 +6441,35 @@ class ThreeMFWizardDialog(QDialog):
             "3MF Files (*.3mf);;All Files (*.*)")
         if not path:
             return
-        colors, err = _parse_3mf_colors(path)
-        if not colors:
-            QMessageBox.information(self, app.t("wizard_title"),
-                                    err if err else app.t("wizard_no_file"))
-            return
-        self._colors = colors
+
+        # Show loading spinner, disable buttons
         self._p1_path_lbl.setText(os.path.basename(path))
-        self._p1_count_lbl.setText(app.t("wizard_colors_found", n=len(colors)))
-        # Draw swatches
+        self._p1_count_lbl.setText("")
+        self._p1_spinner_lbl.setText("⏳ Lade & analysiere 3MF …")
+        self._p1_next_btn.setEnabled(False)
+
+        # Clear old swatches
         while self._p1_swatch_grid.count():
             item = self._p1_swatch_grid.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+
+        # Run in background thread
+        self._loader_worker = ThreeMFLoaderWorker(path)
+        self._loader_worker.finished.connect(self._on_3mf_loaded)
+        self._loader_worker.start()
+
+    def _on_3mf_loaded(self, colors, err):
+        app = self._app
+        self._p1_spinner_lbl.setText("")
+        if not colors:
+            self._p1_count_lbl.setText(
+                f"⚠ {err}" if err else app.t("wizard_no_file"))
+            return
+        self._colors = colors
+        self._p1_count_lbl.setText(
+            app.t("wizard_colors_found", n=len(colors)))
+        # Draw swatches
         for i, hex_c in enumerate(colors[:24]):
             swatch = QLabel()
             swatch.setFixedSize(24, 24)
