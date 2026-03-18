@@ -219,6 +219,13 @@ STRINGS = {
     "btn_palette": "🖼 Palette aus Bild",
     "palette_title": "Palette aus Bild",
     "palette_btn_add": "Alle berechnen & hinzufügen",
+    "palette_indexed_hint": "Indiziertes PNG — alle {n} Palettenfarben geladen",
+    "obj_btn": "📦 OBJ/MTL",
+    "obj_title": "OBJ/MTL Farbanalyse",
+    "obj_no_colors": "Keine Farben gefunden. MTL-Datei vorhanden?",
+    "obj_no_pil": "Pillow nicht installiert — Textur-Extraktion nicht möglich.\npip install Pillow",
+    "obj_filetypes": "OBJ Dateien",
+    "3mf_texture_hint": "Farben aus eingebetteten Texturen extrahiert",
     "remap_title": "3MF Extruder-Remap",
     "remap_keep": "(unverändert)",
     "remap_btn_write": "3MF schreiben",
@@ -483,6 +490,13 @@ STRINGS = {
     "btn_palette": "🖼 Palette from Image",
     "palette_title": "Palette from Image",
     "palette_btn_add": "Calculate all & add",
+    "palette_indexed_hint": "Indexed PNG — all {n} palette colors loaded",
+    "obj_btn": "📦 OBJ/MTL",
+    "obj_title": "OBJ/MTL Color Analysis",
+    "obj_no_colors": "No colors found. Is the MTL file present?",
+    "obj_no_pil": "Pillow not installed — texture extraction unavailable.\npip install Pillow",
+    "obj_filetypes": "OBJ Files",
+    "3mf_texture_hint": "Colors extracted from embedded textures",
     "remap_title": "3MF Extruder Remap",
     "remap_keep": "(keep unchanged)",
     "remap_btn_write": "Write 3MF",
@@ -1058,6 +1072,46 @@ def compute_layer_schedule(sequence, n_layers=12):
 
 HEX_RE = re.compile(r'#([0-9A-Fa-f]{6})\b')
 
+def _extract_colors_from_3mf_textures(zip_ref):
+    """Extract dominant colors from PNG/JPG textures embedded in a .3mf zip."""
+    colors = []
+    if not _HAS_PIL:
+        return colors
+    for name in zip_ref.namelist():
+        lname = name.lower()
+        if lname.endswith('.png') or lname.endswith('.jpg') or lname.endswith('.jpeg'):
+            try:
+                with zip_ref.open(name) as img_file:
+                    img = _PILImage.open(img_file)
+                    if img.mode == 'P':
+                        palette = img.getpalette()
+                        used_indices = set(img.getdata())
+                        for idx in sorted(used_indices):
+                            r = palette[idx * 3]
+                            g = palette[idx * 3 + 1]
+                            b = palette[idx * 3 + 2]
+                            brightness = (r + g + b) / 3
+                            if brightness < 10 or brightness > 245:
+                                continue
+                            colors.append(f"#{r:02X}{g:02X}{b:02X}")
+                    else:
+                        img = img.convert('RGB')
+                        quantized = img.quantize(colors=16,
+                                                 method=_PILImage.Quantize.MEDIANCUT)
+                        palette_img = quantized.convert('RGB')
+                        palette = palette_img.getpalette()
+                        if palette:
+                            for i in range(0, min(len(palette), 16 * 3), 3):
+                                r, g, b = palette[i], palette[i + 1], palette[i + 2]
+                                brightness = (r + g + b) / 3
+                                if brightness < 10 or brightness > 245:
+                                    continue
+                                colors.append(f"#{r:02X}{g:02X}{b:02X}")
+            except Exception:
+                pass
+    return colors
+
+
 def parse_3mf_colors(filepath):
     found = set()
     try:
@@ -1082,12 +1136,111 @@ def parse_3mf_colors(filepath):
                         pass
                 for m in HEX_RE.finditer(content):
                     found.add('#' + m.group(1).upper())
+            # FIX 1: Also extract colors from embedded PNG/JPG textures
+            texture_colors = _extract_colors_from_3mf_textures(zf)
+            extracted_so_far = list(found)
+            for hx in texture_colors:
+                try:
+                    t_lab = rgb_to_lab(hex_to_rgb(hx))
+                    if all(delta_e(t_lab, rgb_to_lab(hex_to_rgb(ex))) >= 3.0
+                           for ex in extracted_so_far):
+                        found.add(hx)
+                        extracted_so_far.append(hx)
+                except Exception:
+                    found.add(hx)
+                    extracted_so_far.append(hx)
     except Exception as e:
         return [], str(e)
     trivial = {"#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF",
                "#AAAAAA", "#333333", "#CCCCCC"}
     meaningful = [c for c in found if c not in trivial]
     return (meaningful if meaningful else list(found)), None
+
+
+def parse_obj_mtl_colors(obj_path):
+    """Extract colors from OBJ+MTL file combination.
+    Returns list of hex color strings.
+    """
+    colors = []
+    obj_dir = os.path.dirname(obj_path)
+
+    # Find MTL file(s) referenced in OBJ
+    mtl_files = []
+    try:
+        with open(obj_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('mtllib '):
+                    mtl_name = line[7:].strip()
+                    mtl_path = os.path.join(obj_dir, mtl_name)
+                    if os.path.exists(mtl_path):
+                        mtl_files.append(mtl_path)
+    except Exception:
+        pass
+
+    if not mtl_files:
+        base = os.path.splitext(obj_path)[0]
+        candidate = base + '.mtl'
+        if os.path.exists(candidate):
+            mtl_files.append(candidate)
+
+    for mtl_path in mtl_files:
+        try:
+            with open(mtl_path, 'r', encoding='utf-8', errors='replace') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.lower().startswith('kd '):
+                        parts = line.split()
+                        if len(parts) >= 4:
+                            try:
+                                r = max(0, min(255, int(float(parts[1]) * 255)))
+                                g = max(0, min(255, int(float(parts[2]) * 255)))
+                                b = max(0, min(255, int(float(parts[3]) * 255)))
+                                colors.append(f"#{r:02X}{g:02X}{b:02X}")
+                            except ValueError:
+                                pass
+                    elif line.lower().startswith('map_kd '):
+                        tex_name = line.split(None, 1)[1].strip()
+                        tex_path = os.path.join(obj_dir, tex_name)
+                        if os.path.exists(tex_path) and _HAS_PIL:
+                            try:
+                                img = _PILImage.open(tex_path)
+                                if img.mode == 'P':
+                                    palette = img.getpalette()
+                                    used = set(img.getdata())
+                                    for idx in sorted(used):
+                                        r = palette[idx * 3]
+                                        g = palette[idx * 3 + 1]
+                                        b = palette[idx * 3 + 2]
+                                        if (r + g + b) / 3 < 10 or (r + g + b) / 3 > 245:
+                                            continue
+                                        colors.append(f"#{r:02X}{g:02X}{b:02X}")
+                                else:
+                                    img = img.convert('RGB')
+                                    q = img.quantize(colors=16,
+                                                     method=_PILImage.Quantize.MEDIANCUT)
+                                    pal = q.convert('RGB').getpalette()
+                                    if pal:
+                                        for i in range(0, min(len(pal), 48), 3):
+                                            r, g, b = pal[i], pal[i + 1], pal[i + 2]
+                                            if (r + g + b) / 3 < 10 or (r + g + b) / 3 > 245:
+                                                continue
+                                            colors.append(f"#{r:02X}{g:02X}{b:02X}")
+                            except Exception:
+                                pass
+        except Exception:
+            pass
+
+    # Deduplicate by ΔE < 3
+    unique = []
+    for hx in colors:
+        try:
+            lab = rgb_to_lab(hex_to_rgb(hx))
+            if all(delta_e(lab, rgb_to_lab(hex_to_rgb(u))) >= 3.0 for u in unique):
+                unique.append(hx)
+        except Exception:
+            pass
+    return unique
 
 # ── DARK STYLESHEET ───────────────────────────────────────────────────────────
 
@@ -1423,6 +1576,19 @@ def _parse_3mf_colors(filepath):
                         pass
                 for m in HEX_RE.finditer(content):
                     found.add('#' + m.group(1).upper())
+            # FIX 1: Also extract colors from embedded PNG/JPG textures
+            texture_colors = _extract_colors_from_3mf_textures(zf)
+            extracted_so_far = list(found)
+            for hx in texture_colors:
+                try:
+                    t_lab = rgb_to_lab(hex_to_rgb(hx))
+                    if all(delta_e(t_lab, rgb_to_lab(hex_to_rgb(ex))) >= 3.0
+                           for ex in extracted_so_far):
+                        found.add(hx)
+                        extracted_so_far.append(hx)
+                except Exception:
+                    found.add(hx)
+                    extracted_so_far.append(hx)
     except Exception as e:
         return [], str(e)
     trivial = {"#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF",
@@ -2629,6 +2795,7 @@ class U1App(QMainWindow):
             return btn
 
         _mkbtn(self.t("btn_3mf"), "#0f4c81", self._open_3mf_assistant)
+        _mkbtn(self.t("obj_btn"), "#065f46", self._open_obj_assistant)
         _mkbtn(self.t("wizard_btn"), "#7c3aed", self._open_3mf_wizard)
         _mkbtn(self.t("btn_batch"), "#4338ca", self._open_batch_dialog)
         _mkbtn(self.t("btn_undo"), "#374151", self._undo_last)
@@ -3919,6 +4086,147 @@ class U1App(QMainWindow):
         layout.addLayout(btn_row)
         dlg.exec()
 
+    # ── OBJ/MTL ASSISTANT ─────────────────────────────────────────────────────
+
+    def _open_obj_assistant(self, path=None):
+        """Open OBJ/MTL color assistant dialog."""
+        if path is None:
+            path, _ = QFileDialog.getOpenFileName(
+                self, self.t("obj_title"), "",
+                f"{self.t('obj_filetypes')} (*.obj);;All Files (*.*)")
+        if not path:
+            return
+
+        colors = parse_obj_mtl_colors(path)
+        if not colors:
+            if not _HAS_PIL:
+                QMessageBox.warning(self, self.t("obj_title"), self.t("obj_no_pil"))
+            else:
+                QMessageBox.information(self, self.t("obj_title"), self.t("obj_no_colors"))
+            return
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"{self.t('obj_title')} — {os.path.basename(path)}")
+        dlg.resize(860, 680)
+        layout = QVBoxLayout(dlg)
+
+        layout.addWidget(QLabel(self.t("3mf_analysis_title", n=len(colors))))
+
+        slots = self._slot_filaments()
+        basis_txt = self.t("3mf_basis",
+                           t1=slots[0]["hex"], t2=slots[1]["hex"],
+                           t3=slots[2]["hex"], t4=slots[3]["hex"])
+        basis_lbl = QLabel(basis_txt)
+        basis_lbl.setObjectName("hint")
+        layout.addWidget(basis_lbl)
+
+        opt_check = QCheckBox(self.t("3mf_optimizer"))
+        layout.addWidget(opt_check)
+
+        prog_lbl = QLabel(self.t("3mf_ready"))
+        prog_lbl.setObjectName("hint")
+        layout.addWidget(prog_lbl)
+
+        # Results table
+        table = QTableWidget(len(colors), 5)
+        table.setHorizontalHeaderLabels([
+            "#", self.t("3mf_col_target"), self.t("3mf_col_seq"),
+            self.t("3mf_col_sim"), self.t("3mf_col_quality")])
+        table.horizontalHeader().setStretchLastSection(True)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        layout.addWidget(table, 1)
+
+        results = [None] * len(colors)
+        include_vars = [True] * len(colors)
+
+        def render_rows():
+            for idx, hex_c in enumerate(colors[:self._max_virtual]):
+                table.setItem(idx, 0, QTableWidgetItem(str(idx + 1)))
+                tgt_item = QTableWidgetItem("")
+                try:
+                    rr, gg, bb = hex_to_rgb(hex_c)
+                    tgt_item.setBackground(QColor(rr, gg, bb))
+                except Exception:
+                    pass
+                table.setItem(idx, 1, tgt_item)
+                r = results[idx]
+                if r:
+                    table.setItem(idx, 2, QTableWidgetItem(r["sequence"]))
+                    sim_item = QTableWidgetItem("")
+                    try:
+                        sr, sg, sb = hex_to_rgb(r["sim_hex"])
+                        sim_item.setBackground(QColor(sr, sg, sb))
+                    except Exception:
+                        pass
+                    table.setItem(idx, 3, sim_item)
+                    de_item = QTableWidgetItem(_de_label_text(r["de"], self.lang))
+                    de_item.setForeground(QColor(_de_color(r["de"])))
+                    table.setItem(idx, 4, de_item)
+                else:
+                    table.setItem(idx, 2, QTableWidgetItem(self.t("3mf_not_calc")))
+                    table.setItem(idx, 3, QTableWidgetItem(""))
+                    table.setItem(idx, 4, QTableWidgetItem(""))
+
+        render_rows()
+
+        chk_row = QHBoxLayout()
+        chk_all = QCheckBox("Select All")
+        chk_all.setChecked(True)
+
+        def on_chk_all(state):
+            for i in range(len(include_vars)):
+                include_vars[i] = bool(state)
+        chk_all.stateChanged.connect(on_chk_all)
+        chk_row.addWidget(chk_all)
+        layout.addLayout(chk_row)
+
+        def run_all():
+            opt = opt_check.isChecked()
+            for idx in range(min(len(colors), self._max_virtual)):
+                prog_lbl.setText(self.t("3mf_progress", i=idx + 1,
+                                         total=min(len(colors), self._max_virtual),
+                                         c=colors[idx]))
+                QApplication.processEvents()
+                r = self._calc_for_color(
+                    colors[idx], optimizer=opt,
+                    seq_len=self._len_spin.value(),
+                    auto=self._auto_check.isChecked(),
+                    auto_threshold=self._auto_thresh_spin.value())
+                results[idx] = r
+            prog_lbl.setText(self.t("3mf_done", n=min(len(colors), self._max_virtual)))
+            render_rows()
+
+        def apply_selected():
+            added = 0
+            for idx, include in enumerate(include_vars):
+                if not include or results[idx] is None:
+                    continue
+                if len(self._virtual) >= self._max_virtual:
+                    break
+                self.add_virtual(results[idx])
+                added += 1
+            dlg.accept()
+            QMessageBox.information(self, self.t("obj_title"),
+                                    self.t("dlg_3mf_added", n=added))
+
+        btn_row = QHBoxLayout()
+        calc_btn = QPushButton(self.t("3mf_btn_calc"))
+        calc_btn.setObjectName("btn_primary")
+        calc_btn.setFixedHeight(42)
+        calc_btn.clicked.connect(run_all)
+        apply_btn = QPushButton(self.t("3mf_btn_apply"))
+        apply_btn.setObjectName("btn_green")
+        apply_btn.setFixedHeight(42)
+        apply_btn.clicked.connect(apply_selected)
+        cancel_btn = QPushButton(self.t("3mf_btn_cancel"))
+        cancel_btn.setFixedHeight(42)
+        cancel_btn.clicked.connect(dlg.reject)
+        btn_row.addWidget(calc_btn)
+        btn_row.addWidget(apply_btn)
+        btn_row.addWidget(cancel_btn)
+        layout.addLayout(btn_row)
+        dlg.exec()
+
     # ── 3MF FARB-WIZARD ────────────────────────────────────────────────────────
 
     def _get_all_library_fils(self):
@@ -5083,14 +5391,30 @@ class U1App(QMainWindow):
                 return
             try:
                 from PIL import Image
-                img = Image.open(file_path[0]).convert("RGB")
-                img.thumbnail((200, 200))
-                quantized = img.quantize(colors=n_spin.value(), method=Image.Quantize.MEDIANCUT)
-                palette_raw = quantized.getpalette()
+                img = Image.open(file_path[0])
                 extracted.clear()
-                for i in range(n_spin.value()):
-                    r, g, b = palette_raw[i*3], palette_raw[i*3+1], palette_raw[i*3+2]
-                    extracted.append(rgb_to_hex(r, g, b))
+                # FIX 2: Handle indexed/palette mode PNG explicitly
+                if img.mode == 'P':
+                    palette = img.getpalette()
+                    used_indices = set(img.getdata())
+                    for idx in sorted(used_indices):
+                        r = palette[idx * 3]
+                        g = palette[idx * 3 + 1]
+                        b = palette[idx * 3 + 2]
+                        brightness = (r + g + b) / 3
+                        if brightness < 5 or brightness > 250:
+                            continue
+                        extracted.append(f"#{r:02X}{g:02X}{b:02X}")
+                else:
+                    img = img.convert("RGB")
+                    img.thumbnail((200, 200))
+                    n_colors = min(n_spin.value(), 32)
+                    quantized = img.quantize(colors=n_colors,
+                                             method=Image.Quantize.MEDIANCUT)
+                    palette_raw = quantized.getpalette()
+                    for i in range(n_colors):
+                        r, g, b = palette_raw[i * 3], palette_raw[i * 3 + 1], palette_raw[i * 3 + 2]
+                        extracted.append(f"#{r:02X}{g:02X}{b:02X}")
             except Exception as e:
                 QMessageBox.warning(dlg, "", str(e))
                 return

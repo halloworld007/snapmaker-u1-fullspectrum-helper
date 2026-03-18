@@ -326,6 +326,14 @@ STRINGS = {
     "palette_title": "Palette aus Bild importieren",
     "palette_colors": "Farben:",
     "palette_btn_add": "Alle berechnen & hinzufügen",
+    "palette_indexed_hint": "Indiziertes PNG — alle {n} Palettenfarben geladen",
+    # OBJ/MTL
+    "obj_btn": "📦 OBJ/MTL",
+    "obj_title": "OBJ/MTL Farbanalyse",
+    "obj_no_colors": "Keine Farben gefunden. MTL-Datei vorhanden?",
+    "obj_no_pil": "Pillow nicht installiert — Textur-Extraktion nicht möglich.\npip install Pillow",
+    "obj_filetypes": "OBJ Dateien",
+    "3mf_texture_hint": "Farben aus eingebetteten Texturen extrahiert",
     # 3MF zurückschreiben
     "btn_3mf_write": "✏️ 3MF schreiben",
     "tip_3mf_write": "Filament-Farben der virtuellen Köpfe in eine 3MF-Datei schreiben",
@@ -737,6 +745,14 @@ STRINGS = {
     "palette_title": "Import Palette from Image",
     "palette_colors": "Colors:",
     "palette_btn_add": "Calculate all & add",
+    "palette_indexed_hint": "Indexed PNG — all {n} palette colors loaded",
+    # OBJ/MTL
+    "obj_btn": "📦 OBJ/MTL",
+    "obj_title": "OBJ/MTL Color Analysis",
+    "obj_no_colors": "No colors found. Is the MTL file present?",
+    "obj_no_pil": "Pillow not installed — texture extraction unavailable.\npip install Pillow",
+    "obj_filetypes": "OBJ Files",
+    "3mf_texture_hint": "Colors extracted from embedded textures",
     # 3MF write-back
     "btn_3mf_write": "✏️ Write 3MF",
     "tip_3mf_write": "Write virtual head colors into a 3MF file",
@@ -1506,6 +1522,47 @@ def de_label_text(de, lang="de"):
 
 HEX_RE = re.compile(r'#([0-9A-Fa-f]{6})\b')
 
+def _extract_colors_from_3mf_textures(zip_ref):
+    """Extract dominant colors from PNG/JPG textures embedded in a .3mf zip."""
+    colors = []
+    if not _HAS_PIL:
+        return colors
+    for name in zip_ref.namelist():
+        lname = name.lower()
+        if lname.endswith('.png') or lname.endswith('.jpg') or lname.endswith('.jpeg'):
+            try:
+                with zip_ref.open(name) as img_file:
+                    img = _PILImage.open(img_file)
+                    if img.mode == 'P':
+                        palette = img.getpalette()
+                        used_indices = set(img.getdata())
+                        for idx in sorted(used_indices):
+                            r = palette[idx * 3]
+                            g = palette[idx * 3 + 1]
+                            b = palette[idx * 3 + 2]
+                            brightness = (r + g + b) / 3
+                            if brightness < 10 or brightness > 245:
+                                continue
+                            colors.append(f"#{r:02X}{g:02X}{b:02X}")
+                    else:
+                        img = img.convert('RGB')
+                        # Quantize to 16 colors to find dominant palette
+                        quantized = img.quantize(colors=16, method=_PILImage.Quantize.MEDIANCUT)
+                        palette_img = quantized.convert('RGB')
+                        palette = palette_img.getpalette()  # flat list R,G,B,...
+                        if palette:
+                            for i in range(0, min(len(palette), 16 * 3), 3):
+                                r, g, b = palette[i], palette[i + 1], palette[i + 2]
+                                # Skip near-black and near-white (background)
+                                brightness = (r + g + b) / 3
+                                if brightness < 10 or brightness > 245:
+                                    continue
+                                colors.append(f"#{r:02X}{g:02X}{b:02X}")
+            except Exception:
+                pass
+    return colors
+
+
 def parse_3mf_colors(filepath):
     found = set()
     try:
@@ -1557,6 +1614,19 @@ def parse_3mf_colors(filepath):
                                     if m: found.add('#' + m.group(1).upper())
                     except Exception:
                         pass
+            # FIX 1: Also extract colors from embedded PNG/JPG textures
+            texture_colors = _extract_colors_from_3mf_textures(zf)
+            extracted_so_far = list(found)
+            for hx in texture_colors:
+                try:
+                    t_lab = rgb_to_lab(hex_to_rgb(hx))
+                    if all(delta_e(t_lab, rgb_to_lab(hex_to_rgb(ex))) >= 3.0
+                           for ex in extracted_so_far):
+                        found.add(hx)
+                        extracted_so_far.append(hx)
+                except Exception:
+                    found.add(hx)
+                    extracted_so_far.append(hx)
     except Exception as e:
         return [], str(e)
     trivial = {"#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF",
@@ -1576,6 +1646,95 @@ def parse_3mf_colors(filepath):
             deduped.append(hex_c)
             deduped_labs.append(lab)
     return deduped, None
+
+
+def parse_obj_mtl_colors(obj_path):
+    """Extract colors from OBJ+MTL file combination.
+    Returns list of hex color strings.
+    """
+    colors = []
+    obj_dir = os.path.dirname(obj_path)
+
+    # Find MTL file(s) referenced in OBJ
+    mtl_files = []
+    try:
+        with open(obj_path, 'r', encoding='utf-8', errors='replace') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('mtllib '):
+                    mtl_name = line[7:].strip()
+                    mtl_path = os.path.join(obj_dir, mtl_name)
+                    if os.path.exists(mtl_path):
+                        mtl_files.append(mtl_path)
+    except Exception:
+        pass
+
+    if not mtl_files:
+        # Try same name as OBJ with .mtl extension
+        base = os.path.splitext(obj_path)[0]
+        candidate = base + '.mtl'
+        if os.path.exists(candidate):
+            mtl_files.append(candidate)
+
+    for mtl_path in mtl_files:
+        try:
+            with open(mtl_path, 'r', encoding='utf-8', errors='replace') as f:
+                for line in f:
+                    line = line.strip()
+                    # Diffuse color: Kd R G B (0.0-1.0)
+                    if line.lower().startswith('kd '):
+                        parts = line.split()
+                        if len(parts) >= 4:
+                            try:
+                                r = max(0, min(255, int(float(parts[1]) * 255)))
+                                g = max(0, min(255, int(float(parts[2]) * 255)))
+                                b = max(0, min(255, int(float(parts[3]) * 255)))
+                                colors.append(f"#{r:02X}{g:02X}{b:02X}")
+                            except ValueError:
+                                pass
+                    # Texture map: map_Kd texture.png
+                    elif line.lower().startswith('map_kd '):
+                        tex_name = line.split(None, 1)[1].strip()
+                        tex_path = os.path.join(obj_dir, tex_name)
+                        if os.path.exists(tex_path) and _HAS_PIL:
+                            try:
+                                img = _PILImage.open(tex_path)
+                                if img.mode == 'P':
+                                    palette = img.getpalette()
+                                    used = set(img.getdata())
+                                    for idx in sorted(used):
+                                        r = palette[idx * 3]
+                                        g = palette[idx * 3 + 1]
+                                        b = palette[idx * 3 + 2]
+                                        if (r + g + b) / 3 < 10 or (r + g + b) / 3 > 245:
+                                            continue
+                                        colors.append(f"#{r:02X}{g:02X}{b:02X}")
+                                else:
+                                    img = img.convert('RGB')
+                                    q = img.quantize(colors=16,
+                                                     method=_PILImage.Quantize.MEDIANCUT)
+                                    pal = q.convert('RGB').getpalette()
+                                    if pal:
+                                        for i in range(0, min(len(pal), 48), 3):
+                                            r, g, b = pal[i], pal[i + 1], pal[i + 2]
+                                            if (r + g + b) / 3 < 10 or (r + g + b) / 3 > 245:
+                                                continue
+                                            colors.append(f"#{r:02X}{g:02X}{b:02X}")
+                            except Exception:
+                                pass
+        except Exception:
+            pass
+
+    # Deduplicate by ΔE < 3
+    unique = []
+    for hx in colors:
+        try:
+            lab = rgb_to_lab(hex_to_rgb(hx))
+            if all(delta_e(lab, rgb_to_lab(hex_to_rgb(u))) >= 3.0 for u in unique):
+                unique.append(hx)
+        except Exception:
+            pass
+    return unique
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -2752,6 +2911,11 @@ class U1FullSpectrumApp(ctk.CTk):
                       command=self.open_3mf_assistant)
         tmf_btn.pack(side="left", padx=(8, 4), pady=6)
         self.tip(tmf_btn, "tip_3mf")
+
+        obj_btn = ctk.CTkButton(tb1, text=self.t("obj_btn"), fg_color="#065f46",
+                      hover_color="#047857", height=36, font=("Segoe UI", 11, "bold"),
+                      command=self.open_obj_assistant)
+        obj_btn.pack(side="left", padx=(0, 4), pady=6)
 
         wizard_btn = ctk.CTkButton(tb1, text=self.t("wizard_btn"), fg_color="#7c3aed",
                       hover_color="#6d28d9", height=36, font=("Segoe UI", 11, "bold"),
@@ -4662,6 +4826,139 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkButton(btm, text=self.t("3mf_btn_cancel"), fg_color="#374151",
                       command=win.destroy, height=42).pack(side="right")
 
+    # ── OBJ/MTL ASSISTENT ──────────────────────────────────────────────────────
+
+    def open_obj_assistant(self, path=None):
+        """Open OBJ/MTL color assistant dialog."""
+        if path is None:
+            path = filedialog.askopenfilename(
+                filetypes=[(self.t("obj_filetypes"), "*.obj"), ("*", "*.*")],
+                title=self.t("obj_title"))
+        if not path:
+            return
+
+        colors = parse_obj_mtl_colors(path)
+        if not colors:
+            if not _HAS_PIL:
+                messagebox.showwarning(self.t("obj_title"), self.t("obj_no_pil"))
+            else:
+                messagebox.showinfo(self.t("obj_title"), self.t("obj_no_colors"))
+            return
+
+        win = ctk.CTkToplevel(self)
+        win.title(f"{self.t('obj_title')} — {os.path.basename(path)}")
+        win.geometry("860x680")
+        win.grab_set()
+
+        ctk.CTkLabel(win,
+                     text=self.t("3mf_analysis_title", n=len(colors)),
+                     font=("Segoe UI", 15, "bold"), text_color="#38bdf8").pack(pady=(16, 2))
+        ctk.CTkLabel(win,
+                     text=self.t("3mf_basis",
+                          t1=self.slots[0]['hex'].get(), t2=self.slots[1]['hex'].get(),
+                          t3=self.slots[2]['hex'].get(), t4=self.slots[3]['hex'].get()),
+                     font=("Segoe UI", 10), text_color="#64748b").pack(pady=(0, 6))
+
+        opt_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(win, text=self.t("3mf_optimizer"),
+                        variable=opt_var, font=("Segoe UI", 11)).pack(pady=(0, 4))
+
+        prog_label = ctk.CTkLabel(win, text=self.t("3mf_ready"),
+                                   font=("Segoe UI", 11), text_color="#94a3b8")
+        prog_label.pack(pady=(0, 6))
+
+        hdr = ctk.CTkFrame(win, fg_color="#1e293b", corner_radius=6)
+        hdr.pack(fill="x", padx=14, pady=(0, 4))
+        hdr.grid_columnconfigure(4, weight=1)
+        for col, txt in enumerate(["#", self.t("3mf_col_target"), self.t("3mf_col_seq"),
+                                    self.t("3mf_col_sim"), self.t("3mf_col_quality"), "VID"]):
+            ctk.CTkLabel(hdr, text=txt, font=("Segoe UI", 10, "bold"),
+                         text_color="#64748b").grid(row=0, column=col, padx=10, pady=6,
+                                                     sticky="w")
+
+        scroll = ctk.CTkScrollableFrame(win, height=380, fg_color="#0f172a")
+        scroll.pack(fill="both", expand=True, padx=14, pady=4)
+        scroll.grid_columnconfigure(4, weight=1)
+
+        results = [None] * len(colors)
+        vid_vars = []
+
+        def render_rows():
+            for w in scroll.winfo_children():
+                w.destroy()
+            vid_vars.clear()
+            for idx, hex_c in enumerate(colors[:self._max_virtual]):
+                r = results[idx]
+                row = ctk.CTkFrame(scroll, fg_color="#1e293b", corner_radius=6)
+                row.pack(fill="x", padx=4, pady=2)
+                row.grid_columnconfigure(4, weight=1)
+                ctk.CTkLabel(row, text=str(idx + 1), width=30, font=("Segoe UI", 10),
+                             text_color="#64748b").grid(row=0, column=0, padx=8, pady=7)
+                ctk.CTkLabel(row, text="", width=34, height=34,
+                             fg_color=hex_c, corner_radius=17).grid(row=0, column=1, padx=4)
+                if r:
+                    ctk.CTkLabel(row, text=r["sequence"],
+                                 font=("Courier New", 15, "bold"), text_color="#4ade80",
+                                 width=145).grid(row=0, column=2, padx=6)
+                    ctk.CTkLabel(row, text="", width=34, height=34,
+                                 fg_color=r["sim_hex"], corner_radius=17).grid(row=0, column=3,
+                                                                                 padx=4)
+                    ctk.CTkLabel(row, text=self.de_label(r["de"]),
+                                 font=("Segoe UI", 11, "bold"),
+                                 text_color=de_color(r["de"])).grid(row=0, column=4, padx=6,
+                                                                     sticky="w")
+                else:
+                    ctk.CTkLabel(row, text=self.t("3mf_not_calc"),
+                                 text_color="#334155").grid(row=0, column=2, columnspan=3,
+                                                             padx=6, sticky="w")
+                sv = ctk.BooleanVar(value=True if r else False)
+                vid_vars.append(sv)
+                ctk.CTkCheckBox(row, text=self.t("3mf_include"), variable=sv,
+                                font=("Segoe UI", 9), width=100).grid(row=0, column=5,
+                                                                        padx=(4, 10))
+
+        render_rows()
+
+        def run_all():
+            opt = opt_var.get()
+            free = self._max_virtual - len(self.virtual_fils)
+            to_calc = min(len(colors), free) if free < len(colors) else len(colors)
+            for idx in range(min(len(colors), self._max_virtual)):
+                prog_label.configure(
+                    text=self.t("3mf_progress", i=idx + 1, total=to_calc, c=colors[idx]))
+                win.update_idletasks()
+                r = self._calc_for_color(colors[idx], optimizer=opt,
+                                         seq_len=int(self.len_slider.get()),
+                                         auto=self.auto_len_var.get(),
+                                         auto_threshold=safe_td(self.auto_thresh_entry.get()))
+                results[idx] = r
+            prog_label.configure(text=self.t("3mf_done", n=to_calc))
+            render_rows()
+
+        def apply_selected():
+            added = 0
+            for idx, sv in enumerate(vid_vars):
+                if not sv.get() or results[idx] is None:
+                    continue
+                if len(self.virtual_fils) >= self._max_virtual:
+                    break
+                self.add_to_virtual(results[idx])
+                added += 1
+            win.destroy()
+            messagebox.showinfo(self.t("obj_title"), self.t("dlg_3mf_added", n=added))
+            self._set_status(self.t("status_3mf", n=added), 4000)
+
+        btm = ctk.CTkFrame(win, fg_color="transparent")
+        btm.pack(fill="x", padx=14, pady=(6, 14))
+        ctk.CTkButton(btm, text=self.t("3mf_btn_calc"), fg_color="#2563eb",
+                      command=run_all, height=42, font=("Segoe UI", 12, "bold")).pack(
+            side="left", padx=(0, 6))
+        ctk.CTkButton(btm, text=self.t("3mf_btn_apply"), fg_color="#15803d",
+                      command=apply_selected, height=42,
+                      font=("Segoe UI", 12, "bold")).pack(side="left")
+        ctk.CTkButton(btm, text=self.t("3mf_btn_cancel"), fg_color="#374151",
+                      command=win.destroy, height=42).pack(side="right")
+
     # ── 3MF FARB-WIZARD ────────────────────────────────────────────────────────
 
     def _get_all_library_fils(self):
@@ -6070,36 +6367,53 @@ class U1FullSpectrumApp(ctk.CTk):
         if not path: return
 
         try:
-            img = _PILImage.open(path).convert("RGB")
-            img.thumbnail((200, 200))
+            img = _PILImage.open(path)
+            # FIX 2: Handle indexed/palette mode PNG explicitly
+            if img.mode == 'P':
+                palette = img.getpalette()
+                used_indices = set(img.getdata())
+                selected = []
+                for idx in sorted(used_indices):
+                    r = palette[idx * 3]
+                    g = palette[idx * 3 + 1]
+                    b = palette[idx * 3 + 2]
+                    brightness = (r + g + b) / 3
+                    if brightness < 5 or brightness > 250:
+                        continue
+                    hx = f"#{r:02X}{g:02X}{b:02X}"
+                    selected.append(hx)
+                indexed_hint = self.t("palette_indexed_hint", n=len(selected))
+            else:
+                img = img.convert("RGB")
+                img.thumbnail((200, 200))
+                from collections import Counter
+                pixels = list(img.getdata())
+                def _quantize_bucket(px, levels=6):
+                    step = 256 // levels
+                    return tuple((c // step) * step + step // 2 for c in px[:3])
+                counts = Counter(_quantize_bucket(p) for p in pixels)
+                top = [rgb for rgb, _ in counts.most_common(50)]
+                selected = []
+                for rgb in top:
+                    hx = "#{:02X}{:02X}{:02X}".format(*rgb)
+                    lab = rgb_to_lab(rgb)
+                    if all(delta_e(lab, rgb_to_lab(hex_to_rgb(s))) > 12 for s in selected):
+                        selected.append(hx)
+                    if len(selected) >= 32:
+                        break
+                indexed_hint = None
         except Exception as e:
             messagebox.showerror(self.t("dlg_error"), str(e)); return
 
         win = ctk.CTkToplevel(self)
         win.title(self.t("palette_title"))
-        win.geometry("480x380")
+        win.geometry("480x420")
         win.grab_set()
         ctk.CTkLabel(win, text=self.t("palette_title"),
                      font=("Segoe UI", 14, "bold")).pack(pady=(14, 6))
-
-        # Simple Quantisierung: Farbraum in 6-Bucket-Raster aufteilen
-        from collections import Counter
-        pixels = list(img.getdata())
-        def quantize(px, levels=6):
-            step = 256 // levels
-            return tuple((c // step) * step + step//2 for c in px[:3])
-        counts = Counter(quantize(p) for p in pixels)
-        # Top-Farben nach Häufigkeit
-        top = [rgb for rgb, _ in counts.most_common(50)]
-        # Nur Farben mit Mindestabstand auswählen
-        selected = []
-        for rgb in top:
-            hx = "#{:02X}{:02X}{:02X}".format(*rgb)
-            lab = rgb_to_lab(rgb)
-            if all(delta_e(lab, rgb_to_lab(hex_to_rgb(s))) > 12 for s in selected):
-                selected.append(hx)
-            if len(selected) >= 8:
-                break
+        if indexed_hint:
+            ctk.CTkLabel(win, text=indexed_hint,
+                         font=("Segoe UI", 9), text_color="#38bdf8").pack(pady=(0, 4))
 
         ctk.CTkLabel(win, text=self.t("palette_colors"),
                      font=("Segoe UI", 10), text_color="#64748b").pack(pady=(0, 4))
