@@ -75,7 +75,7 @@ STRINGS = {
     "weight_arrow": "— progressive Gewichtung →",
     "weight_top": "L10 oben  1.5",
     "sec2_title": "VIRTUELLE DRUCKKÖPFE  V5 – V24",
-    "sec2_desc": "Jeder virtuelle Kopf = FullSpectrum-Sequenz (1–10 Layer) aus T1–T4  ·  max. {max_v}",
+    "sec2_desc": "Jeder virtuelle Kopf = FullSpectrum-Sequenz (1–48 Layer) aus T1–T4  ·  max. {max_v}",
     "btn_3mf": "🔬  3MF Assistent",
     "btn_del_all": "🗑  Alle löschen",
     "btn_export_all": "📤  Alle exportieren",
@@ -358,6 +358,16 @@ STRINGS = {
     "model_linear": "Additiv — FullSpectrum-kompatibel",
     "model_td": "TD-gewichtet (physikalisch)",
     "model_subtractive": "Subtraktiv (Pigment-Modell)",
+    "model_filamentmixer": "FilamentMixer (Pigment)",
+    # Streifenrisiko
+    "stripe_risk": "\u26a0 Streifenrisiko \u2014 Sequenzl\u00e4nge {n} ung\u00fcnstig",
+    "stripe_ok": "\u2713 Kein Streifenrisiko",
+    # Multi-Gradient
+    "btn_multi_gradient": "\U0001f308 Multi-Gradient",
+    "multi_gradient_title": "Multi-Gradient virtueller Kopf",
+    "multi_gradient_desc": "Gewichteten Verlauf aus allen 4 Slots erstellen",
+    "multi_gradient_auto": "Auto-Balance",
+    "multi_gradient_add": "Als virtuellen Kopf hinzuf\u00fcgen",
     # Alle Cadence-Werte kopieren
     "btn_copy_all_cad": "📋 Alle Cadence-Werte",
     "copy_all_title": "Alle Dithering-Werte",
@@ -463,7 +473,7 @@ STRINGS = {
     "weight_arrow": "— progressive weighting →",
     "weight_top": "L10 top  1.5",
     "sec2_title": "VIRTUAL PRINT HEADS  V5 – V24",
-    "sec2_desc": "Each virtual head = FullSpectrum sequence (1–10 layers) from T1–T4  ·  max. {max_v}",
+    "sec2_desc": "Each virtual head = FullSpectrum sequence (1–48 layers) from T1–T4  ·  max. {max_v}",
     "btn_3mf": "🔬  3MF Assistant",
     "btn_del_all": "🗑  Delete All",
     "btn_export_all": "📤  Export All",
@@ -740,6 +750,16 @@ STRINGS = {
     "model_linear": "Additive — FullSpectrum compatible",
     "model_td": "TD-weighted (physical)",
     "model_subtractive": "Subtractive (pigment model)",
+    "model_filamentmixer": "FilamentMixer (Pigment)",
+    # Stripe risk
+    "stripe_risk": "\u26a0 Stripe risk \u2014 sequence length {n} unfavorable",
+    "stripe_ok": "\u2713 No stripe risk",
+    # Multi-Gradient
+    "btn_multi_gradient": "\U0001f308 Multi-Gradient",
+    "multi_gradient_title": "Multi-Gradient Virtual Head",
+    "multi_gradient_desc": "Create weighted gradient from all 4 slots",
+    "multi_gradient_auto": "Auto-Balance",
+    "multi_gradient_add": "Add as Virtual Head",
     # Copy all cadence values
     "btn_copy_all_cad": "📋 All Cadence Values",
     "copy_all_title": "All Dithering Values",
@@ -820,7 +840,7 @@ STRINGS = {
 _SLOT_SKIP = {"(leer)", "(empty)", "(manuell)", "(manual)"}
 
 # ── KONSTANTEN ────────────────────────────────────────────────────────────────
-MAX_SEQ_LEN     = 10
+MAX_SEQ_LEN     = 48
 DEFAULT_TD      = 5.0
 DE_GOOD         = 3.0
 DE_OK           = 6.0
@@ -1222,18 +1242,150 @@ def seq_to_runs(sequence):
     return runs
 
 def calc_cadence(sequence, layer_height):
-    """Cadence Heights aus Sequenz + Schichthöhe.
-    Liefert {filament_id: cadence_mm} basierend auf dem längsten Run je Filament.
-    Physikalisch korrekt für 2-Filament-Sequenzen; Näherung bei mehr.
+    """Cadence Heights matching FullSpectrum slicer v0.92+ logic.
+
+    Slicer formula: minority_side=1, majority=max(1, round(major_pct/minor_pct))
+    Reduces GCD so cycle is minimal. Returns {filament_id: cadence_mm}.
     """
-    runs = seq_to_runs(sequence)
-    max_run = {}
-    for fid, n in runs:
-        max_run[fid] = max(max_run.get(fid, 0), n)
-    return {fid: round(n * layer_height, 4) for fid, n in max_run.items()}
+    if not sequence:
+        return {}
+    # Count occurrences per filament
+    counts = {}
+    for fid in sequence:
+        fid_int = int(fid)
+        counts[fid_int] = counts.get(fid_int, 0) + 1
+    if len(counts) == 1:
+        fid = list(counts.keys())[0]
+        return {fid: round(len(sequence) * layer_height, 3)}
+
+    total = sum(counts.values())
+    # Sort: minority first, majority last
+    sorted_ids = sorted(counts.keys(), key=lambda k: counts[k])
+
+    # Slicer formula: minority anchors to 1, majority scales
+    minority_count = counts[sorted_ids[0]]
+    result = {}
+    for fid in sorted_ids:
+        pct = counts[fid] / total
+        minority_pct = minority_count / total
+        if fid == sorted_ids[0]:  # minority
+            layers = 1
+        else:
+            layers = max(1, round(pct / minority_pct))
+        result[fid] = round(layers * layer_height, 3)
+    return result
 
 def seq_filament_count(sequence):
     return len(set(sequence))
+
+def check_stripe_risk(sequence):
+    """Check if a sequence has stripe risk based on FullSpectrum phase-shift formula.
+
+    Slicer uses phase_step = (cycle / 2 + 1) to avoid striping.
+    Risk exists when cycle length and phase_step share common factors > 1.
+    Returns (risk: bool, message: str)
+    """
+    if not sequence:
+        return False, ""
+    n = len(sequence)
+    if n <= 1:
+        return False, ""
+    # Unique filament count
+    unique = len(set(str(x) for x in sequence))
+    if unique == 1:
+        return False, ""
+    phase_step = (n // 2) + 1
+    gcd = math.gcd(n, phase_step)
+    if gcd > 1:
+        return True, f"\u26a0 Streifenrisiko (Zyklus {n}, Phase {phase_step}, GCD={gcd})"
+    return False, f"\u2713 Kein Streifenrisiko (Zyklus {n}, Phase {phase_step})"
+
+def filament_mixer_lerp(r1, g1, b1, r2, g2, b2, t):
+    """Polynomial pigment blending approximating Mixbox behavior.
+    Degree-4 polynomial regression. t=0 -> color1, t=1 -> color2.
+    Returns (r, g, b) as 0-255 integers.
+    """
+    # Normalize to 0-1
+    r1f, g1f, b1f = r1/255, g1/255, b1/255
+    r2f, g2f, b2f = r2/255, g2/255, b2/255
+
+    # Simple but physically-motivated pigment model:
+    # Convert to "pigment concentration" space (roughly sqrt for scattering)
+    # then blend, then convert back
+    def to_pigment(c):
+        return math.sqrt(max(0.0, c))
+    def from_pigment(c):
+        return min(1.0, c * c)
+
+    # Blend in pigment space
+    rp = to_pigment(r1f) * (1-t) + to_pigment(r2f) * t
+    gp = to_pigment(g1f) * (1-t) + to_pigment(g2f) * t
+    bp = to_pigment(b1f) * (1-t) + to_pigment(b2f) * t
+
+    r = int(round(from_pigment(rp) * 255))
+    g = int(round(from_pigment(gp) * 255))
+    b = int(round(from_pigment(bp) * 255))
+    return (max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)))
+
+def build_weighted_gradient_sequence(weights, max_len=48):
+    """Build a dithering sequence from weighted filament list.
+    weights: list of (filament_id, weight_pct) tuples, weights sum to 100.
+    Uses Bresenham-style distribution like the FullSpectrum slicer.
+    Returns sequence as list of filament IDs.
+    """
+    if not weights:
+        return []
+    total = sum(w for _, w in weights)
+    if total == 0:
+        return [weights[0][0]]
+
+    # Normalize to max_len slots
+    slots = []
+    for fid, w in weights:
+        exact = (w / total) * max_len
+        n = int(exact)
+        remainder_new = exact - n
+        slots.append((fid, n, remainder_new))
+
+    # Distribute remainder slots by largest fractional part
+    n_total = sum(n for _, n, _ in slots)
+    deficit = max_len - n_total
+    sorted_by_rem = sorted(slots, key=lambda x: x[2], reverse=True)
+    final = {fid: n for fid, n, _ in slots}
+    for i in range(deficit):
+        fid = sorted_by_rem[i % len(sorted_by_rem)][0]
+        final[fid] = final.get(fid, 0) + 1
+
+    # Interleave using Bresenham
+    sequence = []
+    accumulators = {fid: 0.0 for fid, _ in weights}
+    for step in range(max_len):
+        best_fid = None
+        best_acc = -1
+        for fid, w in weights:
+            accumulators[fid] += (w / total)
+            if accumulators[fid] > best_acc:
+                best_acc = accumulators[fid]
+                best_fid = fid
+        sequence.append(best_fid)
+        accumulators[best_fid] -= 1.0
+
+    return sequence
+
+def compute_layer_schedule(sequence, n_layers=12):
+    """Simulate which filament is active at each layer index using slicer formula.
+    sequence: list/string of filament IDs forming one cycle.
+    Returns list of filament_ids for layers 0..n_layers-1.
+    """
+    cycle = len(sequence)
+    if cycle == 0:
+        return []
+    seq = [int(s) for s in sequence]
+    result = []
+    for layer_idx in range(n_layers):
+        pos = layer_idx % cycle
+        result.append(seq[pos])
+    return result
 
 def estimate_td(hex_color):
     """Estimate TD from hex brightness. Bright/saturated = higher TD (more transparent)."""
@@ -1867,6 +2019,10 @@ class U1FullSpectrumApp(ctk.CTk):
                 s["td"].insert(0, s_data["td"])
         # Virtuelle Köpfe
         self.virtual_fils = project.get("virtual_fils", [])
+        # Ensure stable_id on loaded virtual heads
+        for i, vf in enumerate(self.virtual_fils):
+            if "stable_id" not in vf:
+                vf["stable_id"] = vf.get("vid", 5 + i)
         # Recent colors
         if "recent_colors" in project:
             self._recent_colors = project["recent_colors"]
@@ -2120,7 +2276,7 @@ class U1FullSpectrumApp(ctk.CTk):
         ctk.CTkLabel(model_frame, text=self.t("model_label"),
                      font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=8, pady=(6,2))
         self.color_model_var = ctk.StringVar(value="linear")
-        for val, key in [("linear","model_linear"),("td","model_td"),("subtractive","model_subtractive")]:
+        for val, key in [("linear","model_linear"),("td","model_td"),("subtractive","model_subtractive"),("filamentmixer","model_filamentmixer")]:
             ctk.CTkRadioButton(model_frame, text=self.t(key),
                                variable=self.color_model_var, value=val,
                                command=self._on_model_change).pack(anchor="w", padx=16, pady=1)
@@ -2351,7 +2507,7 @@ class U1FullSpectrumApp(ctk.CTk):
                                        font=("Segoe UI", 11, "bold"), width=80)
         self.len_label.grid(row=0, column=0, padx=(14, 6), pady=10)
 
-        self.len_slider = ctk.CTkSlider(lr, from_=1, to=10, number_of_steps=9,
+        self.len_slider = ctk.CTkSlider(lr, from_=1, to=48, number_of_steps=47,
                                          command=self._on_len_slider)
         self.len_slider.set(10)
         self.len_slider.grid(row=0, column=1, sticky="ew", padx=6)
@@ -2416,6 +2572,21 @@ class U1FullSpectrumApp(ctk.CTk):
 
         # Keyboard shortcut: Enter = Berechnen
         self.bind("<Return>", lambda e: self.calc())
+
+        # Stripe risk label (Change 4)
+        self._stripe_label = ctk.CTkLabel(sec1, text="", font=("Segoe UI", 9),
+                                          text_color="#64748b")
+        self._stripe_label.grid(row=10, column=0, padx=40, pady=(0, 2), sticky="ew")
+
+        # Layer schedule canvas (Change 8)
+        _lsf = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=6)
+        _lsf.grid(row=10, column=0, padx=40, pady=(18, 2), sticky="ew")
+        _lsf.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(_lsf, text="L1-12:", font=("Segoe UI", 8),
+                     text_color="#475569").grid(row=0, column=0, padx=(8, 4), pady=3, sticky="w")
+        self._layer_sched_canvas = tk.Canvas(_lsf, height=32, bg="#0f172a",
+                                             highlightthickness=0, bd=0)
+        self._layer_sched_canvas.grid(row=0, column=1, sticky="ew", padx=(0, 4), pady=3)
 
         # Dithering-Profile
         dp_frame = ctk.CTkFrame(sec1, fg_color="#0f172a", corner_radius=8)
@@ -2612,6 +2783,7 @@ class U1FullSpectrumApp(ctk.CTk):
         _tool_btn(f, self.t("btn_harmonies"), "#7c3aed", self.open_harmonies_dialog, "tip_harmonies")
         _tool_btn(f, self.t("btn_palette"), "#374151", self.import_palette_from_image, "tip_palette")
         _tool_btn(f, self.t("btn_multitarget"), "#7c3aed", self.open_multitarget_optimizer)
+        _tool_btn(f, self.t("btn_multi_gradient"), "#0e7490", self.open_multi_gradient_dialog)
 
         # Optimierung
         f = _tools_section(tab3, "🎯  Optimierung & Kalibrierung")
@@ -2794,7 +2966,7 @@ class U1FullSpectrumApp(ctk.CTk):
         return fils
 
     def _simulate_mix(self, sequence, fils):
-        """Farbmodell umschaltbar: linear (Standard), TD-gewichtet, subtraktiv."""
+        """Farbmodell umschaltbar: linear (Standard), TD-gewichtet, subtraktiv, FilamentMixer."""
         by_id = {f["id"]: f for f in fils}
         counts = {}
         for fid in sequence:
@@ -2802,6 +2974,20 @@ class U1FullSpectrumApp(ctk.CTk):
         total = len(sequence)
         model = getattr(self, "color_model_var", None)
         model = model.get() if model else "linear"
+
+        if model == "filamentmixer":
+            # Blend pairs sequentially using pigment model
+            if not sequence or not fils:
+                return rgb_to_lab((128, 128, 128))
+            fids = [int(s) for s in sequence]
+            fil_map = {f["id"]: hex_to_rgb(f["hex"]) for f in fils}
+            r, g, b = fil_map.get(fids[0], (128, 128, 128))
+            for i in range(1, len(fids)):
+                r2, g2, b2 = fil_map.get(fids[i], (r, g, b))
+                t = 1.0 / (i + 1)  # progressive blend weight
+                r, g, b = filament_mixer_lerp(r, g, b, r2, g2, b2, t)
+            return rgb_to_lab((r, g, b))
+
         r_acc = g_acc = b_acc = 0.0
         total_w = 0.0
         for fid, cnt in counts.items():
@@ -2842,7 +3028,7 @@ class U1FullSpectrumApp(ctk.CTk):
                         auto_threshold=2.0):
         """Berechnet Sequenz für eine Farbe — ohne UI-Seiteneffekte.
 
-        seq_len : feste Länge 1–10 (None = aktueller Slider-Wert)
+        seq_len : feste Länge 1–48 (None = aktueller Slider-Wert)
         auto    : findet kürzeste Länge mit ΔE < auto_threshold
         """
         t_lab = rgb_to_lab(hex_to_rgb(target_hex))
@@ -2938,6 +3124,32 @@ class U1FullSpectrumApp(ctk.CTk):
             y0 = i * bar_h
             y1 = y0 + bar_h
             c.create_rectangle(0, y0, W, y1, fill=color, outline="")
+
+    def _draw_layer_schedule(self, sequence):
+        """Draw colored squares for first 12 layers showing active filament (Change 8)."""
+        if not hasattr(self, "_layer_sched_canvas"):
+            return
+        c = self._layer_sched_canvas
+        c.update_idletasks()
+        W = c.winfo_width() or 400
+        H = 32
+        c.delete("all")
+        if not sequence:
+            return
+        schedule = compute_layer_schedule(sequence, n_layers=12)
+        fils_hex = {f["id"]: f["hex"] for f in self._get_fils()}
+        n = len(schedule)
+        sq = min(28, (W - 4) // max(n, 1))
+        for i, fid in enumerate(schedule):
+            color = fils_hex.get(fid, "#888888")
+            x0 = 2 + i * (sq + 2)
+            c.create_rectangle(x0, 2, x0 + sq, H - 2, fill=color, outline="#334155")
+            # Label Ln
+            r_, g_, b_ = hex_to_rgb(color)
+            lum = 0.299 * r_ + 0.587 * g_ + 0.114 * b_
+            tc = "#111111" if lum > 140 else "#eeeeee"
+            c.create_text(x0 + sq // 2, H // 2, text=f"L{i+1}", fill=tc,
+                          font=("Segoe UI", 7))
 
     def _schedule_gamut_update(self, delay=150):
         """Debounced gamut strip update — cancels any pending call and reschedules."""
@@ -3113,6 +3325,17 @@ class U1FullSpectrumApp(ctk.CTk):
             self._show_top3()
             self._draw_seq_preview(seq)
 
+            # Stripe risk check (Change 4)
+            _risk, _risk_msg = check_stripe_risk(seq)
+            if hasattr(self, "_stripe_label"):
+                if _risk:
+                    self._stripe_label.configure(text=_risk_msg, text_color="#f97316")
+                else:
+                    self._stripe_label.configure(text=_risk_msg, text_color="#4ade80")
+
+            # Layer schedule (Change 8)
+            self._draw_layer_schedule(seq)
+
             # High ΔE visual warning on result border
             self._set_result_border(dv)
 
@@ -3207,6 +3430,7 @@ class U1FullSpectrumApp(ctk.CTk):
         vid = 5 + len(self.virtual_fils)
         self.virtual_fils.append({
             "vid":        vid,
+            "stable_id":  5 + len(self.virtual_fils),
             "target_hex": result["target_hex"],
             "sequence":   result["sequence"],
             "sim_hex":    result["sim_hex"],
@@ -3811,7 +4035,7 @@ class U1FullSpectrumApp(ctk.CTk):
                          fg_color="#292524", corner_radius=4).pack(side="left", padx=(0, 4))
 
         # Cadence-Hinweis
-        pattern_str = "/".join(vf["sequence"])   # "1121" → "1/1/2/1"
+        pattern_str = ",".join(vf["sequence"])   # "1121" → "1,1,2,1"
 
         if n_fils == 1:
             hint = self.t("hint_pure")
@@ -4414,7 +4638,7 @@ class U1FullSpectrumApp(ctk.CTk):
                 a_v, b_v = resolve_cadence(v["sequence"])
                 runs  = seq_to_runs(v["sequence"])
                 n_f   = seq_filament_count(v["sequence"])
-                pat   = "/".join(v["sequence"])
+                pat   = ",".join(v["sequence"])
                 mode  = "cadence" if n_f <= 2 else "pattern"
                 return {**v, "runs": runs, "filament_count": n_f,
                         "slicer_input_mode": mode,
@@ -4463,7 +4687,7 @@ class U1FullSpectrumApp(ctk.CTk):
                             a_v, b_v = resolve_cadence(v["sequence"])
                             n_f = seq_filament_count(v["sequence"])
                             runs_str = "  ".join(f"T{fid}×{cnt}" for fid, cnt in seq_to_runs(v["sequence"]))
-                            pat_str  = "/".join(v["sequence"])
+                            pat_str  = ",".join(v["sequence"])
                             if n_f == 1:
                                 slicer_hint = self.t("txt_pure")
                             elif n_f == 2:
@@ -4961,6 +5185,99 @@ class U1FullSpectrumApp(ctk.CTk):
 
         ctk.CTkButton(win, text=self.t("gradient_btn_calc"), fg_color="#0e7490",
                       command=do_gradient, height=42,
+                      font=("Segoe UI", 13, "bold")).pack(pady=(4, 4), padx=24, fill="x")
+        ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
+                      command=win.destroy, height=36).pack(padx=24, fill="x")
+
+    # ── MULTI-GRADIENT DIALOG (Change 7) ──────────────────────────────────────
+
+    def open_multi_gradient_dialog(self):
+        """Multi-Gradient: weighted blend of all 4 slots as virtual head."""
+        fils = self._get_fils()
+        win = ctk.CTkToplevel(self)
+        win.title(self.t("multi_gradient_title"))
+        win.geometry("480x440")
+        win.grab_set()
+
+        ctk.CTkLabel(win, text=self.t("multi_gradient_title"),
+                     font=("Segoe UI", 14, "bold")).pack(pady=(14, 6))
+        ctk.CTkLabel(win, text=self.t("multi_gradient_desc"),
+                     font=("Segoe UI", 10), text_color="#64748b").pack(pady=(0, 10))
+
+        weight_vars = []
+        swatch_labels = []
+        rows_frame = ctk.CTkFrame(win, fg_color="transparent")
+        rows_frame.pack(fill="x", padx=24)
+
+        for i, f in enumerate(fils):
+            row = ctk.CTkFrame(rows_frame, fg_color="transparent")
+            row.pack(fill="x", pady=3)
+            sw = ctk.CTkLabel(row, text="", width=32, height=32,
+                              fg_color=f["hex"], corner_radius=6)
+            sw.pack(side="left", padx=(0, 8))
+            ctk.CTkLabel(row, text=f"T{f['id']}", font=("Segoe UI", 10, "bold"),
+                         width=30).pack(side="left")
+            wv = ctk.StringVar(value="25")
+            weight_vars.append(wv)
+            sp = ctk.CTkEntry(row, textvariable=wv, width=60)
+            sp.pack(side="left", padx=8)
+            ctk.CTkLabel(row, text="%", font=("Segoe UI", 9)).pack(side="left")
+            swatch_labels.append(sw)
+
+        preview_label = ctk.CTkLabel(win, text="", width=80, height=32,
+                                     fg_color="#808080", corner_radius=8)
+        preview_label.pack(pady=8)
+
+        def _update_preview(*a):
+            try:
+                ws = [(f["id"], float(wv.get() or "0")) for f, wv in zip(fils, weight_vars)]
+                seq = build_weighted_gradient_sequence(ws, max_len=MAX_SEQ_LEN)
+                if not seq:
+                    return
+                sim_lab = self._simulate_mix([str(x) for x in seq], fils)
+                preview_label.configure(fg_color=lab_to_hex(sim_lab))
+            except Exception:
+                pass
+
+        for wv in weight_vars:
+            wv.trace_add("write", _update_preview)
+        _update_preview()
+
+        def _auto_balance():
+            n = len(weight_vars)
+            base = 100 // n
+            rem = 100 - base * n
+            for i, wv in enumerate(weight_vars):
+                wv.set(str(base + (1 if i < rem else 0)))
+
+        ctk.CTkButton(win, text=self.t("multi_gradient_auto"), fg_color="#1e3a5f",
+                      command=_auto_balance, height=32).pack(pady=(0, 4), padx=24, fill="x")
+
+        def _add_as_virtual():
+            try:
+                ws = [(f["id"], float(wv.get() or "0")) for f, wv in zip(fils, weight_vars)]
+                seq = build_weighted_gradient_sequence(ws, max_len=MAX_SEQ_LEN)
+                if not seq:
+                    return
+                seq_str = "".join(str(x) for x in seq)
+                sim_lab = self._simulate_mix(list(seq_str), fils)
+                sim_hex = lab_to_hex(sim_lab)
+                t_lab = sim_lab
+                dv = delta_e(sim_lab, t_lab)
+                result = {
+                    "target_hex": sim_hex,
+                    "sequence": seq_str,
+                    "sim_hex": sim_hex,
+                    "de": 0.0,
+                    "seq_len": len(seq_str),
+                }
+                self.add_to_virtual(result)
+                win.destroy()
+            except Exception as e:
+                messagebox.showerror(self.t("dlg_error"), str(e))
+
+        ctk.CTkButton(win, text=self.t("multi_gradient_add"), fg_color="#16a34a",
+                      command=_add_as_virtual, height=42,
                       font=("Segoe UI", 13, "bold")).pack(pady=(4, 4), padx=24, fill="x")
         ctk.CTkButton(win, text=self.t("exp_cancel"), fg_color="#334155",
                       command=win.destroy, height=36).pack(padx=24, fill="x")

@@ -239,6 +239,14 @@ STRINGS = {
     "model_linear": "Additiv (FullSpectrum)",
     "model_td": "TD-gewichtet",
     "model_subtractive": "Subtraktiv",
+    "model_filamentmixer": "FilamentMixer (Pigment)",
+    "stripe_risk": "\u26a0 Streifenrisiko \u2014 Sequenzl\u00e4nge {n} ung\u00fcnstig",
+    "stripe_ok": "\u2713 Kein Streifenrisiko",
+    "btn_multi_gradient": "\U0001f308 Multi-Gradient",
+    "multi_gradient_title": "Multi-Gradient virtueller Kopf",
+    "multi_gradient_desc": "Gewichteten Verlauf aus allen 4 Slots erstellen",
+    "multi_gradient_auto": "Auto-Balance",
+    "multi_gradient_add": "Als virtuellen Kopf hinzuf\u00fcgen",
     "btn_gradient": "🌈 Gradient",
     "gradient_title": "Gradient-Generator",
     "gradient_from": "Von:",
@@ -476,6 +484,14 @@ STRINGS = {
     "model_linear": "Additive (FullSpectrum)",
     "model_td": "TD-weighted",
     "model_subtractive": "Subtractive",
+    "model_filamentmixer": "FilamentMixer (Pigment)",
+    "stripe_risk": "\u26a0 Stripe risk \u2014 sequence length {n} unfavorable",
+    "stripe_ok": "\u2713 No stripe risk",
+    "btn_multi_gradient": "\U0001f308 Multi-Gradient",
+    "multi_gradient_title": "Multi-Gradient Virtual Head",
+    "multi_gradient_desc": "Create weighted gradient from all 4 slots",
+    "multi_gradient_auto": "Auto-Balance",
+    "multi_gradient_add": "Add as Virtual Head",
     "btn_gradient": "🌈 Gradient",
     "gradient_title": "Gradient Generator",
     "gradient_from": "From:",
@@ -518,7 +534,7 @@ STRINGS = {
 }
 
 _SLOT_SKIP = {"(leer)", "(empty)", "(manuell)", "(manual)"}
-MAX_SEQ_LEN      = 10
+MAX_SEQ_LEN      = 48
 DEFAULT_TD       = 5.0
 DE_GOOD          = 3.0
 DE_OK            = 6.0
@@ -809,11 +825,138 @@ def seq_to_runs(sequence):
     return runs
 
 def calc_cadence(sequence, layer_height):
-    runs = seq_to_runs(sequence)
-    max_run = {}
-    for fid, n in runs:
-        max_run[fid] = max(max_run.get(fid, 0), n)
-    return {fid: round(n * layer_height, 4) for fid, n in max_run.items()}
+    """Cadence Heights matching FullSpectrum slicer v0.92+ logic.
+
+    Slicer formula: minority_side=1, majority=max(1, round(major_pct/minor_pct))
+    Reduces GCD so cycle is minimal. Returns {filament_id: cadence_mm}.
+    """
+    if not sequence:
+        return {}
+    # Count occurrences per filament
+    counts = {}
+    for fid in sequence:
+        fid_int = int(fid)
+        counts[fid_int] = counts.get(fid_int, 0) + 1
+    if len(counts) == 1:
+        fid = list(counts.keys())[0]
+        return {fid: round(len(sequence) * layer_height, 3)}
+
+    total = sum(counts.values())
+    # Sort: minority first, majority last
+    sorted_ids = sorted(counts.keys(), key=lambda k: counts[k])
+
+    # Slicer formula: minority anchors to 1, majority scales
+    minority_count = counts[sorted_ids[0]]
+    result = {}
+    for fid in sorted_ids:
+        pct = counts[fid] / total
+        minority_pct = minority_count / total
+        if fid == sorted_ids[0]:  # minority
+            layers = 1
+        else:
+            layers = max(1, round(pct / minority_pct))
+        result[fid] = round(layers * layer_height, 3)
+    return result
+
+def check_stripe_risk(sequence):
+    """Check if a sequence has stripe risk based on FullSpectrum phase-shift formula.
+
+    Slicer uses phase_step = (cycle / 2 + 1) to avoid striping.
+    Risk exists when cycle length and phase_step share common factors > 1.
+    Returns (risk: bool, message: str)
+    """
+    if not sequence:
+        return False, ""
+    n = len(sequence)
+    if n <= 1:
+        return False, ""
+    unique = len(set(str(x) for x in sequence))
+    if unique == 1:
+        return False, ""
+    phase_step = (n // 2) + 1
+    gcd = math.gcd(n, phase_step)
+    if gcd > 1:
+        return True, f"\u26a0 Streifenrisiko (Zyklus {n}, Phase {phase_step}, GCD={gcd})"
+    return False, f"\u2713 Kein Streifenrisiko (Zyklus {n}, Phase {phase_step})"
+
+def filament_mixer_lerp(r1, g1, b1, r2, g2, b2, t):
+    """Polynomial pigment blending approximating Mixbox behavior.
+    Degree-4 polynomial regression. t=0 -> color1, t=1 -> color2.
+    Returns (r, g, b) as 0-255 integers.
+    """
+    r1f, g1f, b1f = r1/255, g1/255, b1/255
+    r2f, g2f, b2f = r2/255, g2/255, b2/255
+
+    def to_pigment(c):
+        return math.sqrt(max(0.0, c))
+    def from_pigment(c):
+        return min(1.0, c * c)
+
+    rp = to_pigment(r1f) * (1-t) + to_pigment(r2f) * t
+    gp = to_pigment(g1f) * (1-t) + to_pigment(g2f) * t
+    bp = to_pigment(b1f) * (1-t) + to_pigment(b2f) * t
+
+    r = int(round(from_pigment(rp) * 255))
+    g = int(round(from_pigment(gp) * 255))
+    b = int(round(from_pigment(bp) * 255))
+    return (max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)))
+
+def build_weighted_gradient_sequence(weights, max_len=48):
+    """Build a dithering sequence from weighted filament list.
+    weights: list of (filament_id, weight_pct) tuples, weights sum to 100.
+    Uses Bresenham-style distribution like the FullSpectrum slicer.
+    Returns sequence as list of filament IDs.
+    """
+    if not weights:
+        return []
+    total = sum(w for _, w in weights)
+    if total == 0:
+        return [weights[0][0]]
+
+    slots = []
+    for fid, w in weights:
+        exact = (w / total) * max_len
+        n = int(exact)
+        remainder_new = exact - n
+        slots.append((fid, n, remainder_new))
+
+    n_total = sum(n for _, n, _ in slots)
+    deficit = max_len - n_total
+    sorted_by_rem = sorted(slots, key=lambda x: x[2], reverse=True)
+    final = {fid: n for fid, n, _ in slots}
+    for i in range(deficit):
+        fid = sorted_by_rem[i % len(sorted_by_rem)][0]
+        final[fid] = final.get(fid, 0) + 1
+
+    sequence = []
+    accumulators = {fid: 0.0 for fid, _ in weights}
+    for step in range(max_len):
+        best_fid = None
+        best_acc = -1
+        for fid, w in weights:
+            accumulators[fid] += (w / total)
+            if accumulators[fid] > best_acc:
+                best_acc = accumulators[fid]
+                best_fid = fid
+        sequence.append(best_fid)
+        accumulators[best_fid] -= 1.0
+
+    return sequence
+
+def compute_layer_schedule(sequence, n_layers=12):
+    """Simulate which filament is active at each layer index using slicer formula.
+    sequence: list/string of filament IDs forming one cycle.
+    Returns list of filament_ids for layers 0..n_layers-1.
+    """
+    cycle = len(sequence)
+    if cycle == 0:
+        return []
+    seq = [int(s) for s in sequence]
+    result = []
+    for layer_idx in range(n_layers):
+        pos = layer_idx % cycle
+        result.append(seq[pos])
+    return result
 
 HEX_RE = re.compile(r'#([0-9A-Fa-f]{6})\b')
 
@@ -1074,7 +1217,7 @@ class ClickableLabel(QLabel):
 
 # ── CONSTANTS ─────────────────────────────────────────────────────────────────
 
-MAX_SEQ_LEN      = 10
+MAX_SEQ_LEN      = 48
 DEFAULT_TD       = 5.0
 DE_GOOD          = 3.0
 DE_OK            = 6.0
@@ -1716,6 +1859,7 @@ class U1App(QMainWindow):
             self.t("model_linear"),
             self.t("model_td"),
             self.t("model_subtractive"),
+            self.t("model_filamentmixer"),
         ])
         self._model_combo.currentIndexChanged.connect(self._on_model_change)
         model_layout.addWidget(self._model_combo)
@@ -2054,6 +2198,10 @@ class U1App(QMainWindow):
         for i, s_data in enumerate(project.get("slots", [])[:4]):
             self._apply_slot(i, s_data)
         self._virtual = project.get("virtual_fils", [])
+        # Ensure stable_id on loaded virtual heads
+        for i, vf in enumerate(self._virtual):
+            if "stable_id" not in vf:
+                vf["stable_id"] = vf.get("vid", 5 + i)
         self._refresh_virtual_grid()
         self._update_gamut_strip()
         QMessageBox.information(self, self.t("dlg_saved"),
@@ -2165,7 +2313,7 @@ class U1App(QMainWindow):
 
         opts_layout.addWidget(QLabel("Length:"))
         self._len_spin = QSpinBox()
-        self._len_spin.setRange(1, 10)
+        self._len_spin.setRange(1, 48)
         self._len_spin.setValue(10)
         opts_layout.addWidget(self._len_spin)
 
@@ -2202,6 +2350,7 @@ class U1App(QMainWindow):
                 self.t("model_linear"),
                 self.t("model_td"),
                 self.t("model_subtractive"),
+                self.t("model_filamentmixer"),
             ])
             self._model_combo.currentIndexChanged.connect(self._on_model_change)
         opts_layout.addWidget(self._model_combo)
@@ -2279,6 +2428,24 @@ class U1App(QMainWindow):
         self._hint_label.setObjectName("hint")
         self._hint_label.setWordWrap(True)
         seq_col.addWidget(self._hint_label)
+        # Stripe risk label (Change 4)
+        self._stripe_label = QLabel("")
+        self._stripe_label.setObjectName("hint")
+        self._stripe_label.setWordWrap(True)
+        seq_col.addWidget(self._stripe_label)
+        # Layer schedule row (Change 8)
+        self._layer_sched_labels = []
+        layer_sched_row = QHBoxLayout()
+        layer_sched_row.setSpacing(2)
+        for i in range(12):
+            lbl = QLabel(f"L{i+1}")
+            lbl.setFixedSize(28, 28)
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setStyleSheet("background-color: #1e293b; border-radius: 4px; font-size: 8px;")
+            self._layer_sched_labels.append(lbl)
+            layer_sched_row.addWidget(lbl)
+        layer_sched_row.addStretch()
+        seq_col.addLayout(layer_sched_row)
         copy_btn = QPushButton(self.t("btn_copy"))
         copy_btn.setFixedHeight(30)
         copy_btn.clicked.connect(self._copy_sequence)
@@ -2472,6 +2639,7 @@ class U1App(QMainWindow):
         f2 = _section("🌈  " + ("Farb-Generierung" if self.lang == "de" else "Color Generation"))
         _btn(f2, self.t("btn_gradient"), "#0e7490", self._open_gradient_dialog)
         _btn(f2, self.t("btn_harmonies"), "#7c3aed", self._open_harmonies_dialog)
+        _btn(f2, self.t("btn_multi_gradient"), "#0e7490", self._open_multi_gradient_dialog)
         if _HAS_PIL:
             _btn(f2, self.t("btn_palette"), "#374151", self._import_palette_from_image)
         _btn(f2, self.t("btn_multitarget"), "#7c3aed", self._open_multitarget_optimizer)
@@ -2505,15 +2673,28 @@ class U1App(QMainWindow):
     # ═══════════════════════════════════════════════════════════════════════════
 
     def _simulate_mix(self, sequence, fils):
-        """Color simulation: linear (additive), TD-weighted, or subtractive."""
+        """Color simulation: linear (additive), TD-weighted, subtractive, or FilamentMixer."""
         by_id = {f["id"]: f for f in fils}
         counts = {}
         for fid in sequence:
             counts[fid] = counts.get(fid, 0) + 1
         total = len(sequence)
-        models = ["linear", "td", "subtractive"]
+        models = ["linear", "td", "subtractive", "filamentmixer"]
         idx = self._model_combo.currentIndex() if hasattr(self, "_model_combo") else 0
-        model = models[idx] if 0 <= idx < 3 else "linear"
+        model = models[idx] if 0 <= idx < len(models) else "linear"
+
+        if model == "filamentmixer":
+            if not sequence or not fils:
+                return rgb_to_lab((128, 128, 128))
+            fids = [int(s) for s in sequence]
+            fil_map = {f["id"]: hex_to_rgb(f["hex"]) for f in fils}
+            r, g, b = fil_map.get(fids[0], (128, 128, 128))
+            for i in range(1, len(fids)):
+                r2, g2, b2 = fil_map.get(fids[i], (r, g, b))
+                t = 1.0 / (i + 1)
+                r, g, b = filament_mixer_lerp(r, g, b, r2, g2, b2, t)
+            return rgb_to_lab((r, g, b))
+
         r_acc = g_acc = b_acc = 0.0
         total_w = 0.0
         for fid, cnt in counts.items():
@@ -2839,7 +3020,7 @@ class U1App(QMainWindow):
             # Hint
             lh = self._lh_spin.value()
             n_fils = _seq_filament_count(seq)
-            pat_str = "/".join(seq)
+            pat_str = ",".join(seq)
             if n_fils == 1:
                 hint = self.t("hint_pure")
             elif n_fils == 2 and lh > 0:
@@ -2855,10 +3036,52 @@ class U1App(QMainWindow):
             self._show_top3()
             self._update_history(self._target_hex, result["sim_hex"], dv, seq)
             self._set_status(self.t("status_calculated", de=dv, seq=seq), 5000)
+
+            # Stripe risk check (Change 4)
+            _risk, _risk_msg = check_stripe_risk(seq)
+            if hasattr(self, "_stripe_label"):
+                if _risk:
+                    self._stripe_label.setText(_risk_msg)
+                    self._stripe_label.setStyleSheet("color: #f97316;")
+                else:
+                    self._stripe_label.setText(_risk_msg)
+                    self._stripe_label.setStyleSheet("color: #4ade80;")
+
+            # Layer schedule (Change 8)
+            self._draw_layer_schedule(seq)
         finally:
             if hasattr(self, "_calc_btn"):
                 self._calc_btn.setText(self.t("btn_calculate"))
                 self._calc_btn.setEnabled(True)
+
+    def _draw_layer_schedule(self, sequence):
+        """Update colored squares for first 12 layers showing active filament (Change 8)."""
+        if not hasattr(self, "_layer_sched_labels"):
+            return
+        if not sequence:
+            for lbl in self._layer_sched_labels:
+                lbl.setStyleSheet("background-color: #1e293b; border-radius: 4px; font-size: 8px;")
+                lbl.setText("")
+            return
+        schedule = compute_layer_schedule(sequence, n_layers=12)
+        fils_hex = {f["id"]: f["hex"] for f in self._slot_filaments()}
+        for i, lbl in enumerate(self._layer_sched_labels):
+            if i < len(schedule):
+                fid = schedule[i]
+                color = fils_hex.get(fid, "#888888")
+                try:
+                    r_, g_, b_ = hex_to_rgb(color)
+                    lum = 0.299 * r_ + 0.587 * g_ + 0.114 * b_
+                    tc = "#111111" if lum > 140 else "#eeeeee"
+                except Exception:
+                    tc = "#eeeeee"
+                lbl.setStyleSheet(
+                    f"background-color: {color}; border-radius: 4px; "
+                    f"font-size: 8px; color: {tc};")
+                lbl.setText(f"L{i+1}")
+            else:
+                lbl.setStyleSheet("background-color: #1e293b; border-radius: 4px; font-size: 8px;")
+                lbl.setText("")
 
     def _show_top3(self):
         # Clear existing
@@ -2928,6 +3151,7 @@ class U1App(QMainWindow):
         vid = 5 + len(self._virtual)
         self._virtual.append({
             "vid": vid,
+            "stable_id": 5 + len(self._virtual),
             "target_hex": result["target_hex"],
             "sequence": result["sequence"],
             "sim_hex": result["sim_hex"],
@@ -3141,7 +3365,7 @@ class U1App(QMainWindow):
             bottom_row.addWidget(warn_lbl)
 
         # Cadence hint
-        pat_str = "/".join(vf["sequence"])
+        pat_str = ",".join(vf["sequence"])
         if n_fils == 1:
             hint = self.t("hint_pure")
             hint_col = "#94a3b8"
@@ -3691,7 +3915,7 @@ class U1App(QMainWindow):
                             a_v, b_v = resolve_cadence(v["sequence"])
                             runs = seq_to_runs(v["sequence"])
                             n_f = _seq_filament_count(v["sequence"])
-                            pat = "/".join(v["sequence"])
+                            pat = ",".join(v["sequence"])
                             mode = "cadence" if n_f <= 2 else "pattern"
                             return {**v, "runs": runs, "filament_count": n_f,
                                     "slicer_input_mode": mode, "pattern_string": pat,
@@ -3727,7 +3951,7 @@ class U1App(QMainWindow):
                             n_f = _seq_filament_count(v["sequence"])
                             runs_str = "  ".join(
                                 f"T{fid}x{cnt}" for fid, cnt in seq_to_runs(v["sequence"]))
-                            pat_str = "/".join(v["sequence"])
+                            pat_str = ",".join(v["sequence"])
                             if n_f == 1:
                                 slicer_hint = self.t("txt_pure")
                             elif n_f == 2:
@@ -4458,6 +4682,109 @@ class U1App(QMainWindow):
         btn_close.clicked.connect(dlg.accept)
         row.addWidget(btn_close)
         lay.addLayout(row)
+        dlg.exec()
+
+    # ── MULTI-GRADIENT DIALOG (Change 7) ──────────────────────────────────────
+
+    def _open_multi_gradient_dialog(self):
+        """Multi-Gradient: weighted blend of all 4 slots as virtual head."""
+        fils = self._slot_filaments()
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.t("multi_gradient_title"))
+        dlg.resize(440, 380)
+        layout = QVBoxLayout(dlg)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        title_lbl = QLabel(self.t("multi_gradient_title"))
+        title_lbl.setStyleSheet("font-size: 14pt; font-weight: bold;")
+        layout.addWidget(title_lbl)
+        desc_lbl = QLabel(self.t("multi_gradient_desc"))
+        desc_lbl.setStyleSheet("color: #64748b;")
+        layout.addWidget(desc_lbl)
+
+        weight_spins = []
+        for f in fils:
+            row = QHBoxLayout()
+            sw = QLabel("")
+            sw.setFixedSize(28, 28)
+            sw.setStyleSheet(f"background-color: {f['hex']}; border-radius: 4px;")
+            row.addWidget(sw)
+            row.addWidget(QLabel(f"T{f['id']}"))
+            spin = QDoubleSpinBox()
+            spin.setRange(0, 100)
+            spin.setValue(25)
+            spin.setSuffix("%")
+            spin.setFixedWidth(80)
+            weight_spins.append(spin)
+            row.addWidget(spin)
+            row.addStretch()
+            layout.addLayout(row)
+
+        preview_lbl = QLabel("")
+        preview_lbl.setFixedSize(80, 32)
+        preview_lbl.setStyleSheet("background-color: #808080; border-radius: 6px;")
+        layout.addWidget(preview_lbl)
+
+        def _update_preview():
+            try:
+                ws = [(f["id"], spin.value()) for f, spin in zip(fils, weight_spins)]
+                seq = build_weighted_gradient_sequence(ws, max_len=MAX_SEQ_LEN)
+                if not seq:
+                    return
+                sim_lab = self._simulate_mix([str(x) for x in seq], fils)
+                preview_lbl.setStyleSheet(
+                    f"background-color: {lab_to_hex(sim_lab)}; border-radius: 6px;")
+            except Exception:
+                pass
+
+        for spin in weight_spins:
+            spin.valueChanged.connect(lambda _: _update_preview())
+        _update_preview()
+
+        def _auto_balance():
+            n = len(weight_spins)
+            base = 100.0 / n
+            for spin in weight_spins:
+                spin.setValue(base)
+
+        auto_btn = QPushButton(self.t("multi_gradient_auto"))
+        auto_btn.clicked.connect(_auto_balance)
+        layout.addWidget(auto_btn)
+
+        def _add_as_virtual():
+            try:
+                ws = [(f["id"], spin.value()) for f, spin in zip(fils, weight_spins)]
+                seq = build_weighted_gradient_sequence(ws, max_len=MAX_SEQ_LEN)
+                if not seq:
+                    return
+                seq_str = "".join(str(x) for x in seq)
+                sim_lab = self._simulate_mix(list(seq_str), fils)
+                sim_hex = lab_to_hex(sim_lab)
+                result = {
+                    "target_hex": sim_hex,
+                    "sequence": seq_str,
+                    "sim_hex": sim_hex,
+                    "de": 0.0,
+                    "seq_len": len(seq_str),
+                }
+                self.add_virtual(result)
+                dlg.accept()
+            except Exception as e:
+                QMessageBox.critical(dlg, self.t("dlg_error"), str(e))
+
+        add_btn = QPushButton(self.t("multi_gradient_add"))
+        add_btn.setStyleSheet(
+            "QPushButton { background-color: #15803d; color: white; font-size: 13px; "
+            "font-weight: bold; border-radius: 6px; } "
+            "QPushButton:hover { background-color: #16a34a; }")
+        add_btn.setFixedHeight(42)
+        add_btn.clicked.connect(_add_as_virtual)
+        layout.addWidget(add_btn)
+
+        close_btn = QPushButton(self.t("exp_cancel"))
+        close_btn.clicked.connect(dlg.accept)
+        layout.addWidget(close_btn)
         dlg.exec()
 
     # ── HARMONIES DIALOG ───────────────────────────────────────────────────────
