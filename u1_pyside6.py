@@ -21,7 +21,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QPalette, QColor, QFont, QPainter, QBrush, QKeySequence, QShortcut,
-    QPixmap, QIcon, QCursor,
+    QPixmap, QIcon, QCursor, QImage,
 )
 
 try:
@@ -855,8 +855,13 @@ def hex_to_rgb(hex_str):
     except ValueError:
         return (128, 128, 128)
 
+_LAB_CACHE: dict = {}
+
 def rgb_to_lab(rgb):
-    r, g, b = [x / 255.0 for x in rgb]
+    key = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
+    if key in _LAB_CACHE:
+        return _LAB_CACHE[key]
+    r, g, b = [x / 255.0 for x in key]
     r = (r / 12.92) if r <= 0.04045 else ((r + 0.055) / 1.055) ** 2.4
     g = (g / 12.92) if g <= 0.04045 else ((g + 0.055) / 1.055) ** 2.4
     b = (b / 12.92) if b <= 0.04045 else ((b + 0.055) / 1.055) ** 2.4
@@ -864,7 +869,9 @@ def rgb_to_lab(rgb):
     y =  r * 0.2126 + g * 0.7152 + b * 0.0722
     z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883
     x, y, z = [v**(1/3) if v > 0.008856 else 7.787*v + 16/116 for v in [x, y, z]]
-    return (116*y - 16, 500*(x - y), 200*(y - z))
+    result = (116*y - 16, 500*(x - y), 200*(y - z))
+    _LAB_CACHE[key] = result
+    return result
 
 def lab_to_hex(lab):
     L, a, b = lab
@@ -2633,6 +2640,18 @@ class U1App(QMainWindow):
         self._lh_spin.setSuffix(" mm")
         self._lh_spin.valueChanged.connect(self._on_lh_changed)
         lh_layout.addWidget(self._lh_spin)
+        # Print height input (for statistics)
+        lh_layout.addWidget(QLabel("/" + ("Druckhöhe" if self.lang == "de" else "Print height") + ":"))
+        self._print_h_spin = QDoubleSpinBox()
+        self._print_h_spin.setRange(0.0, 500.0)
+        self._print_h_spin.setSingleStep(1.0)
+        self._print_h_spin.setDecimals(1)
+        self._print_h_spin.setValue(0.0)
+        self._print_h_spin.setSuffix(" mm")
+        self._print_h_spin.setToolTip("Druckhöhe für Statistik (0 = deaktiviert)" if self.lang == "de"
+                                       else "Print height for statistics (0 = disabled)")
+        self._print_h_spin.valueChanged.connect(self._update_print_stats)
+        lh_layout.addWidget(self._print_h_spin)
         lh_hint = QLabel(self.t("lh_hint"))
         lh_hint.setObjectName("hint")
         lh_hint.setWordWrap(True)
@@ -3216,6 +3235,10 @@ class U1App(QMainWindow):
         self._hint_label.setObjectName("hint")
         self._hint_label.setWordWrap(True)
         seq_col.addWidget(self._hint_label)
+        self._stats_label = QLabel("")
+        self._stats_label.setObjectName("hint")
+        self._stats_label.setWordWrap(True)
+        seq_col.addWidget(self._stats_label)
         # Stripe risk label (Change 4)
         self._stripe_label = QLabel("")
         self._stripe_label.setObjectName("hint")
@@ -3234,6 +3257,13 @@ class U1App(QMainWindow):
             layer_sched_row.addWidget(lbl)
         layer_sched_row.addStretch()
         seq_col.addLayout(layer_sched_row)
+        # Sequence preview bar — full-width colored strip
+        self._seq_preview = QLabel()
+        self._seq_preview.setFixedHeight(20)
+        self._seq_preview.setMinimumWidth(200)
+        self._seq_preview.setToolTip("Sequenz-Vorschau: jeder Block = 1 Schicht im Zyklus" if self.lang == "de"
+                                      else "Sequence preview: each block = 1 layer in cycle")
+        seq_col.addWidget(self._seq_preview)
         copy_btn = QPushButton(self.t("btn_copy"))
         copy_btn.setFixedHeight(30)
         copy_btn.clicked.connect(self._copy_sequence)
@@ -3840,6 +3870,8 @@ class U1App(QMainWindow):
 
             # Layer schedule (Change 8)
             self._draw_layer_schedule(seq)
+            self._draw_seq_preview(seq)
+            self._update_print_stats()
         finally:
             if hasattr(self, "_calc_btn"):
                 self._calc_btn.setText(self.t("btn_calculate"))
@@ -3873,6 +3905,71 @@ class U1App(QMainWindow):
             else:
                 lbl.setStyleSheet("background-color: #1e293b; border-radius: 4px; font-size: 8px;")
                 lbl.setText("")
+
+    def _draw_seq_preview(self, sequence):
+        """Paint a full-width bar where each cell = one slot in the sequence."""
+        if not hasattr(self, "_seq_preview"):
+            return
+        if not sequence:
+            self._seq_preview.setPixmap(QPixmap())
+            return
+        fils_hex = {f["id"]: f["hex"] for f in self._slot_filaments()}
+        n = len(sequence)
+        w = max(self._seq_preview.width(), 200)
+        h = 20
+        cell_w = max(1, w // n)
+        total_w = cell_w * n
+        img = QImage(total_w, h, QImage.Format_RGB32)
+        img.fill(QColor("#1e293b"))
+        painter = QPainter(img)
+        painter.setPen(Qt.NoPen)
+        for i, fid in enumerate(sequence):
+            color = fils_hex.get(fid, "#888888")
+            painter.setBrush(QColor(color))
+            painter.drawRect(i * cell_w, 0, cell_w, h)
+        painter.end()
+        self._seq_preview.setPixmap(QPixmap.fromImage(img))
+
+    def _update_print_stats(self):
+        """Recompute and display print statistics."""
+        if not hasattr(self, "_stats_label"):
+            return
+        seq = getattr(self, "_seq_label", None)
+        seq_text = seq.text().strip() if seq else ""
+        if not seq_text or seq_text == "----------":
+            self._stats_label.setText("")
+            return
+        lh = self._lh_spin.value() if hasattr(self, "_lh_spin") else 0.08
+        ph = self._print_h_spin.value() if hasattr(self, "_print_h_spin") else 0.0
+        if ph <= 0 or lh <= 0:
+            self._stats_label.setText("")
+            return
+        sequence = list(seq_text)
+        total_layers = max(1, round(ph / lh))
+        cycle_len = len(sequence)
+        # Count tool changes: whenever consecutive layers differ
+        full_cycles = total_layers // cycle_len
+        remainder = total_layers % cycle_len
+        extended = sequence * full_cycles + sequence[:remainder]
+        tool_changes = sum(1 for i in range(1, len(extended)) if extended[i] != extended[i-1])
+        # layers per filament
+        from collections import Counter
+        counts = Counter(extended)
+        # estimate change time: ~30s per change
+        change_time_min = tool_changes * 30 / 60
+        if self.lang == "de":
+            parts = [f"📊 {total_layers} Schichten · {tool_changes} Werkzeugwechsel"]
+            for fid, cnt in sorted(counts.items()):
+                pct = 100.0 * cnt / total_layers
+                parts.append(f"  T{fid}: {cnt} Lagen ({pct:.0f}%)")
+            parts.append(f"  ~{change_time_min:.0f} min Wechselzeit (30s/Wechsel)")
+        else:
+            parts = [f"📊 {total_layers} layers · {tool_changes} tool changes"]
+            for fid, cnt in sorted(counts.items()):
+                pct = 100.0 * cnt / total_layers
+                parts.append(f"  T{fid}: {cnt} layers ({pct:.0f}%)")
+            parts.append(f"  ~{change_time_min:.0f} min change time (30s/change)")
+        self._stats_label.setText("\n".join(parts))
 
     def _show_top3(self):
         # Clear existing
@@ -6314,24 +6411,72 @@ class U1App(QMainWindow):
     # ── WEB UPDATE LIBRARY ────────────────────────────────────────────────────
 
     def _web_update_library(self):
-        from PySide6.QtWidgets import QMessageBox
-        try:
-            import urllib.request
-            with urllib.request.urlopen(_COMMUNITY_URL, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
+        """Download community filament DB async — no UI freeze."""
+        btn = None
+        # find the button and disable it temporarily
+        for child in self.findChildren(QPushButton):
+            if "online" in child.text().lower() or "update" in child.text().lower():
+                btn = child
+                break
+
+        self._set_status("⏳ " + ("Community-DB wird heruntergeladen…" if self.lang == "de"
+                                   else "Downloading community DB…"))
+
+        class _FetchWorker(QThread):
+            done = Signal(dict)   # {"added": N, "error": str|None, "data": [...]}
+            def __init__(self, url):
+                super().__init__()
+                self._url = url
+            def run(self):
+                import urllib.request
+                try:
+                    with urllib.request.urlopen(self._url, timeout=15) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                    self.done.emit({"added": -1, "error": None, "data": data})
+                except Exception as e:
+                    self.done.emit({"added": 0, "error": str(e), "data": []})
+
+        def _on_done(result):
+            if result["error"]:
+                self._set_status("❌ " + result["error"], 6000)
+                QMessageBox.warning(self, "Community DB", result["error"])
+                return
+            data = result["data"]
             added = 0
-            existing_names = {e.get("name", "").lower() for e in self._library}
-            for entry in data:
-                if entry.get("name", "").lower() not in existing_names:
-                    self._library.append(entry)
-                    added += 1
-            self._save_settings()
-            QMessageBox.information(
-                self, self.t("lib_update_title"),
-                self.t("lib_update_result").format(added)
-            )
-        except Exception as e:
-            QMessageBox.warning(self, self.t("lib_update_title"), str(e))
+            if isinstance(data, dict):
+                # format: {"BrandName": [{name, hex, td}, ...], ...}
+                for brand, fils in data.items():
+                    if not isinstance(fils, list):
+                        continue
+                    existing = {f.get("name","").lower() for f in self.library.get(brand, [])}
+                    new_fils = [f for f in fils
+                                if isinstance(f, dict) and "name" in f and "hex" in f
+                                and f["name"].lower() not in existing]
+                    if new_fils:
+                        self.library.setdefault(brand, []).extend(new_fils)
+                        added += len(new_fils)
+            elif isinstance(data, list):
+                # flat list format
+                all_names = {f.get("name","").lower()
+                            for fils in self.library.values() for f in fils}
+                for entry in data:
+                    if not isinstance(entry, dict) or "name" not in entry or "hex" not in entry:
+                        continue
+                    if entry["name"].lower() not in all_names:
+                        brand = entry.get("brand", "Community")
+                        self.library.setdefault(brand, []).append(entry)
+                        added += 1
+            self._save_db()
+            msg = (f"✅ {added} neue Filamente hinzugefügt." if self.lang == "de"
+                   else f"✅ {added} new filaments added.")
+            self._set_status(msg, 6000)
+            QMessageBox.information(self, "Community DB", msg)
+
+        worker = _FetchWorker(_COMMUNITY_URL)
+        worker.done.connect(_on_done)
+        # keep reference so GC doesn't kill it
+        self._community_worker = worker
+        worker.start()
 
     # ── LAB 3D PLOT ──────────────────────────────────────────────────────────
 
