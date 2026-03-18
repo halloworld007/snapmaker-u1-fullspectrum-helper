@@ -7501,27 +7501,178 @@ class U1FullSpectrumApp(ctk.CTk):
             existing.lift()
             return
 
+        # get current slot hex to pre-fill color filter
+        slot_hex = None
+        if hasattr(self, "slots") and slot_idx < len(self.slots):
+            h = self.slots[slot_idx]["hex"].get().strip()
+            if len(h.lstrip("#")) == 6:
+                slot_hex = h if h.startswith("#") else "#" + h
+
         win = ctk.CTkToplevel(self)
-        win.title("Filament suchen")
-        win.geometry("420x560")
+        win.title(f"Filament suchen — Slot T{slot_idx + 1}")
+        win.geometry("520x600")
         self._search_wins[slot_idx] = win
         win.protocol("WM_DELETE_WINDOW", lambda: (self._search_wins.pop(slot_idx, None), win.destroy()))
 
-        # Brand filter row
-        brand_row = ctk.CTkFrame(win, fg_color="transparent")
-        brand_row.pack(fill="x", padx=8, pady=(8, 2))
-        brand_var = ctk.StringVar(value="Alle")
-        all_brands = ["Alle"] + list(self.library.keys())
-        brand_menu = ctk.CTkOptionMenu(brand_row, variable=brand_var, values=all_brands,
-                                        width=180)
-        brand_menu.pack(side="left")
+        # deep-copy library so orca imports don't mutate parent
+        _local_library = {k: list(v) for k, v in self.library.items()}
 
+        # ── Color filter row ─────────────────────────────────────────────
+        color_row = ctk.CTkFrame(win, fg_color="transparent")
+        color_row.pack(fill="x", padx=8, pady=(8, 2))
+
+        ctk.CTkLabel(color_row, text="Farbfilter:").pack(side="left", padx=(0, 4))
+
+        _filter_hex = [None]   # mutable container for active color filter
+
+        swatch_btn = tk.Button(color_row, width=2, relief="solid", bd=2,
+                               bg="#444444", cursor="hand2")
+        swatch_btn.pack(side="left", padx=(0, 4))
+
+        color_hex_var = ctk.StringVar()
+        color_entry = ctk.CTkEntry(color_row, textvariable=color_hex_var,
+                                   placeholder_text="#RRGGBB", width=100)
+        color_entry.pack(side="left", padx=(0, 4))
+
+        def _refresh_swatch():
+            if _filter_hex[0]:
+                swatch_btn.configure(bg=_filter_hex[0])
+            else:
+                swatch_btn.configure(bg="#444444")
+
+        def _set_color_filter(hex_color):
+            _filter_hex[0] = hex_color
+            color_hex_var.set(hex_color)
+            _refresh_swatch()
+            _schedule_update()
+
+        def _clear_color_filter():
+            _filter_hex[0] = None
+            color_hex_var.set("")
+            _refresh_swatch()
+            _schedule_update()
+
+        def _pick_color():
+            initial = _filter_hex[0] if _filter_hex[0] else "#808080"
+            result = colorchooser.askcolor(color=initial, title="Zielfarbe wählen", parent=win)
+            if result and result[1]:
+                _set_color_filter(result[1].upper())
+
+        swatch_btn.configure(command=_pick_color)
+
+        def _use_slot_color():
+            if slot_hex:
+                _set_color_filter(slot_hex)
+            else:
+                messagebox.showinfo("Info", "Kein Slot-Farbwert verfügbar.", parent=win)
+
+        slot_btn = ctk.CTkButton(color_row, text="🎯 Slot-Farbe", width=100,
+                                  command=_use_slot_color)
+        slot_btn.pack(side="left", padx=(0, 4))
+
+        clear_btn = ctk.CTkButton(color_row, text="✕", width=28,
+                                   command=_clear_color_filter)
+        clear_btn.pack(side="left")
+
+        # ── Text search row ──────────────────────────────────────────────
         search_var = ctk.StringVar()
-        entry = ctk.CTkEntry(win, textvariable=search_var, placeholder_text="Suchen...")
-        entry.pack(fill="x", padx=8, pady=(2, 4))
+        entry = ctk.CTkEntry(win, textvariable=search_var, placeholder_text="Name / Brand suchen...")
+        entry.pack(fill="x", padx=8, pady=(4, 2))
         entry.focus()
 
-        # Use tk.Listbox for keyboard navigation and double-click support
+        # ── Brand filter + OrcaSlicer import row ─────────────────────────
+        brand_row = ctk.CTkFrame(win, fg_color="transparent")
+        brand_row.pack(fill="x", padx=8, pady=(2, 4))
+        brand_var = ctk.StringVar(value="Alle")
+        all_brands = ["Alle"] + list(_local_library.keys())
+        brand_menu = ctk.CTkOptionMenu(brand_row, variable=brand_var, values=all_brands,
+                                        width=180)
+        brand_menu.pack(side="left", padx=(0, 8))
+
+        status_var = ctk.StringVar(value="")
+        status_lbl = ctk.CTkLabel(brand_row, textvariable=status_var,
+                                   text_color="#94a3b8", font=ctk.CTkFont(size=11))
+
+        def _find_orca_dirs():
+            import platform
+            found = []
+            seen = set()
+            def add(path):
+                norm = os.path.normcase(os.path.normpath(path))
+                if norm not in seen and os.path.isdir(path):
+                    seen.add(norm)
+                    found.append(path)
+            if platform.system() == "Windows":
+                appdata = os.environ.get("APPDATA", "")
+                if appdata and os.path.isdir(appdata):
+                    for entry in os.scandir(appdata):
+                        if not entry.is_dir(): continue
+                        if any(x in entry.name.lower() for x in ["orca", "snapmaker_orca", "bambu"]):
+                            for sub in ["user/default/filament", "user/filament"]:
+                                add(os.path.join(entry.path, sub))
+            elif platform.system() == "Darwin":
+                base = os.path.expanduser("~/Library/Application Support")
+                if os.path.isdir(base):
+                    for e in os.scandir(base):
+                        if e.is_dir() and "orca" in e.name.lower():
+                            for sub in ["user/default/filament", "user/filament"]:
+                                add(os.path.join(e.path, sub))
+            else:
+                base = os.path.expanduser("~/.config")
+                if os.path.isdir(base):
+                    for e in os.scandir(base):
+                        if e.is_dir() and "orca" in e.name.lower():
+                            add(os.path.join(e.path, "user", "default", "filament"))
+            return found
+
+        def _import_orca_profiles():
+            dirs = _find_orca_dirs()
+            if not dirs:
+                messagebox.showinfo("OrcaSlicer", "Keine OrcaSlicer-Installation gefunden.", parent=win)
+                return
+            brand = "OrcaSlicer (lokal)"
+            imported = []
+            for d in dirs:
+                for fname in os.listdir(d):
+                    if not fname.endswith(".json"):
+                        continue
+                    try:
+                        with open(os.path.join(d, fname), "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        name = data.get("filament_settings_id") or data.get("name") or fname[:-5]
+                        if isinstance(name, list): name = name[0]
+                        colors = data.get("filament_colour", ["#808080"])
+                        if isinstance(colors, list) and colors:
+                            hex_c = colors[0].strip()
+                        else:
+                            hex_c = "#808080"
+                        if not hex_c.startswith("#"):
+                            hex_c = "#" + hex_c
+                        td_raw = data.get("filament_density", [None])
+                        if isinstance(td_raw, list): td_raw = td_raw[0]
+                        try:
+                            td = float(td_raw) if td_raw and td_raw != "nil" else 1.24
+                        except Exception:
+                            td = 1.24
+                        imported.append({"name": name, "hex": hex_c, "td": td})
+                    except Exception:
+                        continue
+            if not imported:
+                messagebox.showinfo("OrcaSlicer", "Keine Profile gefunden.", parent=win)
+                return
+            _local_library[brand] = imported
+            # update brand menu
+            cur_brands = ["Alle"] + list(_local_library.keys())
+            brand_menu.configure(values=cur_brands)
+            status_var.set(f"✅ {len(imported)} OrcaSlicer-Profile geladen")
+            _schedule_update()
+
+        orca_btn = ctk.CTkButton(brand_row, text="📂 OrcaSlicer importieren",
+                                  command=_import_orca_profiles)
+        orca_btn.pack(side="left", padx=(0, 8))
+        status_lbl.pack(side="left")
+
+        # ── Results listbox ──────────────────────────────────────────────
         list_frame = ctk.CTkFrame(win, fg_color="#0f172a", corner_radius=6)
         list_frame.pack(fill="both", expand=True, padx=8, pady=4)
         listbox = tk.Listbox(list_frame, bg="#0f172a", fg="#e2e8f0",
@@ -7532,6 +7683,12 @@ class U1FullSpectrumApp(ctk.CTk):
         listbox.configure(yscrollcommand=listbox_scroll.set)
         listbox_scroll.pack(side="right", fill="y")
         listbox.pack(side="left", fill="both", expand=True, padx=4, pady=4)
+
+        # ── Count label ──────────────────────────────────────────────────
+        count_var = ctk.StringVar(value="")
+        count_lbl = ctk.CTkLabel(win, textvariable=count_var,
+                                  text_color="#94a3b8", font=ctk.CTkFont(size=11))
+        count_lbl.pack(fill="x", padx=8)
 
         # Store search results for apply
         _results = []
@@ -7573,20 +7730,79 @@ class U1FullSpectrumApp(ctk.CTk):
         def _update_results():
             listbox.delete(0, "end")
             _results.clear()
-            q = search_var.get().lower()
+            q = search_var.get().lower().strip()
             brand_filter = brand_var.get()
-            count = 0
-            for brand, filaments in self.library.items():
+
+            # Compute target lab if color filter active
+            target_lab = None
+            if _filter_hex[0]:
+                try:
+                    target_lab = rgb_to_lab(hex_to_rgb(_filter_hex[0]))
+                except Exception:
+                    target_lab = None
+
+            # Collect matching candidates
+            candidates = []
+            for brand, filaments in _local_library.items():
                 if brand_filter != "Alle" and brand != brand_filter:
                     continue
                 for fil in filaments:
-                    if q in brand.lower() or q in fil.get("name", "").lower() or q in fil.get("hex", "").lower():
-                        if count >= 200:
-                            break
-                        count += 1
-                        _results.append((brand, fil))
-                        name_str = f"{brand} — {fil.get('name', '?')}  {fil.get('hex', '')}"
-                        listbox.insert("end", name_str)
+                    name = fil.get("name", "")
+                    if q and q not in brand.lower() and q not in name.lower():
+                        continue
+                    de = None
+                    if target_lab:
+                        try:
+                            fil_lab = rgb_to_lab(hex_to_rgb(fil.get("hex", "#808080")))
+                            de = delta_e(target_lab, fil_lab)
+                        except Exception:
+                            de = 9999.0
+                    candidates.append((de, brand, fil))
+
+            # Sort: by ΔE if color filter active, else by brand+name
+            if target_lab:
+                candidates.sort(key=lambda x: (x[0] if x[0] is not None else 9999))
+            else:
+                candidates.sort(key=lambda x: (x[1].lower(), x[2].get("name", "").lower()))
+
+            for de, brand, fil in candidates[:300]:
+                _results.append((brand, fil))
+                name_str = fil.get("name", "?")
+                hex_c = fil.get("hex", "")
+                if de is not None:
+                    display = f"ΔE {de:5.1f}  {brand} — {name_str}  ({hex_c})"
+                else:
+                    display = f"{brand} — {name_str}  ({hex_c})"
+                listbox.insert("end", display)
+
+            total = len(candidates)
+            shown = min(300, total)
+            if target_lab:
+                count_var.set(f"{shown}/{total} Filamente — sortiert nach ΔE (CIEDE2000)")
+            else:
+                count_var.set(f"{shown}/{total} Filamente")
+
+        # handle color hex entry changes
+        def _on_color_hex_changed(*args):
+            text = color_hex_var.get().strip()
+            if not text.startswith("#"):
+                text = "#" + text
+            if len(text) == 7:
+                try:
+                    # validate hex
+                    int(text[1:], 16)
+                    _filter_hex[0] = text.upper()
+                    _refresh_swatch()
+                    _schedule_update()
+                    return
+                except ValueError:
+                    pass
+            if not color_hex_var.get().strip() or color_hex_var.get().strip() == "#":
+                _filter_hex[0] = None
+                _refresh_swatch()
+                _schedule_update()
+
+        color_hex_var.trace_add("write", _on_color_hex_changed)
 
         listbox.bind("<Double-Button-1>", lambda e: _apply_selected())
         listbox.bind("<Return>", lambda e: _apply_selected())
@@ -7598,7 +7814,11 @@ class U1FullSpectrumApp(ctk.CTk):
                                 command=_apply_selected)
         ok_btn.pack(fill="x", padx=8, pady=(0, 8))
 
-        _update_results()
+        # pre-fill slot color if available
+        if slot_hex:
+            _set_color_filter(slot_hex)
+        else:
+            _update_results()
 
     # ── FEATURE 8: FILAMENT DISTANCE MATRIX ──────────────────────────────────
 
