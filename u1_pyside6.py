@@ -855,6 +855,11 @@ def hex_to_rgb(hex_str):
     except ValueError:
         return (128, 128, 128)
 
+def rgb_to_hex(r, g, b):
+    return "#{:02X}{:02X}{:02X}".format(int(max(0, min(255, r))),
+                                         int(max(0, min(255, g))),
+                                         int(max(0, min(255, b))))
+
 _LAB_CACHE: dict = {}
 
 def rgb_to_lab(rgb):
@@ -6314,14 +6319,15 @@ class U1App(QMainWindow):
 
         def _build_lib_fils(self=self):
             fils = []
-            for entry in self._library:
-                fid = (entry.get("id") or entry.get("name", "?"))[:1].upper()
-                fils.append({
-                    "id": fid,
-                    "name": entry.get("name", ""),
-                    "hex": entry.get("hex", "#808080"),
-                    "td": entry.get("td", DEFAULT_TD),
-                })
+            for brand, entries in self.library.items():
+                for entry in entries:
+                    fils.append({
+                        "id": brand[:2],
+                        "name": f"{brand} {entry.get('name', '')}",
+                        "hex": entry.get("hex", "#808080"),
+                        "td": entry.get("td", DEFAULT_TD),
+                        "lab": rgb_to_lab(hex_to_rgb(entry.get("hex", "#808080"))),
+                    })
             return fils
 
         self._build_lib_fils = _build_lib_fils
@@ -6504,14 +6510,12 @@ class U1App(QMainWindow):
         fils = self._slot_filaments()
         colors_hex = [f.get("hex", "#808080") for f in fils]
         for hx in colors_hex:
-            r, g, b = hex_to_rgb(hx)
-            L, a, bv = rgb_to_lab(r, g, b)
+            L, a, bv = rgb_to_lab(hex_to_rgb(hx))
             ax.scatter([a], [bv], [L], c=hx, s=80, depthshade=False)
 
         # Also plot virtual heads
         for v in self._virtual:
-            r, g, b = hex_to_rgb(v.get("hex", "#808080"))
-            L, a, bv = rgb_to_lab(r, g, b)
+            L, a, bv = rgb_to_lab(hex_to_rgb(v.get("hex", "#808080")))
             ax.scatter([a], [bv], [L], c=v.get("hex", "#808080"), s=120, marker="*", depthshade=False)
 
         ax.set_xlabel("a*")
@@ -6560,14 +6564,12 @@ class U1App(QMainWindow):
 
         fils = self._slot_filaments()
         for f in fils:
-            r, g, b = hex_to_rgb(f.get("hex", "#808080"))
-            L, a, bv = rgb_to_lab(r, g, b)
+            L, a, bv = rgb_to_lab(hex_to_rgb(f.get("hex", "#808080")))
             ax.scatter([a], [bv], c=f.get("hex", "#808080"), s=80, zorder=5)
             ax.annotate(f.get("name", "?")[:8], (a, bv), fontsize=7)
 
         for v in self._virtual:
-            r, g, b = hex_to_rgb(v.get("hex", "#808080"))
-            L, a, bv = rgb_to_lab(r, g, b)
+            L, a, bv = rgb_to_lab(hex_to_rgb(v.get("hex", "#808080")))
             ax.scatter([a], [bv], c=v.get("hex", "#808080"), s=120, marker="*", zorder=6)
 
         canvas = FigureCanvasQTAgg(fig)
