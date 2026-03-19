@@ -1155,5 +1155,672 @@
       "td": 5.0
     }
   ],
-  "Eigene Favoriten": []
+  "Eigene Favoriten": [],
+  "Polymaker PolyLite PLA": [
+    {
+      "name": "Black",
+      "hex": "#101820",
+      "td": 0.3
+    },
+    {
+      "name": "White",
+      "hex": "#FFFFFF",
+      "td": 8.5
+    },
+    {
+      "name": "Cold White",
+      "hex": "#EEF0F5",
+      "td": 8.0
+    },
+    {
+      "name": "Natural",
+      "hex": "#E8E6D0",
+      "td": 7.5
+    },
+    {
+      "name": "Grey",
+      "hex": "#91999F",
+      "td": 4.5
+    },
+    {
+      "name": "Steel Grey",
+      "hex": "#616469",
+      "td": 2.0
+    },
+    {
+      "name": "Dark Grey",
+      "hex": "#4A4E51",
+      "td": 1.0
+    },
+    {
+      "name": "Red",
+      "hex": "#E72F1D",
+      "td": 3.5
+    },
+    {
+      "name": "Wine Red",
+      "hex": "#AE1215",
+      "td": 2.0
+    },
+    {
+      "name": "Orange",
+      "hex": "#F67405",
+      "td": 4.5
+    },
+    {
+      "name": "Lemon Yellow",
+      "hex": "#F1D335",
+      "td": 6.5
+    },
+    {
+      "name": "Cream",
+      "hex": "#E5C8A2",
+      "td": 6.5
+    },
+    {
+      "name": "Beige",
+      "hex": "#C6AD74",
+      "td": 5.0
+    },
+    {
+      "name": "Brown",
+      "hex": "#55331A",
+      "td": 1.5
+    },
+    {
+      "name": "Azure Blue",
+      "hex": "#0066D9",
+      "td": 3.5
+    },
+    {
+      "name": "Aqua Blue",
+      "hex": "#39B9DB",
+      "td": 4.5
+    },
+    {
+      "name": "Stone Blue",
+      "hex": "#40719A",
+      "td": 3.0
+    },
+    {
+      "name": "Teal",
+      "hex": "#52BBB1",
+      "td": 4.0
+    },
+    {
+      "name": "Green",
+      "hex": "#06924D",
+      "td": 3.0
+    },
+    {
+      "name": "Lime Green",
+      "hex": "#DEDE00",
+      "td": 6.0
+    },
+    {
+      "name": "Jungle Green",
+      "hex": "#446B20",
+      "td": 2.0
+    },
+    {
+      "name": "Purple",
+      "hex": "#7A4F9E",
+      "td": 3.0
+    },
+    {
+      "name": "Magenta",
+      "hex": "#F2306E",
+      "td": 4.0
+    },
+    {
+      "name": "Pink",
+      "hex": "#EE9BB5",
+      "td": 5.5
+    }
+  ],
+  "Polymaker PolyTerra PLA": [
+    {
+      "name": "Charcoal Black",
+      "hex": "#4C4E56",
+      "td": 0.3
+    },
+    {
+      "name": "Cotton White",
+      "hex": "#FFFFFF",
+      "td": 8.5
+    },
+    {
+      "name": "Fossil Grey",
+      "hex": "#9B9EA0",
+      "td": 4.5
+    },
+    {
+      "name": "Lava Red",
+      "hex": "#DE4343",
+      "td": 3.5
+    },
+    {
+      "name": "Army Red",
+      "hex": "#BC3E44",
+      "td": 2.5
+    },
+    {
+      "name": "Sunrise Orange",
+      "hex": "#F99963",
+      "td": 5.5
+    },
+    {
+      "name": "Savannah Yellow",
+      "hex": "#FFE17F",
+      "td": 7.0
+    },
+    {
+      "name": "Forest Green",
+      "hex": "#70AE68",
+      "td": 3.5
+    },
+    {
+      "name": "Muted Green",
+      "hex": "#7D8B72",
+      "td": 4.0
+    },
+    {
+      "name": "Army Dark Green",
+      "hex": "#68724D",
+      "td": 2.5
+    },
+    {
+      "name": "Lime Green",
+      "hex": "#A8D55A",
+      "td": 5.5
+    },
+    {
+      "name": "Sapphire Blue",
+      "hex": "#0078BF",
+      "td": 3.0
+    },
+    {
+      "name": "Arctic Teal",
+      "hex": "#73CEC6",
+      "td": 5.0
+    },
+    {
+      "name": "Army Blue",
+      "hex": "#375172",
+      "td": 1.5
+    },
+    {
+      "name": "Sky Blue",
+      "hex": "#7BBCD5",
+      "td": 5.5
+    },
+    {
+      "name": "Lavender Purple",
+      "hex": "#AE96D4",
+      "td": 5.5
+    },
+    {
+      "name": "Army Purple",
+      "hex": "#5A3E72",
+      "td": 1.5
+    },
+    {
+      "name": "Sakura Pink",
+      "hex": "#E4BDD0",
+      "td": 6.5
+    },
+    {
+      "name": "Pastel Ice",
+      "hex": "#8BD5EE",
+      "td": 6.5
+    },
+    {
+      "name": "Pastel Banana",
+      "hex": "#FEE5A5",
+      "td": 7.5
+    },
+    {
+      "name": "Pastel Watermelon",
+      "hex": "#FC6371",
+      "td": 5.5
+    },
+    {
+      "name": "Pastel Mint",
+      "hex": "#C8EF97",
+      "td": 7.0
+    },
+    {
+      "name": "Pastel Peach",
+      "hex": "#FFC29E",
+      "td": 6.5
+    },
+    {
+      "name": "Wood Brown",
+      "hex": "#D2A273",
+      "td": 5.0
+    },
+    {
+      "name": "Earth Brown",
+      "hex": "#775C50",
+      "td": 2.0
+    },
+    {
+      "name": "Army Beige",
+      "hex": "#DFC8B7",
+      "td": 6.0
+    }
+  ],
+  "eSUN ePLA-Matte": [
+    {
+      "name": "Deep Black",
+      "hex": "#2A2A2A",
+      "td": 0.3
+    },
+    {
+      "name": "Dark Grey",
+      "hex": "#5A5A5A",
+      "td": 1.5
+    },
+    {
+      "name": "Milky White",
+      "hex": "#EDE8E0",
+      "td": 8.0
+    },
+    {
+      "name": "Almond Yellow",
+      "hex": "#E8C87A",
+      "td": 5.5
+    },
+    {
+      "name": "Mint Green",
+      "hex": "#7DCFB0",
+      "td": 5.0
+    },
+    {
+      "name": "Peach Pink",
+      "hex": "#F0B8A8",
+      "td": 6.5
+    },
+    {
+      "name": "Light Khaki",
+      "hex": "#C8BA90",
+      "td": 6.0
+    },
+    {
+      "name": "Lake Blue",
+      "hex": "#4A8FB5",
+      "td": 3.5
+    },
+    {
+      "name": "Lilac",
+      "hex": "#B89CC8",
+      "td": 5.5
+    },
+    {
+      "name": "Tangerine",
+      "hex": "#F08040",
+      "td": 5.0
+    },
+    {
+      "name": "Strawberry Red",
+      "hex": "#C8364A",
+      "td": 3.0
+    },
+    {
+      "name": "Matcha Green",
+      "hex": "#8AAE78",
+      "td": 4.5
+    },
+    {
+      "name": "Morandi Green",
+      "hex": "#7A9A80",
+      "td": 4.0
+    },
+    {
+      "name": "Morandi Purple",
+      "hex": "#8878A8",
+      "td": 4.0
+    },
+    {
+      "name": "Fire Engine Red",
+      "hex": "#CC2020",
+      "td": 2.5
+    },
+    {
+      "name": "Olive Green",
+      "hex": "#7A8050",
+      "td": 3.0
+    },
+    {
+      "name": "Concrete",
+      "hex": "#A0A098",
+      "td": 4.5
+    }
+  ],
+  "ColorFabb PLA/PHA": [
+    {
+      "name": "Standard Black",
+      "hex": "#1A1A1A",
+      "td": 0.3
+    },
+    {
+      "name": "Standard White",
+      "hex": "#F0F0F0",
+      "td": 8.5
+    },
+    {
+      "name": "Natural",
+      "hex": "#DDD9C4",
+      "td": 7.5
+    },
+    {
+      "name": "Dutch Orange",
+      "hex": "#E85B1A",
+      "td": 4.0
+    },
+    {
+      "name": "Traffic Red",
+      "hex": "#CC0000",
+      "td": 2.5
+    },
+    {
+      "name": "Sky Blue",
+      "hex": "#5B9DC9",
+      "td": 4.5
+    },
+    {
+      "name": "Blue Grey",
+      "hex": "#6B7E8C",
+      "td": 3.5
+    },
+    {
+      "name": "Ultra Marine Blue",
+      "hex": "#1B2B8C",
+      "td": 1.5
+    },
+    {
+      "name": "Lila",
+      "hex": "#8B7BAD",
+      "td": 4.5
+    },
+    {
+      "name": "Fluorescent Pink",
+      "hex": "#F52584",
+      "td": 5.0
+    },
+    {
+      "name": "Fluorescent Green",
+      "hex": "#7FCC00",
+      "td": 5.5
+    },
+    {
+      "name": "Mint Turquoise",
+      "hex": "#48C9B0",
+      "td": 5.0
+    },
+    {
+      "name": "Intense Green",
+      "hex": "#007A4D",
+      "td": 2.5
+    },
+    {
+      "name": "Olive Green",
+      "hex": "#6E6E29",
+      "td": 2.0
+    },
+    {
+      "name": "Leaf Green",
+      "hex": "#4E9B4A",
+      "td": 3.5
+    },
+    {
+      "name": "Light Brown",
+      "hex": "#B07D55",
+      "td": 4.0
+    },
+    {
+      "name": "Shining Silver",
+      "hex": "#A0A0A0",
+      "td": 4.5
+    },
+    {
+      "name": "Pale Gold",
+      "hex": "#C9A84C",
+      "td": 5.0
+    },
+    {
+      "name": "Signal Yellow",
+      "hex": "#E5C100",
+      "td": 6.5
+    }
+  ],
+  "ERYONE PLA": [
+    {
+      "name": "Black",
+      "hex": "#1E1E1E",
+      "td": 0.3
+    },
+    {
+      "name": "Ivory White",
+      "hex": "#DCDCD3",
+      "td": 8.0
+    },
+    {
+      "name": "Cool White",
+      "hex": "#E8EAEC",
+      "td": 8.5
+    },
+    {
+      "name": "Red",
+      "hex": "#C02020",
+      "td": 2.5
+    },
+    {
+      "name": "Rose Red",
+      "hex": "#D44060",
+      "td": 3.0
+    },
+    {
+      "name": "Orange",
+      "hex": "#E06820",
+      "td": 4.5
+    },
+    {
+      "name": "Yellow",
+      "hex": "#E8C030",
+      "td": 5.5
+    },
+    {
+      "name": "Apple Green",
+      "hex": "#60B040",
+      "td": 4.5
+    },
+    {
+      "name": "Green",
+      "hex": "#208040",
+      "td": 3.0
+    },
+    {
+      "name": "White Jade",
+      "hex": "#C8E0D0",
+      "td": 7.0
+    },
+    {
+      "name": "Blue",
+      "hex": "#1848A0",
+      "td": 2.0
+    },
+    {
+      "name": "Lavender Purple",
+      "hex": "#9070C0",
+      "td": 4.5
+    },
+    {
+      "name": "Dark Purple",
+      "hex": "#401860",
+      "td": 1.0
+    },
+    {
+      "name": "Silver",
+      "hex": "#909090",
+      "td": 4.0
+    },
+    {
+      "name": "Gray",
+      "hex": "#707070",
+      "td": 3.0
+    },
+    {
+      "name": "Matte Black",
+      "hex": "#2A2A2A",
+      "td": 0.3
+    },
+    {
+      "name": "Matte White",
+      "hex": "#E8E4DC",
+      "td": 8.0
+    },
+    {
+      "name": "Matte Red",
+      "hex": "#B83030",
+      "td": 2.5
+    },
+    {
+      "name": "Matte Navy Blue",
+      "hex": "#203060",
+      "td": 1.5
+    },
+    {
+      "name": "Matte Olive Green",
+      "hex": "#607040",
+      "td": 2.5
+    },
+    {
+      "name": "Matte Mint Green",
+      "hex": "#80C8A8",
+      "td": 5.5
+    },
+    {
+      "name": "Matte Pink",
+      "hex": "#E0889A",
+      "td": 6.0
+    },
+    {
+      "name": "Matte Army Green",
+      "hex": "#506040",
+      "td": 2.0
+    },
+    {
+      "name": "Matte Aqua Blue",
+      "hex": "#5098B0",
+      "td": 4.0
+    }
+  ],
+  "Prusament PLA (HueForge)": [
+    {
+      "name": "Jet Black",
+      "hex": "#24292A",
+      "td": 0.3
+    },
+    {
+      "name": "Gravity Grey",
+      "hex": "#9FA4A7",
+      "td": 0.7
+    },
+    {
+      "name": "Pearl Mouse",
+      "hex": "#A49D8D",
+      "td": 2.3
+    },
+    {
+      "name": "Galaxy Silver",
+      "hex": "#999A9F",
+      "td": 6.4
+    },
+    {
+      "name": "Pristine White",
+      "hex": "#E6EAED",
+      "td": 5.1
+    },
+    {
+      "name": "Vanilla White",
+      "hex": "#D9D4C4",
+      "td": 7.1
+    },
+    {
+      "name": "Noctua Beige",
+      "hex": "#E7CEB4",
+      "td": 7.0
+    },
+    {
+      "name": "Pineapple Yellow",
+      "hex": "#EFD006",
+      "td": 7.6
+    },
+    {
+      "name": "Oh My Gold",
+      "hex": "#CE9F2D",
+      "td": 4.1
+    },
+    {
+      "name": "Prusa Orange",
+      "hex": "#FE6E31",
+      "td": 6.6
+    },
+    {
+      "name": "Lipstick Red",
+      "hex": "#D03036",
+      "td": 3.3
+    },
+    {
+      "name": "Ms. Pink",
+      "hex": "#E34A93",
+      "td": 4.1
+    },
+    {
+      "name": "Azure Blue",
+      "hex": "#0682AC",
+      "td": 6.6
+    },
+    {
+      "name": "Chalky Blue",
+      "hex": "#6F9AAA",
+      "td": 5.0
+    },
+    {
+      "name": "Army Green",
+      "hex": "#5E6344",
+      "td": 0.4
+    },
+    {
+      "name": "Galaxy Green",
+      "hex": "#426639",
+      "td": 3.2
+    },
+    {
+      "name": "Simply Green",
+      "hex": "#70A640",
+      "td": 3.0
+    },
+    {
+      "name": "Prusa Pro Green",
+      "hex": "#00C389",
+      "td": 5.0
+    },
+    {
+      "name": "Lime Green Blend",
+      "hex": "#A7B852",
+      "td": 3.5
+    },
+    {
+      "name": "Pistachio Green",
+      "hex": "#93A683",
+      "td": 4.5
+    },
+    {
+      "name": "Noctua Brown",
+      "hex": "#653525",
+      "td": 1.5
+    }
+  ]
 }
