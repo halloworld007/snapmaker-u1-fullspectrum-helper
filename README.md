@@ -18,6 +18,18 @@ This tool helps you:
 - Generate up to **20 virtual print heads** (V5–V24) for OrcaSlicer
 - Analyze `.3mf` files and find the best matching sequences for all colors in the model
 
+## Screenshots
+
+> *Screenshots werden noch hinzugefügt / Screenshots will be added.*
+
+| Hauptfenster / Main Window | 3MF Farb-Wizard |
+|---|---|
+| ![Main](docs/screenshots/main.png) | ![Wizard](docs/screenshots/wizard.png) |
+
+| Filament-Suche mit ΔE | Sequenz-Vorschau |
+|---|---|
+| ![Search](docs/screenshots/search.png) | ![Preview](docs/screenshots/preview.png) |
+
 ### Features
 
 | Feature | Description |
