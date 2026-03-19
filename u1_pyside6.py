@@ -6184,7 +6184,7 @@ class U1App(QMainWindow):
                     for hx in targets:
                         rgb_t = hex_to_rgb(hx)
                         mixed = self._simulate_mix(seq, fils)
-                        de = delta_e(rgb_to_lab(*rgb_t), rgb_to_lab(*mixed))
+                        de = delta_e(rgb_to_lab(rgb_t), rgb_to_lab(mixed))
                         total_de += de
                     avg = total_de / len(targets)
                     if avg < best_score:
@@ -6260,7 +6260,7 @@ class U1App(QMainWindow):
                             for seq in product(range(len(fils)), repeat=length):
                                 ids = [fils[i]["id"] for i in seq]
                                 mixed = self._simulate_mix_static(ids, fils)
-                                de = delta_e(rgb_to_lab(*rgb_t), rgb_to_lab(*mixed))
+                                de = delta_e(rgb_to_lab(rgb_t), rgb_to_lab(mixed))
                                 if de < best_local:
                                     best_local = de
                         total_de += best_local
@@ -6393,8 +6393,8 @@ class U1App(QMainWindow):
                 # Estimate TD: higher opacity = lower TD
                 # Opacity = how much the base "shows through" vs white
                 # Simple heuristic: TD ~ -log(1 - de_ratio) / layers
-                de_fil = delta_e(rgb_to_lab(r1, g1, b1), rgb_to_lab(255, 255, 255))
-                de_meas = delta_e(rgb_to_lab(r2, g2, b2), rgb_to_lab(255, 255, 255))
+                de_fil = delta_e(rgb_to_lab((r1, g1, b1)), rgb_to_lab((255, 255, 255)))
+                de_meas = delta_e(rgb_to_lab((r2, g2, b2)), rgb_to_lab((255, 255, 255)))
                 if de_fil < 0.1:
                     result_label.setText(self.t("tdcal_white_warn"))
                     return
@@ -6870,7 +6870,7 @@ class U1App(QMainWindow):
             de = 0.0
             if hasattr(self, "_target_hex") and self._target_hex:
                 rgb_t = hex_to_rgb(self._target_hex)
-                de = round(delta_e(rgb_to_lab(*rgb_t), rgb_to_lab(*mixed)), 2)
+                de = round(delta_e(rgb_to_lab(rgb_t), rgb_to_lab(mixed)), 2)
             self._virtual.append({
                 "hex": hx,
                 "label": f"Seq {seq_str}",
