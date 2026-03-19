@@ -6182,9 +6182,9 @@ class U1App(QMainWindow):
                     seq = [fils[i]["id"] for i in combo]
                     total_de = 0.0
                     for hx in targets:
-                        rgb_t = hex_to_rgb(hx)
+                        rgb_t = rgb_to_lab(hex_to_rgb(hx))
                         mixed = self._simulate_mix(seq, fils)
-                        de = delta_e(rgb_to_lab(rgb_t), rgb_to_lab(mixed))
+                        de = delta_e(rgb_t, mixed)
                         total_de += de
                     avg = total_de / len(targets)
                     if avg < best_score:
@@ -6773,12 +6773,12 @@ class U1App(QMainWindow):
             for col_j, f2 in enumerate(fils):
                 seq = [f1["id"], f2["id"]]
                 mixed = self._simulate_mix(seq, fils)
-                hx = rgb_to_hex(*mixed)
+                hx = lab_to_hex(mixed)
                 item = QTableWidgetItem(hx)
                 item.setBackground(
                     __import__("PySide6.QtGui", fromlist=["QColor"]).QColor(hx)
                 )
-                r, g, b = mixed
+                r, g, b = hex_to_rgb(hx)
                 lum = 0.299*r + 0.587*g + 0.114*b
                 fg = "#000000" if lum > 140 else "#FFFFFF"
                 item.setForeground(
@@ -6822,7 +6822,7 @@ class U1App(QMainWindow):
                 return
             seq_label.setText("Sequence: " + "".join(seq))
             mixed = self._simulate_mix(seq, fils)
-            hx = rgb_to_hex(*mixed)
+            hx = lab_to_hex(mixed)
             preview_lbl.setStyleSheet(f"background:{hx};border-radius:4px;")
 
         slot_row = QHBoxLayout()
@@ -6864,13 +6864,13 @@ class U1App(QMainWindow):
                 return
             seq_str = "".join(seq)
             mixed = self._simulate_mix(seq, fils)
-            hx = rgb_to_hex(*mixed)
+            hx = lab_to_hex(mixed)
             lh = self._lh_spin.value() if hasattr(self, "_lh_spin") else 0.2
             cad = calc_cadence(seq, lh)
             de = 0.0
             if hasattr(self, "_target_hex") and self._target_hex:
-                rgb_t = hex_to_rgb(self._target_hex)
-                de = round(delta_e(rgb_to_lab(rgb_t), rgb_to_lab(mixed)), 2)
+                t_lab = rgb_to_lab(hex_to_rgb(self._target_hex))
+                de = round(delta_e(t_lab, mixed), 2)
             self._virtual.append({
                 "hex": hx,
                 "label": f"Seq {seq_str}",
