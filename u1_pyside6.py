@@ -251,7 +251,7 @@ STRINGS = {
     "btn_tc_est": "🔄 Werkzeugwechsel",
     "tc_title": "Werkzeugwechsel-Schätzung",
     "tc_layers": "Druckschichten gesamt:",
-    "tc_result": "Geschätzte Werkzeugwechsel: {n}",
+    "tc_result": "TC/Schicht: {tc}   Layers bis opak: {n}",
     "tc_time": "Zusatzzeit: ~{min:.0f} min  (bei {sec}s/Wechsel)",
     "tc_purge": "Purge: ~{g:.0f}g",
     "btn_harmonies": "🎨 Harmonien",
@@ -422,6 +422,53 @@ STRINGS = {
     "tdcal_measured": "Gemessene Druckfarbe (Hex):",
     "tdcal_title": "TD-Kalibrierung",
     "txt_pattern": "Pattern Mode: {p}",
+    # ── UI labels & dialog strings ──
+    "search_window_title": "Filament-Suche — Slot T{i}",
+    "search_color_filter": "Farbfilter:",
+    "search_color_tip": "Farbe wählen (Ergebnisse nach ΔE sortiert)",
+    "search_color_placeholder": "#RRGGBB  (leer = kein Filter)",
+    "search_slot_color": "🎯 Slot-Farbe",
+    "search_slot_color_tip": "Farbe aus aktuellem Slot übernehmen",
+    "search_clear_tip": "Farbfilter löschen",
+    "search_placeholder": "Name / Marke suchen…",
+    "search_all_brands": "Alle Marken",
+    "search_orca_import": "📂 OrcaSlicer importieren",
+    "search_orca_tip": "Lokale OrcaSlicer-Profile in Suche laden",
+    "search_select": "Auswählen",
+    "seqed_seq_empty": "Sequenz: (leer)",
+    "seqed_seq_prefix": "Sequenz: ",
+    "lbl_gamut": "Gamut:",
+    "lbl_length": "Länge:",
+    "lbl_mix_pct": "Mix %:",
+    "lbl_sort": "Sortierung:",
+    "lbl_print_height": "Druckhöhe:",
+    "lbl_td": "TD:",
+    "compare_run_btn": "▶  Vergleichen",
+    "de_matrix_btn": "📊 ΔE-Matrix",
+    "png_export_btn": "🖼 PNG Export",
+    "txt_json_export_btn": "TXT/JSON Export",
+    "tools_analysis": "Analyse & Visualisierung",
+    "tools_color_gen": "Farb-Generierung",
+    "tools_optimization": "Optimierung & Kalibrierung",
+    "tools_library": "Bibliothek & Datenbank",
+    "tools_export": "Export",
+    "btn_print_stats": "📊 Print-Statistik",
+    "print_stats_title": "Filament-Statistik",
+    "print_stats_desc": "Filamentanteil und -verbrauch pro virtuellem Kopf.",
+    "print_stats_height": "Druckhöhe (mm):",
+    "print_stats_col_head": "Kopf",
+    "print_stats_col_seq": "Sequenz",
+    "print_stats_col_de": "ΔE",
+    "btn_layer_preview": "🔬 Schicht-Vorschau",
+    "layer_preview_title": "Schichtfolgen-Vorschau",
+    "layer_preview_layers": "Schichten anzeigen:",
+    "lbl_local_z": "Local-Z Dithering",
+    "lbl_local_z_tip": "dithering_local_z_mode=1: Jede bemalte Zone erhält eigene Z-Höhenkontrolle.\nVerbessert Qualität bei Multi-Zonen-Drucken (empfohlen ab FS v0.7).",
+    "lbl_adv_dither": "Advanced Dithering",
+    "lbl_adv_dither_tip": "mixed_filament_advanced_dithering=1: Erweiterte Dithering-Kontrolle.\n(Experimentell — nur für erfahrene Nutzer)",
+    "de_quality_excellent": "ausgezeichnet",
+    "de_quality_good": "gut",
+    "de_quality_visible": "sichtbar",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — PySide6 Edition",
@@ -627,7 +674,7 @@ STRINGS = {
     "btn_tc_est": "🔄 Tool Changes",
     "tc_title": "Tool Change Estimator",
     "tc_layers": "Total print layers:",
-    "tc_result": "Estimated tool changes: {n}",
+    "tc_result": "TC/layer: {tc}   Layers to opaque: {n}",
     "tc_time": "Extra time: ~{min:.0f} min  (at {sec}s/change)",
     "tc_purge": "Purge: ~{g:.0f}g",
     "btn_harmonies": "🎨 Harmonies",
@@ -798,6 +845,53 @@ STRINGS = {
     "tdcal_measured": "Measured print color (hex):",
     "tdcal_title": "TD Calibration",
     "txt_pattern": "Pattern Mode: {p}",
+    # ── UI labels & dialog strings ──
+    "search_window_title": "Filament Search — Slot T{i}",
+    "search_color_filter": "Color filter:",
+    "search_color_tip": "Pick color (results sorted by ΔE)",
+    "search_color_placeholder": "#RRGGBB  (empty = no filter)",
+    "search_slot_color": "🎯 Slot Color",
+    "search_slot_color_tip": "Use color from current slot",
+    "search_clear_tip": "Clear color filter",
+    "search_placeholder": "Search name / brand…",
+    "search_all_brands": "All Brands",
+    "search_orca_import": "📂 Import OrcaSlicer",
+    "search_orca_tip": "Load local OrcaSlicer profiles into search",
+    "search_select": "Select",
+    "seqed_seq_empty": "Sequence: (empty)",
+    "seqed_seq_prefix": "Sequence: ",
+    "lbl_gamut": "Gamut:",
+    "lbl_length": "Length:",
+    "lbl_mix_pct": "Mix %:",
+    "lbl_sort": "Sort:",
+    "lbl_print_height": "Print height:",
+    "lbl_td": "TD:",
+    "compare_run_btn": "▶  Compare",
+    "de_matrix_btn": "📊 ΔE Matrix",
+    "png_export_btn": "🖼 PNG Export",
+    "txt_json_export_btn": "TXT/JSON Export",
+    "tools_analysis": "Analysis & Visualization",
+    "tools_color_gen": "Color Generation",
+    "tools_optimization": "Optimization & Calibration",
+    "tools_library": "Library & Database",
+    "tools_export": "Export",
+    "btn_print_stats": "📊 Print Stats",
+    "print_stats_title": "Filament Statistics",
+    "print_stats_desc": "Filament fraction and usage per virtual head.",
+    "print_stats_height": "Print height (mm):",
+    "print_stats_col_head": "Head",
+    "print_stats_col_seq": "Sequence",
+    "print_stats_col_de": "ΔE",
+    "btn_layer_preview": "🔬 Layer Preview",
+    "layer_preview_title": "Layer Sequence Preview",
+    "layer_preview_layers": "Layers to show:",
+    "lbl_local_z": "Local-Z Dithering",
+    "lbl_local_z_tip": "dithering_local_z_mode=1: Each painted zone gets its own Z-height control.\nImproves quality for multi-zone prints (recommended from FS v0.7).",
+    "lbl_adv_dither": "Advanced Dithering",
+    "lbl_adv_dither_tip": "mixed_filament_advanced_dithering=1: Advanced dithering control.\n(Experimental — for experienced users only)",
+    "de_quality_excellent": "excellent",
+    "de_quality_good": "good",
+    "de_quality_visible": "visible",
 },
 }
 
@@ -2107,18 +2201,23 @@ def _parse_3mf_colors(filepath):
 class FilamentSearchDialog(QDialog):
     filament_selected = Signal(int, dict)  # slot_idx, filament_dict
 
-    def __init__(self, slot_idx, library, parent=None, slot_hex=None):
+    def __init__(self, slot_idx, library, parent=None, slot_hex=None, lang="de"):
         super().__init__(parent)
         self.slot_idx = slot_idx
         self.slot_hex = slot_hex  # pre-fill color from slot
+        self.lang = lang
         # deep-copy so orca imports don't mutate parent library
         self.library = {k: list(v) for k, v in library.items()}
         self._filter_hex = None   # active color filter
-        self.setWindowTitle(f"Filament Search — Slot T{slot_idx + 1}")
+        self.setWindowTitle(STRINGS[self.lang].get("search_window_title", "Filament Search — Slot T{i}").format(i=slot_idx + 1))
         self.resize(500, 560)
         self._build_ui()
         if slot_hex:
             self._set_color_filter(slot_hex)
+
+    def _t(self, key, **kwargs):
+        s = STRINGS[self.lang].get(key, STRINGS["de"].get(key, key))
+        return s.format(**kwargs) if kwargs else s
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -2127,29 +2226,29 @@ class FilamentSearchDialog(QDialog):
 
         # ── Color filter row ──────────────────────────────────────────────
         color_row = QHBoxLayout()
-        color_lbl = QLabel("Farbfilter:")
+        color_lbl = QLabel(self._t("search_color_filter"))
         color_row.addWidget(color_lbl)
 
         self._color_swatch = QPushButton()
         self._color_swatch.setFixedSize(28, 28)
-        self._color_swatch.setToolTip("Farbe wählen (Ergebnisse nach ΔE sortiert)")
+        self._color_swatch.setToolTip(self._t("search_color_tip"))
         self._color_swatch.clicked.connect(self._pick_color)
         color_row.addWidget(self._color_swatch)
 
         self._color_hex_edit = QLineEdit()
-        self._color_hex_edit.setPlaceholderText("#RRGGBB  (leer = kein Filter)")
+        self._color_hex_edit.setPlaceholderText(self._t("search_color_placeholder"))
         self._color_hex_edit.setMaximumWidth(120)
         self._color_hex_edit.textChanged.connect(self._on_color_hex_changed)
         color_row.addWidget(self._color_hex_edit)
 
-        slot_btn = QPushButton("🎯 Slot-Farbe")
-        slot_btn.setToolTip("Farbe aus aktuellem Slot übernehmen")
+        slot_btn = QPushButton(self._t("search_slot_color"))
+        slot_btn.setToolTip(self._t("search_slot_color_tip"))
         slot_btn.clicked.connect(self._use_slot_color)
         color_row.addWidget(slot_btn)
 
         clear_btn = QPushButton("✕")
         clear_btn.setFixedWidth(28)
-        clear_btn.setToolTip("Farbfilter löschen")
+        clear_btn.setToolTip(self._t("search_clear_tip"))
         clear_btn.clicked.connect(self._clear_color_filter)
         color_row.addWidget(clear_btn)
         color_row.addStretch()
@@ -2157,20 +2256,20 @@ class FilamentSearchDialog(QDialog):
 
         # ── Text search row ───────────────────────────────────────────────
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("Name / Brand suchen...")
+        self.search_edit.setPlaceholderText(self._t("search_placeholder"))
         layout.addWidget(self.search_edit)
 
         # ── Brand filter ──────────────────────────────────────────────────
         brand_row = QHBoxLayout()
-        brand_row.addWidget(QLabel("Brand:"))
+        brand_row.addWidget(QLabel(self._t("lib_brand")))
         self.brand_combo = QComboBox()
-        self.brand_combo.addItem("Alle Brands")
+        self.brand_combo.addItem(self._t("search_all_brands"))
         for brand in sorted(self.library.keys()):
             self.brand_combo.addItem(brand)
         brand_row.addWidget(self.brand_combo, 1)
 
-        orca_btn = QPushButton("📂 OrcaSlicer importieren")
-        orca_btn.setToolTip("Lokale OrcaSlicer-Profile in Suche laden")
+        orca_btn = QPushButton(self._t("search_orca_import"))
+        orca_btn.setToolTip(self._t("search_orca_tip"))
         orca_btn.clicked.connect(self._import_orca_profiles)
         brand_row.addWidget(orca_btn)
         layout.addLayout(brand_row)
@@ -2187,9 +2286,9 @@ class FilamentSearchDialog(QDialog):
 
         # ── Buttons ───────────────────────────────────────────────────────
         btn_row = QHBoxLayout()
-        self.select_btn = QPushButton("Auswählen")
+        self.select_btn = QPushButton(self._t("search_select"))
         self.select_btn.setObjectName("btn_green")
-        cancel_btn = QPushButton("Abbrechen")
+        cancel_btn = QPushButton(self._t("exp_cancel"))
         btn_row.addWidget(self.select_btn)
         btn_row.addWidget(cancel_btn)
         layout.addLayout(btn_row)
@@ -2859,7 +2958,7 @@ class U1App(QMainWindow):
         self._lh_spin.valueChanged.connect(self._on_lh_changed)
         lh_layout.addWidget(self._lh_spin)
         # Print height input (for statistics)
-        lh_layout.addWidget(QLabel("/" + ("Druckhöhe" if self.lang == "de" else "Print height") + ":"))
+        lh_layout.addWidget(QLabel("/" + self.t("lbl_print_height")))
         self._print_h_spin = QDoubleSpinBox()
         self._print_h_spin.setRange(0.0, 500.0)
         self._print_h_spin.setSingleStep(1.0)
@@ -2980,7 +3079,7 @@ class U1App(QMainWindow):
         hex_row.addWidget(pick_btn)
 
         hex_row.addStretch()
-        td_lbl = QLabel("TD:")
+        td_lbl = QLabel(self.t("lbl_td"))
         hex_row.addWidget(td_lbl)
         td_spin = QDoubleSpinBox()
         td_spin.setRange(0.1, 10.0)
@@ -3382,7 +3481,7 @@ class U1App(QMainWindow):
         gamut_frame.setObjectName("card")
         gamut_frame_layout = QHBoxLayout(gamut_frame)
         gamut_frame_layout.setContentsMargins(6, 4, 6, 4)
-        gamut_lbl = QLabel("Gamut:")
+        gamut_lbl = QLabel(self.t("lbl_gamut"))
         gamut_lbl.setObjectName("hint")
         gamut_frame_layout.addWidget(gamut_lbl)
         self._gamut_strip = GamutStrip()
@@ -3396,7 +3495,7 @@ class U1App(QMainWindow):
         opts_layout = QHBoxLayout(opts_frame)
         opts_layout.setContentsMargins(8, 6, 8, 6)
 
-        opts_layout.addWidget(QLabel("Length:"))
+        opts_layout.addWidget(QLabel(self.t("lbl_length")))
         self._len_spin = QSpinBox()
         self._len_spin.setRange(1, 48)
         self._len_spin.setValue(10)
@@ -3434,7 +3533,7 @@ class U1App(QMainWindow):
         opts_layout.addWidget(self._skin_tone_check)
 
         opts_layout.addSpacing(8)
-        opts_layout.addWidget(QLabel("Mix %:"))
+        opts_layout.addWidget(QLabel(self.t("lbl_mix_pct")))
         self._mix_pct_spin = QDoubleSpinBox()
         self._mix_pct_spin.setRange(1.0, 99.0)
         self._mix_pct_spin.setSingleStep(5.0)
@@ -3692,7 +3791,7 @@ class U1App(QMainWindow):
         sf_layout = QHBoxLayout(sort_filter_bar)
         sf_layout.setContentsMargins(6, 4, 6, 4)
         sf_layout.setSpacing(6)
-        sf_layout.addWidget(QLabel("Sort:" if self.lang == "en" else "Sortierung:"))
+        sf_layout.addWidget(QLabel(self.t("lbl_sort")))
         self._virt_sort = QComboBox()
         self._virt_sort.addItems(["Hinzugefügt", "ΔE ↑", "ΔE ↓", "Label A-Z"])
         self._virt_sort.setFixedWidth(130)
@@ -3748,20 +3847,22 @@ class U1App(QMainWindow):
             return b
 
         # Gamut & Analysis
-        f = _section("🔭  " + ("Analyse & Visualisierung" if self.lang == "de" else "Analysis & Visualization"))
+        f = _section("🔭  " + self.t("tools_analysis"))
         if _HAS_MPL:
             _btn(f, self.t("btn_lab_plot"), "#0f4c81", self._show_lab_plot)
             _btn(f, self.t("btn_gamut_plot"), "#0f4c81", self._open_gamut_plot)
         _btn(f, self.t("btn_swatch"), "#374151", self._save_swatch)
         _btn(f, self.t("btn_slicer_guide"), "#7c3aed", self._open_slicer_guide)
         _btn(f, self.t("btn_tc_est"), "#374151", self._open_tc_estimator)
-        _btn(f, "📊 ΔE-Matrix", "#1e3a5f", self._open_filament_matrix)
+        _btn(f, self.t("btn_print_stats"), "#374151", self._open_print_stats)
+        _btn(f, self.t("btn_layer_preview"), "#0f4c81", self._open_layer_preview)
+        _btn(f, self.t("de_matrix_btn"), "#1e3a5f", self._open_filament_matrix)
         if _HAS_PIL:
-            _btn(f, "🖼 PNG Export", "#374151", self._export_png_summary)
+            _btn(f, self.t("png_export_btn"), "#374151", self._export_png_summary)
         f.addStretch()
 
         # Color generation
-        f2 = _section("🌈  " + ("Farb-Generierung" if self.lang == "de" else "Color Generation"))
+        f2 = _section("🌈  " + self.t("tools_color_gen"))
         _btn(f2, self.t("btn_gradient"), "#0e7490", self._open_gradient_dialog)
         _btn(f2, self.t("btn_harmonies"), "#7c3aed", self._open_harmonies_dialog)
         _btn(f2, self.t("btn_multi_gradient"), "#0e7490", self._open_multi_gradient_dialog)
@@ -3771,21 +3872,21 @@ class U1App(QMainWindow):
         f2.addStretch()
 
         # Optimization
-        f3 = _section("🎯  " + ("Optimierung & Kalibrierung" if self.lang == "de" else "Optimization & Calibration"))
+        f3 = _section("🎯  " + self.t("tools_optimization"))
         _btn(f3, self.t("btn_slot_opt"), "#7c3aed", self._open_slot_optimizer)
         _btn(f3, self.t("btn_td_cal"), "#0f4c81", self._open_td_calibration)
         f3.addStretch()
 
         # Library
-        f4 = _section("📚  " + ("Bibliothek & Datenbank" if self.lang == "de" else "Library & Database"))
+        f4 = _section("📚  " + self.t("tools_library"))
         _btn(f4, self.t("btn_new_brand"), "#1e3a5f", self._add_brand)
         _btn(f4, self.t("btn_library"), "#374151", self._open_library_manager)
         _btn(f4, self.t("btn_web_update"), "#164e63", self._web_update_library)
         f4.addStretch()
 
         # Export
-        f5 = _section("📤  " + ("Export" if self.lang == "en" else "Export"))
-        _btn(f5, "Export TXT/JSON", "#374151", self._open_export_dialog)
+        f5 = _section("📤  " + self.t("tools_export"))
+        _btn(f5, self.t("txt_json_export_btn"), "#374151", self._open_export_dialog)
         _btn(f5, self.t("btn_orca_export"), "#0f766e", self._open_orca_export_dialog)
         _btn(f5, self.t("btn_recipe"), "#374151", self._open_recipe_export)
         f5.addStretch()
@@ -4163,6 +4264,7 @@ class U1App(QMainWindow):
             self._seq_label.setText(seq)
             self._last_sim_hex = result["sim_hex"]
             self._last_de = result["de"]
+            self._last_sequence = list(result.get("sequence", []))
             dv = result["de"]
 
             # Update result swatches
@@ -4696,7 +4798,7 @@ class U1App(QMainWindow):
             h = self._slots[slot_idx]["hex_edit"].text().strip()
             if len(h.lstrip("#")) == 6:
                 slot_hex = h if h.startswith("#") else "#" + h
-        dlg = FilamentSearchDialog(slot_idx, self.library, self, slot_hex=slot_hex)
+        dlg = FilamentSearchDialog(slot_idx, self.library, self, slot_hex=slot_hex, lang=self.lang)
         dlg.filament_selected.connect(self._on_filament_search_select)
         self._search_wins[slot_idx] = dlg
         dlg.show()
@@ -6007,7 +6109,7 @@ class U1App(QMainWindow):
         alt_combo.setMinimumWidth(240)
         ctrl_row.addWidget(alt_combo, 1)
 
-        compare_btn = QPushButton("▶  Vergleichen")
+        compare_btn = QPushButton(self.t("compare_run_btn"))
         compare_btn.setFixedHeight(36)
         ctrl_row.addWidget(compare_btn)
         layout.addLayout(ctrl_row)
@@ -6077,6 +6179,203 @@ class U1App(QMainWindow):
 
         close_btn = QPushButton(self.t("exp_cancel"))
         close_btn.clicked.connect(dlg.reject)
+        layout.addWidget(close_btn)
+        dlg.exec()
+
+    # ── PRINT STATISTICS ──────────────────────────────────────────────────────
+
+    def _open_print_stats(self):
+        """Filament usage statistics for all virtual heads."""
+        if not self._virtual:
+            QMessageBox.information(self, self.t("dlg_note"), self.t("orca_no_virtual"))
+            return
+        from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
+            QLabel, QPushButton, QTableWidget, QTableWidgetItem,
+            QDoubleSpinBox, QAbstractItemView)
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.t("print_stats_title"))
+        dlg.resize(900, 480)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(QLabel(self.t("print_stats_desc")))
+
+        h_row = QHBoxLayout()
+        h_row.addWidget(QLabel(self.t("print_stats_height")))
+        h_spin = QDoubleSpinBox()
+        h_spin.setRange(0.0, 9999.0)
+        h_spin.setValue(100.0)
+        h_spin.setDecimals(1)
+        h_spin.setSuffix(" mm")
+        h_row.addWidget(h_spin)
+        h_row.addStretch()
+        layout.addLayout(h_row)
+
+        # Columns: Head | Label | Seq | T1% | T2% | T3% | T4% | T1 mm | T2 mm | T3 mm | T4 mm | ΔE
+        col_headers = [
+            self.t("print_stats_col_head"),
+            self.t("de_overview_col_label"),
+            self.t("print_stats_col_seq"),
+            "T1 %", "T2 %", "T3 %", "T4 %",
+            "T1 mm", "T2 mm", "T3 mm", "T4 mm",
+            self.t("print_stats_col_de"),
+        ]
+        table = QTableWidget(0, len(col_headers))
+        table.setHorizontalHeaderLabels(col_headers)
+        table.horizontalHeader().setSectionResizeMode(2, 1)  # stretch seq col
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        layout.addWidget(table, 1)
+
+        fils = self._slot_filaments()
+        fil_colors = {str(f["id"]): f.get("hex", "#808080") for f in fils}
+
+        def _refresh_fixed():
+            total_h = h_spin.value()
+            lh = self._lh_spin.value()
+            total_layers = round(total_h / lh) if lh > 0 else 0
+            table.setRowCount(0)
+            for vf in self._virtual:
+                seq = vf.get("sequence", "")
+                if not seq:
+                    continue
+                seq_len = len(seq)
+                row = table.rowCount()
+                table.insertRow(row)
+                table.setItem(row, 0, QTableWidgetItem(f"V{vf['vid']}"))
+                table.setItem(row, 1, QTableWidgetItem(vf.get("label", "")))
+                table.setItem(row, 2, QTableWidgetItem(seq))
+                for i, slot_id in enumerate(["1", "2", "3", "4"]):
+                    cnt = seq.count(slot_id)
+                    pct = cnt / seq_len * 100
+                    pct_item = QTableWidgetItem(f"{pct:.0f}%" if cnt > 0 else "—")
+                    if cnt > 0:
+                        hx = fil_colors.get(slot_id, "#808080")
+                        try:
+                            r, g, b = hex_to_rgb(hx)
+                            pct_item.setBackground(QColor(r, g, b, 120))
+                        except Exception:
+                            pass
+                    table.setItem(row, 3 + i, pct_item)
+                    mm_val = pct / 100 * total_layers * lh if total_layers > 0 else 0
+                    mm_item = QTableWidgetItem(f"{mm_val:.0f}" if cnt > 0 else "—")
+                    table.setItem(row, 7 + i, mm_item)
+                de = vf.get("de", 0.0)
+                de_item = QTableWidgetItem(f"{de:.1f}")
+                de_item.setForeground(QColor(_de_color(de)))
+                table.setItem(row, 11, de_item)
+
+        h_spin.valueChanged.connect(_refresh_fixed)
+        _refresh_fixed()
+
+        close_btn = QPushButton(self.t("exp_cancel"))
+        close_btn.clicked.connect(dlg.accept)
+        layout.addWidget(close_btn)
+        dlg.exec()
+
+    # ── LAYER SEQUENCE PREVIEW ────────────────────────────────────────────────
+
+    def _open_layer_preview(self):
+        """Visual layer-by-layer color strip preview."""
+        from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
+            QLabel, QPushButton, QSpinBox, QScrollArea, QWidget, QComboBox)
+        from PySide6.QtGui import QPainter, QColor as _QColor
+        from PySide6.QtCore import Qt as _Qt
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.t("layer_preview_title"))
+        dlg.resize(680, 560)
+        layout = QVBoxLayout(dlg)
+
+        # Controls
+        ctrl_row = QHBoxLayout()
+
+        # Virtual head selector
+        head_combo = QComboBox()
+        head_combo.addItem(self.t("sec1_title") if hasattr(self, "_result") else "Calculator", "calc")
+        for vf in self._virtual:
+            head_combo.addItem(f"V{vf['vid']}  {vf.get('label', '')}", f"v{vf['vid']}")
+        ctrl_row.addWidget(QLabel("Head:" if self.lang == "en" else "Kopf:"))
+        ctrl_row.addWidget(head_combo)
+
+        ctrl_row.addSpacing(12)
+        ctrl_row.addWidget(QLabel(self.t("layer_preview_layers")))
+        n_spin = QSpinBox()
+        n_spin.setRange(4, 200)
+        n_spin.setValue(40)
+        n_spin.setSingleStep(4)
+        ctrl_row.addWidget(n_spin)
+        ctrl_row.addStretch()
+        layout.addLayout(ctrl_row)
+
+        # Canvas widget
+        class LayerCanvas(QWidget):
+            def __init__(self, parent=None):
+                super().__init__(parent)
+                self.layers = []  # list of (r,g,b)
+                self.setMinimumHeight(300)
+            def set_layers(self, layers):
+                self.layers = layers
+                self.update()
+            def paintEvent(self, event):
+                if not self.layers:
+                    return
+                p = QPainter(self)
+                w = self.width()
+                h = self.height()
+                n = len(self.layers)
+                lh = max(1, h // n)
+                for i, (r, g, b) in enumerate(self.layers):
+                    y = i * lh
+                    p.fillRect(0, y, w, lh, _QColor(r, g, b))
+                p.end()
+
+        canvas = LayerCanvas()
+        scroll = QScrollArea()
+        scroll.setWidget(canvas)
+        scroll.setWidgetResizable(True)
+        layout.addWidget(scroll, 1)
+
+        fils = self._slot_filaments()
+        by_id = {str(f["id"]): f for f in fils}
+
+        def _get_seq_and_fils():
+            key = head_combo.currentData()
+            if key == "calc":
+                seq = getattr(self, "_last_sequence", None)
+                if not seq:
+                    return [], fils
+                return list(seq), fils
+            else:
+                vid = int(key[1:])
+                vf = next((v for v in self._virtual if v["vid"] == vid), None)
+                if vf is None:
+                    return [], fils
+                return list(vf.get("sequence", "")), fils
+
+        def _refresh():
+            seq, cur_fils = _get_seq_and_fils()
+            if not seq:
+                canvas.set_layers([])
+                return
+            n = n_spin.value()
+            layers = []
+            cur_by_id = {str(f["id"]): f for f in cur_fils}
+            for i in range(n):
+                fid = seq[i % len(seq)]
+                fil = cur_by_id.get(str(fid), {})
+                hx = fil.get("hex", "#808080")
+                try:
+                    r, g, b = hex_to_rgb(hx)
+                except Exception:
+                    r, g, b = 128, 128, 128
+                layers.append((r, g, b))
+            canvas.set_layers(layers)
+            canvas.setMinimumHeight(max(300, n * 8))
+
+        head_combo.currentIndexChanged.connect(_refresh)
+        n_spin.valueChanged.connect(_refresh)
+        _refresh()
+
+        close_btn = QPushButton(self.t("exp_cancel"))
+        close_btn.clicked.connect(dlg.accept)
         layout.addWidget(close_btn)
         dlg.exec()
 
@@ -6152,13 +6451,13 @@ class U1App(QMainWindow):
             seq = vf["sequence"]
             de = vf.get("de", 0.0)
             if de < DE_GOOD:
-                q_text = "✓ " + ("excellent" if self.lang == "en" else "ausgezeichnet")
+                q_text = "✓ " + self.t("de_quality_excellent")
                 q_col = QColor("#4ade80")
             elif de < DE_OK:
-                q_text = "~ " + ("good" if self.lang == "en" else "gut")
+                q_text = "~ " + self.t("de_quality_good")
                 q_col = QColor("#fbbf24")
             else:
-                q_text = "✗ " + ("visible" if self.lang == "en" else "sichtbar")
+                q_text = "✗ " + self.t("de_quality_visible")
                 q_col = QColor("#f87171")
 
             table.setItem(row, 0, QTableWidgetItem(f"V{vf['vid']}"))
@@ -7345,7 +7644,7 @@ class U1App(QMainWindow):
             layers_to_opaque = round(td / lh) if lh > 0 else 0
             result_lbl.setText(
                 self.t("tc_result").format(
-                    round(tc, 4), layers_to_opaque
+                    tc=round(tc, 4), n=layers_to_opaque
                 )
             )
 
@@ -7422,7 +7721,7 @@ class U1App(QMainWindow):
         fils = self._slot_filaments()
         seq = []
 
-        seq_label = QLabel("Sequence: (empty)")
+        seq_label = QLabel(self.t("seqed_seq_empty"))
         lay.addWidget(seq_label)
 
         preview_lbl = QLabel()
@@ -7432,10 +7731,10 @@ class U1App(QMainWindow):
 
         def _update_preview():
             if not seq or not fils:
-                seq_label.setText("Sequence: (empty)")
+                seq_label.setText(self.t("seqed_seq_empty"))
                 preview_lbl.setStyleSheet("background:#808080;border-radius:4px;")
                 return
-            seq_label.setText("Sequence: " + "".join(seq))
+            seq_label.setText(self.t("seqed_seq_prefix") + "".join(seq))
             mixed = self._simulate_mix(seq, fils)
             hx = lab_to_hex(mixed)
             preview_lbl.setStyleSheet(f"background:{hx};border-radius:4px;")
@@ -8041,16 +8340,12 @@ class FullSpectrumExportDialog(QDialog):
         self._count_lbl.setStyleSheet("color: #94a3b8;")
         set_layout.addWidget(self._count_lbl)
         set_layout.addSpacing(16)
-        self._local_z_check = QCheckBox("Local-Z Dithering")
-        self._local_z_check.setToolTip(
-            "dithering_local_z_mode=1: Jede bemalte Zone bekommt eigene Z-Höhenkontrolle.\n"
-            "Verbessert Qualität bei Multi-Zonen-Drucken (empfohlen für v0.9.4+).")
+        self._local_z_check = QCheckBox(app.t("lbl_local_z"))
+        self._local_z_check.setToolTip(app.t("lbl_local_z_tip"))
         set_layout.addWidget(self._local_z_check)
         set_layout.addSpacing(8)
-        self._adv_dither_check = QCheckBox("Advanced Dithering")
-        self._adv_dither_check.setToolTip(
-            "mixed_filament_advanced_dithering=1: Aktiviert erweiterte Dithering-Kontrollen\n"
-            "(experimentell, nur für erfahrene Nutzer).")
+        self._adv_dither_check = QCheckBox(app.t("lbl_adv_dither"))
+        self._adv_dither_check.setToolTip(app.t("lbl_adv_dither_tip"))
         set_layout.addWidget(self._adv_dither_check)
         set_layout.addStretch()
         layout.addWidget(set_grp)
