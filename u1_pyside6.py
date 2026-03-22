@@ -2943,7 +2943,7 @@ class U1App(QMainWindow):
         # Sidebar
         sidebar_scroll = QScrollArea()
         sidebar_scroll.setWidgetResizable(True)
-        sidebar_scroll.setFixedWidth(300)
+        sidebar_scroll.setFixedWidth(340)
         sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         sidebar_inner = QWidget()
         sidebar_layout = QVBoxLayout(sidebar_inner)
@@ -3169,11 +3169,11 @@ class U1App(QMainWindow):
         td_spin.valueChanged.connect(lambda v, i=idx: self._update_gamut_strip())
         hex_row.addWidget(td_spin)
 
+        body_layout.addLayout(hex_row)
+
         translucent_check = QCheckBox(self.t("transluc_check"))
         translucent_check.setToolTip(self.t("transluc_tip"))
-        translucent_check.setFixedWidth(110)
-        hex_row.addWidget(translucent_check)
-        body_layout.addLayout(hex_row)
+        body_layout.addWidget(translucent_check)
 
         frame_layout.addWidget(body)
 
@@ -3699,10 +3699,10 @@ class U1App(QMainWindow):
         seq_col = QVBoxLayout()
         seq_col.setAlignment(Qt.AlignCenter)
         self._seq_label = ClickableLabel("----------")
-        font = QFont("Courier New", 28, QFont.Bold)
-        self._seq_label.setFont(font)
-        self._seq_label.setStyleSheet("color: #4ade80;")
+        self._seq_label.setFont(QFont("Courier New", 13, QFont.Bold))
+        self._seq_label.setStyleSheet("color: #4ade80; letter-spacing: 1px;")
         self._seq_label.setAlignment(Qt.AlignCenter)
+        self._seq_label.setWordWrap(True)
         self._seq_label.setToolTip(self.t("seq_label_click_tip"))
         seq_col.addWidget(self._seq_label)
         _copy_hint_lbl = QLabel(self.t("seq_click_copy_hint"))
@@ -4362,10 +4362,11 @@ class U1App(QMainWindow):
             # Result border color based on ΔE
             self._set_result_border(dv)
 
-            # Hint
+            # Hint — use run-length encoding for compact display
             lh = self._lh_spin.value()
             n_fils = _seq_filament_count(seq)
-            pat_str = ",".join(seq)
+            runs = seq_to_runs(seq)
+            pat_str = " ".join(f"T{fid}×{cnt}" for fid, cnt in runs)
             if n_fils == 1:
                 hint = self.t("hint_pure")
             elif n_fils == 2 and lh > 0:
@@ -4454,7 +4455,7 @@ class U1App(QMainWindow):
         painter = QPainter(img)
         painter.setPen(Qt.NoPen)
         for i, fid in enumerate(sequence):
-            color = fils_hex.get(fid, "#888888")
+            color = fils_hex.get(int(fid), "#888888")
             painter.setBrush(QColor(color))
             painter.drawRect(i * cell_w, 0, cell_w, h)
         painter.end()
