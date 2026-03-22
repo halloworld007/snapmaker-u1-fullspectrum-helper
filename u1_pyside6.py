@@ -31,6 +31,12 @@ except ImportError:
     _HAS_PIL = False
 
 try:
+    from filament_mixer import GPMixer as _GPMixer
+    _HAS_FILAMENT_MIXER = True
+except ImportError:
+    _HAS_FILAMENT_MIXER = False
+
+try:
     import matplotlib
     matplotlib.use("QtAgg")
     import matplotlib.pyplot as _plt
@@ -64,6 +70,11 @@ STRINGS = {
     "optimizer_check": "Optimizer (24 Combos)",
     "btn_add_virtual": "➕ Als virtuellen Druckkopf",
     "sec2_title": "VIRTUELLE DRUCKKÖPFE  V5–V24",
+    "sec2_desc": "bis zu {max_v} virtuelle Köpfe",
+    "dlg_save_err": "Speicherfehler",
+    "tdcal_calc": "TD berechnen",
+    "tdcal_white_warn": "⚠ Weißes Filament nicht geeignet für TD-Kalibrierung.",
+    "tdcal_result": "Geschätztes TD: {:.2f}",
     "btn_3mf": "🔬 3MF Assistent",
     "btn_del_all": "🗑 Alle löschen",
     "btn_undo": "↩ Rückgängig",
@@ -254,7 +265,7 @@ STRINGS = {
     "model_linear": "Additiv (FullSpectrum)",
     "model_td": "TD-gewichtet",
     "model_subtractive": "Subtraktiv",
-    "model_filamentmixer": "FilamentMixer (Pigment)",
+    "model_filamentmixer": "FilamentMixer (GPMixer/Pigment)",
     "stripe_risk": "\u26a0 Streifenrisiko \u2014 Sequenzl\u00e4nge {n} ung\u00fcnstig",
     "stripe_ok": "\u2713 Kein Streifenrisiko",
     "btn_multi_gradient": "\U0001f308 Multi-Gradient",
@@ -360,6 +371,11 @@ STRINGS = {
     "optimizer_check": "Optimizer (24 Combos)",
     "btn_add_virtual": "➕ Add as Virtual Head",
     "sec2_title": "VIRTUAL PRINT HEADS  V5–V24",
+    "sec2_desc": "up to {max_v} virtual heads",
+    "dlg_save_err": "Save Error",
+    "tdcal_calc": "Calculate TD",
+    "tdcal_white_warn": "⚠ White filament not suitable for TD calibration.",
+    "tdcal_result": "Estimated TD: {:.2f}",
     "btn_3mf": "🔬 3MF Assistant",
     "btn_del_all": "🗑 Delete All",
     "btn_undo": "↩ Undo",
@@ -550,7 +566,7 @@ STRINGS = {
     "model_linear": "Additive (FullSpectrum)",
     "model_td": "TD-weighted",
     "model_subtractive": "Subtractive",
-    "model_filamentmixer": "FilamentMixer (Pigment)",
+    "model_filamentmixer": "FilamentMixer (GPMixer/Pigment)",
     "stripe_risk": "\u26a0 Stripe risk \u2014 sequence length {n} unfavorable",
     "stripe_ok": "\u2713 No stripe risk",
     "btn_multi_gradient": "\U0001f308 Multi-Gradient",
@@ -1129,7 +1145,8 @@ def calc_cadence(sequence, layer_height):
     return result
 
 
-def build_mixed_filament_definitions(virtual_heads, layer_height=0.08):
+def build_mixed_filament_definitions(virtual_heads, layer_height=0.08,
+                                      local_z=False, advanced_dithering=False):
     """Build the mixed_filament_definitions string for FullSpectrum slicer.
 
     Each virtual head becomes one row in the semicolon-delimited string.
@@ -1196,8 +1213,8 @@ def build_mixed_filament_definitions(virtual_heads, layer_height=0.08):
                 weights[0] += diff
             grad_w = "/".join(str(w) for w in weights)
 
-            # Manual pattern: the sequence as comma-joined groups
-            pattern = ",".join(seq)
+            # Manual pattern: compact form (e.g. "11112222") — native slicer format
+            pattern = "".join(seq)
 
             # Use first and last unique filament as component_a/b
             fid_a, fid_b = unique_ids[0], unique_ids[-1]
@@ -1218,9 +1235,9 @@ def build_mixed_filament_definitions(virtual_heads, layer_height=0.08):
         extra_cfg["mixed_color_layer_height_b"] = str(layer_height)
 
     extra_cfg["dithering_z_step_size"] = "0.0"
-    extra_cfg["dithering_local_z_mode"] = "0"
+    extra_cfg["dithering_local_z_mode"] = "1" if local_z else "0"
     extra_cfg["dithering_step_painted_zones_only"] = "1"
-    extra_cfg["mixed_filament_advanced_dithering"] = "0"
+    extra_cfg["mixed_filament_advanced_dithering"] = "1" if advanced_dithering else "0"
     extra_cfg["mixed_filament_gradient_mode"] = "0"
     extra_cfg["mixed_filament_height_lower_bound"] = "0.04"
     extra_cfg["mixed_filament_height_upper_bound"] = str(round(layer_height * 4, 3))
@@ -1229,7 +1246,8 @@ def build_mixed_filament_definitions(virtual_heads, layer_height=0.08):
 
 
 def inject_fullspectrum_into_3mf(input_path, output_path, virtual_heads,
-                                   physical_filaments, layer_height=0.08):
+                                   physical_filaments, layer_height=0.08,
+                                   local_z=False, advanced_dithering=False):
     """Write FullSpectrum mixed_filament_definitions into a .3mf project file.
 
     input_path:        path to existing .3mf file (or None to create minimal skeleton)
@@ -1246,7 +1264,8 @@ def inject_fullspectrum_into_3mf(input_path, output_path, virtual_heads,
         return False, "Keine virtuellen Druckköpfe definiert."
 
     # Build the definitions string
-    defs_str, extra_cfg = build_mixed_filament_definitions(virtual_heads, layer_height)
+    defs_str, extra_cfg = build_mixed_filament_definitions(
+        virtual_heads, layer_height, local_z=local_z, advanced_dithering=advanced_dithering)
 
     # Physical filament colors for filament_colour array
     phys_colors = [f.get("hex", "#808080") for f in physical_filaments if f.get("hex")]
@@ -2292,6 +2311,7 @@ class U1App(QMainWindow):
 
         self._build_ui()
         self._apply_theme(self._theme)
+        self.setAcceptDrops(True)
 
         # Restore geometry
         geom = self._settings.value("geometry")
@@ -2324,6 +2344,34 @@ class U1App(QMainWindow):
         # Keyboard shortcuts
         QShortcut(QKeySequence("Ctrl+Z"), self, self._undo_last)
         QShortcut(QKeySequence("Return"), self, self._calc)
+        QShortcut(QKeySequence("Ctrl+S"), self, self._save_project)
+        QShortcut(QKeySequence("Ctrl+O"), self, self._load_project)
+        QShortcut(QKeySequence("Delete"), self, self._delete_selected_virtual)
+
+    # ── DRAG & DROP ──────────────────────────────────────────────────────────
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if any(u.toLocalFile().lower().endswith((".3mf", ".obj")) for u in urls):
+                event.acceptProposedAction()
+                return
+        event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if path.lower().endswith(".3mf"):
+                self._open_3mf_with_path(path)
+                break
+            elif path.lower().endswith(".obj"):
+                self._open_obj_assistant(path)
+                break
+        event.acceptProposedAction()
 
     def closeEvent(self, event):
         self._save_settings()
@@ -3054,6 +3102,57 @@ class U1App(QMainWindow):
             self._calc()
         self._refresh_virtual_grid()
 
+    def _apply_mix_pct(self):
+        """Build a 2-filament sequence from a direct percentage value."""
+        if not self._target_hex:
+            QMessageBox.information(self, self.t("dlg_note"), self.t("dlg_select_color"))
+            return
+        pct_b = self._mix_pct_spin.value() / 100.0  # fraction for T2
+        pct_a = 1.0 - pct_b
+
+        # Find best 2 filaments for this target
+        fils = self._slot_filaments()
+        t_lab = rgb_to_lab(hex_to_rgb(self._target_hex))
+        best_pair = None
+        best_de = float("inf")
+        for i in range(len(fils)):
+            for j in range(i + 1, len(fils)):
+                sim = self._simulate_mix(
+                    [fils[i]["id"]] * round(pct_a * 10) + [fils[j]["id"]] * round(pct_b * 10),
+                    fils)
+                de = delta_e(sim, t_lab)
+                if de < best_de:
+                    best_de = de
+                    best_pair = (fils[i], fils[j])
+
+        if best_pair is None:
+            return
+
+        # Build balanced integer sequence (minority=1)
+        fa, fb = best_pair
+        if pct_a <= pct_b:
+            minority_id, majority_id = fa["id"], fb["id"]
+            ratio = round(pct_b / pct_a) if pct_a > 0 else 8
+        else:
+            minority_id, majority_id = fb["id"], fa["id"]
+            ratio = round(pct_a / pct_b) if pct_b > 0 else 8
+        ratio = max(1, min(ratio, 24))
+        seq = [str(minority_id)] + [str(majority_id)] * ratio
+
+        # Trigger full calc with this sequence as target
+        self._auto_check.setChecked(False)
+        self._len_spin.setValue(len(seq))
+        result = self._calc_for_color(
+            self._target_hex, optimizer=False, seq_len=len(seq), auto=False)
+        if result:
+            self._seq_label.setText(result["sequence"])
+            self._last_sim_hex = result["sim_hex"]
+            self._last_de = result["de"]
+            self._last_result = result
+            self._set_status(
+                f"Mix {int(self._mix_pct_spin.value())}% T{fb['id']} → "
+                f"Seq {''.join(seq)} — ΔE {result['de']:.1f}", 5000)
+
     # ═══════════════════════════════════════════════════════════════════════════
     # TAB 1 — CALCULATOR
     # ═══════════════════════════════════════════════════════════════════════════
@@ -3176,6 +3275,24 @@ class U1App(QMainWindow):
 
         self._optimizer_check = QCheckBox(self.t("optimizer_check").replace("\n", " "))
         opts_layout.addWidget(self._optimizer_check)
+
+        opts_layout.addSpacing(8)
+        opts_layout.addWidget(QLabel("Mix %:"))
+        self._mix_pct_spin = QDoubleSpinBox()
+        self._mix_pct_spin.setRange(1.0, 99.0)
+        self._mix_pct_spin.setSingleStep(5.0)
+        self._mix_pct_spin.setValue(50.0)
+        self._mix_pct_spin.setDecimals(0)
+        self._mix_pct_spin.setMaximumWidth(70)
+        self._mix_pct_spin.setToolTip(
+            "Direkte Prozent-Eingabe für 2-Filament-Mischung.\n"
+            "Beispiel: 30% → Sequenz 1222 (T2 dominiert)")
+        opts_layout.addWidget(self._mix_pct_spin)
+        mix_btn = QPushButton("→ Seq")
+        mix_btn.setFixedWidth(55)
+        mix_btn.setToolTip("Sequenz aus %-Verhältnis erzeugen (nur 2 Filamente)")
+        mix_btn.clicked.connect(self._apply_mix_pct)
+        opts_layout.addWidget(mix_btn)
 
         opts_layout.addStretch()
 
@@ -3537,8 +3654,22 @@ class U1App(QMainWindow):
         if model == "filamentmixer":
             if not sequence or not fils:
                 return rgb_to_lab((128, 128, 128))
-            fids = [int(s) for s in sequence]
             fil_map = {f["id"]: hex_to_rgb(f["hex"]) for f in fils}
+            if _HAS_FILAMENT_MIXER:
+                # Use GPMixer (dE≈1.79) — matches FullSpectrum slicer preview
+                try:
+                    colors = [fil_map.get(int(s), (128, 128, 128)) for s in sequence]
+                    weights = [1.0 / len(colors)] * len(colors)
+                    mixer = _GPMixer()
+                    result_rgb = mixer.mix_n_colors(
+                        [(r / 255, g / 255, b / 255) for r, g, b in colors], weights)
+                    r = int(result_rgb[0] * 255)
+                    g = int(result_rgb[1] * 255)
+                    b = int(result_rgb[2] * 255)
+                    return rgb_to_lab((r, g, b))
+                except Exception:
+                    pass  # fall through to polynomial approximation
+            fids = [int(s) for s in sequence]
             r, g, b = fil_map.get(fids[0], (128, 128, 128))
             for i in range(1, len(fids)):
                 r2, g2, b2 = fil_map.get(fids[i], (r, g, b))
@@ -3773,6 +3904,7 @@ class U1App(QMainWindow):
             de = result["de"]
             self._live_de_label.setText(f"≈ΔE {de:.1f}")
             self._live_de_label.setStyleSheet(f"color: {_de_color(de)};")
+        self._check_auto_suggestion(raw)
 
     def _apply_target(self, hex_str):
         if not hex_str.startswith("#"):
@@ -3897,6 +4029,12 @@ class U1App(QMainWindow):
                 else:
                     self._stripe_label.setText(_risk_msg)
                     self._stripe_label.setStyleSheet("color: #4ade80;")
+
+            # Material compatibility check
+            seq_ids = [int(c) - 1 for c in seq if c.isdigit()]
+            compat_warn = self._check_material_compatibility(seq_ids)
+            if compat_warn:
+                self._set_status(compat_warn, 10000)
 
             # Layer schedule (Change 8)
             self._draw_layer_schedule(seq)
@@ -4066,10 +4204,13 @@ class U1App(QMainWindow):
             QMessageBox.information(self, self.t("dlg_note"), self.t("dlg_no_seq"))
             return
         self._undo_stack.append(copy.deepcopy(self._virtual))
+        if len(self._undo_stack) > 20:
+            self._undo_stack.pop(0)
         vid = 5 + len(self._virtual)
+        stable_id = vid  # assign before append so ID == vid
         self._virtual.append({
             "vid": vid,
-            "stable_id": 5 + len(self._virtual),
+            "stable_id": stable_id,
             "target_hex": result["target_hex"],
             "sequence": result["sequence"],
             "sim_hex": result["sim_hex"],
@@ -4316,10 +4457,17 @@ class U1App(QMainWindow):
 
     def _remove_virtual(self, vid):
         self._undo_stack.append(copy.deepcopy(self._virtual))
+        if len(self._undo_stack) > 20:
+            self._undo_stack.pop(0)
         self._virtual = [v for v in self._virtual if v["vid"] != vid]
         for i, v in enumerate(self._virtual):
             v["vid"] = 5 + i
         self._refresh_virtual_grid()
+
+    def _delete_selected_virtual(self):
+        """Delete shortcut: removes the last virtual head (Delete key)."""
+        if self._virtual:
+            self._remove_virtual(self._virtual[-1]["vid"])
 
     def _vhead_move(self, idx, direction):
         vf = self._virtual
@@ -5393,12 +5541,18 @@ class U1App(QMainWindow):
                         if old_e is None or choice == self.t("remap_keep"):
                             continue
                         if choice.startswith("T"):
-                            slot_i = int(choice[1]) - 1
+                            try:
+                                slot_i = int(choice[1]) - 1
+                            except (IndexError, ValueError):
+                                continue
                             new_e = slot_i + 1
                             ext_map[old_e] = new_e
                             slot_for_ext[new_e] = slot_i
                         elif choice.startswith("V"):
-                            vid = int(choice.split()[0][1:])
+                            try:
+                                vid = int(choice.split()[0][1:])
+                            except (IndexError, ValueError):
+                                continue
                             new_e = vid
                             ext_map[old_e] = new_e
                             vf_match = next((v for v in self._virtual if v["vid"] == vid), None)
@@ -7300,6 +7454,11 @@ class ThreeMFWizardDialog(QDialog):
         self._loader_worker.start()
 
     def _on_3mf_loaded(self, colors, err):
+        # Guard: dialog may have been closed before async load finished
+        try:
+            spinner_alive = self._p1_spinner_lbl.isVisible()
+        except RuntimeError:
+            return
         app = self._app
         self._p1_spinner_lbl.setText("")
         if not colors:
@@ -7658,6 +7817,18 @@ class FullSpectrumExportDialog(QDialog):
         self._count_lbl = QLabel(app.t("fs_count", n=n_virt))
         self._count_lbl.setStyleSheet("color: #94a3b8;")
         set_layout.addWidget(self._count_lbl)
+        set_layout.addSpacing(16)
+        self._local_z_check = QCheckBox("Local-Z Dithering")
+        self._local_z_check.setToolTip(
+            "dithering_local_z_mode=1: Jede bemalte Zone bekommt eigene Z-Höhenkontrolle.\n"
+            "Verbessert Qualität bei Multi-Zonen-Drucken (empfohlen für v0.9.4+).")
+        set_layout.addWidget(self._local_z_check)
+        set_layout.addSpacing(8)
+        self._adv_dither_check = QCheckBox("Advanced Dithering")
+        self._adv_dither_check.setToolTip(
+            "mixed_filament_advanced_dithering=1: Aktiviert erweiterte Dithering-Kontrollen\n"
+            "(experimentell, nur für erfahrene Nutzer).")
+        set_layout.addWidget(self._adv_dither_check)
         set_layout.addStretch()
         layout.addWidget(set_grp)
 
@@ -7745,7 +7916,9 @@ class FullSpectrumExportDialog(QDialog):
             phys.append({"hex": hx, "name": nm, "brand": br, "td": td})
 
         ok, msg = inject_fullspectrum_into_3mf(
-            src, out, app._virtual, phys, lh)
+            src, out, app._virtual, phys, lh,
+            local_z=self._local_z_check.isChecked(),
+            advanced_dithering=self._adv_dither_check.isChecked())
         if ok:
             QMessageBox.information(self, app.t("dlg_saved"),
                                     app.t("fs_success", path=out))
