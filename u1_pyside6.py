@@ -347,6 +347,81 @@ STRINGS = {
     "fs_no_src": "Bitte Quelldatei auswählen.",
     "fs_warn_fullspectrum": "⚠ Nur für FullSpectrum Slicer (Snapmaker_Orca).\nStandard OrcaSlicer unterstützt mixed_filament_definitions nicht.",
     "fs_guide_title": "Anleitung",
+    "skin_tone_check": "Hauttöne-Modus",
+    "skin_tone_mode": "Hauttöne-Modus: ΔE-Schwelle {de:.1f} aktiv",
+    "batch_import_svg": "SVG importieren",
+    # ── newly added keys ──
+    "btn_target_color": "🎨 Zielfarbe wählen",
+    "copy_all_btn": "📋 Alles kopieren",
+    "copy_all_title": "Cadence-Werte aller V-Köpfe",
+    "de_overview_col_label": "Bezeichnung",
+    "dlg_3mf_no_colors_fallback": "Keine Farben in der 3MF-Datei gefunden.",
+    "dlg_3mf_title": "3MF Assistent",
+    "exp_header": "Export — Snapmaker U1 FullSpectrum",
+    "exp_lh_label": "Schichthöhe (mm):",
+    "exp_lh_unit": "mm",
+    "gamut_plot_title": "Gamut-Plot",
+    "grad_add_virtual": "➕ Als virtuelle Köpfe hinzufügen",
+    "grad_added": "{n} Schritte als V-Köpfe hinzugefügt.",
+    "grad_generate": "⚙ Verlauf berechnen",
+    "grad_generate_first": "Bitte zuerst den Verlauf berechnen.",
+    "grad_pick_stops": "Farbstopps wählen:",
+    "grad_stops": "Farbstopps:",
+    "guide_title": "Slicer-Einrichtungsanleitung",
+    "harm_add_virtual": "➕ Als virtuelle Köpfe hinzufügen",
+    "harm_added": "{n} Harmoniefarben als V-Köpfe hinzugefügt.",
+    "harm_base": "Basisfarbe:",
+    "harm_tetradic": "Tetraden",
+    "harm_type": "Harmonieart:",
+    "img_pick_title": "Farbe aus Bild wählen",
+    "inp_add_title": "Filament hinzufügen",
+    "inp_color_title": "Farbe eingeben",
+    "inp_td2": "TD-Wert (Standard {td}):",
+    "inp_td_title": "TD-Wert",
+    "lab_plot_title": "Lab-Farbraum",
+    "layer_height": "Schichthöhe (mm):",
+    "matrix_desc": "ΔE-Abstände zwischen allen geladenen Filamenten.",
+    "matrix_title": "Filament-Mischmatrix",
+    "multi_add_color": "➕ Zielfarbe hinzufügen",
+    "multi_best_seq": "Beste Sequenz: {}   Ø ΔE: {}",
+    "multi_desc": "Optimiere eine Sequenz für mehrere Zielfarben gleichzeitig.",
+    "multi_no_result": "Kein Ergebnis gefunden.",
+    "multi_no_targets": "Bitte mind. 1 Zielfarbe hinzufügen.",
+    "multi_optimize": "⚙ Optimieren",
+    "multi_result": "Optimierungs-Ergebnis",
+    "multi_title": "Mehrfach-Ziel-Optimizer",
+    "no_filaments": "Keine Filamente geladen.",
+    "orca_prefix_hint": "Prefix für OrcaSlicer-Profilnamen",
+    "pal_add_virtual": "➕ Als virtuelle Köpfe hinzufügen",
+    "pal_added": "{n} Palettenfarben als V-Köpfe hinzugefügt.",
+    "pal_browse": "📂 Bild öffnen",
+    "pal_colors": "Anzahl Farben:",
+    "pal_no_file": "(kein Bild geladen)",
+    "pal_title": "Palette aus Bild",
+    "png_export_title": "PNG-Übersicht speichern",
+    "png_saved": "PNG gespeichert:\n{}",
+    "remap_col_hdr": "Extruder-Zuordnung neu belegen",
+    "seqed_add": "➕ Hinzufügen",
+    "seqed_added": "Sequenz '{}' als V-Kopf hinzugefügt.",
+    "seqed_apply": "✅ Als V-Kopf übernehmen",
+    "seqed_clear": "🗑 Leeren",
+    "seqed_desc": "Sequenz manuell zusammenstellen und als virtuellen Kopf speichern.",
+    "seqed_max": "Maximale Sequenzlänge erreicht.",
+    "seqed_remove": "↩ Letzten entfernen",
+    "seqed_title": "Sequenz-Editor",
+    "slotopt_desc": "Beste 4 Filamente für maximalen Gamut-Abdeckung.",
+    "slotopt_running": "Optimizer läuft …",
+    "slotopt_start": "▶ Starten",
+    "slotopt_title": "Slot-Optimizer",
+    "swatch_save_title": "Swatch speichern",
+    "tc_desc": "Schätze Transmissionskoeffizient und Layers-bis-Opak.",
+    "td_label": "TD-Wert:",
+    "tdcal_desc": "Filament-Hex und gemessene Druckfarbe eingeben, um TD zu schätzen.",
+    "tdcal_fil_hex": "Filament-Hex-Farbe:",
+    "tdcal_layers": "Anzahl Schichten:",
+    "tdcal_measured": "Gemessene Druckfarbe (Hex):",
+    "tdcal_title": "TD-Kalibrierung",
+    "txt_pattern": "Pattern Mode: {p}",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — PySide6 Edition",
@@ -648,6 +723,81 @@ STRINGS = {
     "fs_no_src": "Please select a source file.",
     "fs_warn_fullspectrum": "⚠ For FullSpectrum Slicer (Snapmaker_Orca) only.\nStandard OrcaSlicer does not support mixed_filament_definitions.",
     "fs_guide_title": "Instructions",
+    "skin_tone_check": "Skin-Tone Mode",
+    "skin_tone_mode": "Skin-Tone Mode: ΔE threshold {de:.1f} active",
+    "batch_import_svg": "Import SVG",
+    # ── newly added keys ──
+    "btn_target_color": "🎨 Pick Target Color",
+    "copy_all_btn": "📋 Copy All",
+    "copy_all_title": "Cadence Values — All Virtual Heads",
+    "de_overview_col_label": "Label",
+    "dlg_3mf_no_colors_fallback": "No colors found in 3MF file.",
+    "dlg_3mf_title": "3MF Assistant",
+    "exp_header": "Export — Snapmaker U1 FullSpectrum",
+    "exp_lh_label": "Layer Height (mm):",
+    "exp_lh_unit": "mm",
+    "gamut_plot_title": "Gamut Plot",
+    "grad_add_virtual": "➕ Add as Virtual Heads",
+    "grad_added": "{n} steps added as virtual heads.",
+    "grad_generate": "⚙ Generate Gradient",
+    "grad_generate_first": "Please generate the gradient first.",
+    "grad_pick_stops": "Pick color stops:",
+    "grad_stops": "Color stops:",
+    "guide_title": "Slicer Setup Guide",
+    "harm_add_virtual": "➕ Add as Virtual Heads",
+    "harm_added": "{n} harmony colors added as virtual heads.",
+    "harm_base": "Base color:",
+    "harm_tetradic": "Tetradic",
+    "harm_type": "Harmony type:",
+    "img_pick_title": "Pick Color from Image",
+    "inp_add_title": "Add Filament",
+    "inp_color_title": "Enter Color",
+    "inp_td2": "TD value (default {td}):",
+    "inp_td_title": "TD Value",
+    "lab_plot_title": "Lab Color Space",
+    "layer_height": "Layer Height (mm):",
+    "matrix_desc": "ΔE distances between all loaded filaments.",
+    "matrix_title": "Filament Mix Matrix",
+    "multi_add_color": "➕ Add Target Color",
+    "multi_best_seq": "Best sequence: {}   avg ΔE: {}",
+    "multi_desc": "Optimize a sequence for multiple target colors simultaneously.",
+    "multi_no_result": "No result found.",
+    "multi_no_targets": "Please add at least 1 target color.",
+    "multi_optimize": "⚙ Optimize",
+    "multi_result": "Optimization Result",
+    "multi_title": "Multi-Target Optimizer",
+    "no_filaments": "No filaments loaded.",
+    "orca_prefix_hint": "Prefix for OrcaSlicer profile names",
+    "pal_add_virtual": "➕ Add as Virtual Heads",
+    "pal_added": "{n} palette colors added as virtual heads.",
+    "pal_browse": "📂 Open Image",
+    "pal_colors": "Number of colors:",
+    "pal_no_file": "(no image loaded)",
+    "pal_title": "Palette from Image",
+    "png_export_title": "Save PNG Summary",
+    "png_saved": "PNG saved:\n{}",
+    "remap_col_hdr": "Remap Extruder Assignments",
+    "seqed_add": "➕ Add",
+    "seqed_added": "Sequence '{}' added as virtual head.",
+    "seqed_apply": "✅ Add as Virtual Head",
+    "seqed_clear": "🗑 Clear",
+    "seqed_desc": "Manually compose a sequence and save as a virtual head.",
+    "seqed_max": "Maximum sequence length reached.",
+    "seqed_remove": "↩ Remove Last",
+    "seqed_title": "Sequence Editor",
+    "slotopt_desc": "Find the best 4 filaments for maximum gamut coverage.",
+    "slotopt_running": "Optimizer running …",
+    "slotopt_start": "▶ Start",
+    "slotopt_title": "Slot Optimizer",
+    "swatch_save_title": "Save Swatch",
+    "tc_desc": "Estimate transmission coefficient and layers-to-opaque.",
+    "td_label": "TD value:",
+    "tdcal_desc": "Enter filament hex and measured print color to estimate TD.",
+    "tdcal_fil_hex": "Filament hex color:",
+    "tdcal_layers": "Number of layers:",
+    "tdcal_measured": "Measured print color (hex):",
+    "tdcal_title": "TD Calibration",
+    "txt_pattern": "Pattern Mode: {p}",
 },
 }
 
@@ -1829,16 +1979,6 @@ class ClickableLabel(QLabel):
         self.setStyleSheet(self._original_style)
 
 
-# ── CONSTANTS ─────────────────────────────────────────────────────────────────
-
-MAX_SEQ_LEN      = 48
-DEFAULT_TD       = 5.0
-DE_GOOD          = 3.0
-DE_OK            = 6.0
-GAMUT_WARN_DE    = 25.0
-MAX_VIRTUAL      = 20
-MAX_VIRTUAL_HARD = 24
-
 _SLOT_SKIP = {"(leer)", "(empty)", "(manuell)", "(manual)"}
 
 _COMMUNITY_URL = (
@@ -2850,6 +2990,14 @@ class U1App(QMainWindow):
         td_spin.setMaximumWidth(70)
         td_spin.valueChanged.connect(lambda v, i=idx: self._update_gamut_strip())
         hex_row.addWidget(td_spin)
+
+        translucent_check = QCheckBox("🔆 Transluc.")
+        translucent_check.setToolTip(
+            "Per-Slot: Beer-Lambert TD-Modell für dieses Filament.\n"
+            "Per-slot: use Beer-Lambert TD model for this filament.\n"
+            "Overrides global color model for this slot.")
+        translucent_check.setFixedWidth(110)
+        hex_row.addWidget(translucent_check)
         body_layout.addLayout(hex_row)
 
         frame_layout.addWidget(body)
@@ -2860,6 +3008,7 @@ class U1App(QMainWindow):
             "hex_edit": hex_edit,
             "preview_lbl": preview_lbl,
             "td_spin": td_spin,
+            "translucent_check": translucent_check,
             "toggle_btn": toggle_btn,
             "body": body,
             "color_strip": color_strip,
@@ -3276,6 +3425,14 @@ class U1App(QMainWindow):
         self._optimizer_check = QCheckBox(self.t("optimizer_check").replace("\n", " "))
         opts_layout.addWidget(self._optimizer_check)
 
+        self._skin_tone_check = QCheckBox(self.t("skin_tone_check"))
+        self._skin_tone_check.setToolTip(
+            "Hautton-Modus: Engere ΔE-Schwelle (1.5) global,\n"
+            "1.0 für LAB im Bereich L*40–80 a*5–25 b*10–30.\n"
+            "Skin-Tone Mode: tighter ΔE threshold (1.5) globally,\n"
+            "1.0 for LAB in range L*40–80 a*5–25 b*10–30.")
+        opts_layout.addWidget(self._skin_tone_check)
+
         opts_layout.addSpacing(8)
         opts_layout.addWidget(QLabel("Mix %:"))
         self._mix_pct_spin = QDoubleSpinBox()
@@ -3677,13 +3834,27 @@ class U1App(QMainWindow):
                 r, g, b = filament_mixer_lerp(r, g, b, r2, g2, b2, t)
             return rgb_to_lab((r, g, b))
 
+        # Build per-slot translucency map (slot index → bool)
+        _slot_translucent = {}
+        for _si, _sd in enumerate(getattr(self, "_slots", [])):
+            _tc = _sd.get("translucent_check")
+            _slot_translucent[_si + 1] = (_tc.isChecked() if _tc is not None else False)
+
         r_acc = g_acc = b_acc = 0.0
         total_w = 0.0
         for fid, cnt in counts.items():
             r, g, b = hex_to_rgb(by_id[fid]["hex"])
             td = max(0.1, float(by_id[fid].get("td", 5.0)))
             base_w = cnt / total
-            w = (base_w / td) if model == "td" else base_w
+            # Per-slot: if translucent_check is checked for this fid, use TD weighting
+            # regardless of global model; otherwise respect global model
+            slot_is_translucent = _slot_translucent.get(int(fid), False)
+            if slot_is_translucent:
+                w = base_w / td
+            elif model == "td":
+                w = base_w / td
+            else:
+                w = base_w
             total_w += w
             rl = (r / 255) ** 2.2
             gl = (g / 255) ** 2.2
@@ -3961,6 +4132,18 @@ class U1App(QMainWindow):
             auto = self._auto_check.isChecked()
             threshold = self._auto_thresh_spin.value() if auto else 2.0
             seq_len = self._len_spin.value() if not auto else None
+
+            # Skin-Tone Mode: override threshold if checkbox is active
+            skin_tone = hasattr(self, "_skin_tone_check") and self._skin_tone_check.isChecked()
+            if skin_tone and auto:
+                threshold = min(threshold, 1.5)
+                # Check if target is in skin-tone LAB range
+                L_, a_, b_ = t_lab
+                if 40 <= L_ <= 80 and 5 <= a_ <= 25 and 10 <= b_ <= 30:
+                    threshold = 1.0
+                    self._set_status(self.t("skin_tone_mode", de=1.0), 8000)
+                else:
+                    self._set_status(self.t("skin_tone_mode", de=1.5), 5000)
 
             result = self._calc_for_color(
                 self._target_hex,
@@ -4702,6 +4885,46 @@ class U1App(QMainWindow):
         txt_edit = QTextEdit()
         txt_edit.setFont(QFont("Courier New", 11))
         layout.addWidget(txt_edit, 1)
+
+        # SVG import row
+        svg_row = QHBoxLayout()
+        svg_btn = QPushButton(self.t("batch_import_svg"))
+        svg_btn.setFixedHeight(32)
+        svg_btn.setToolTip("Parse fill=\"#RRGGBB\" attributes from an SVG file and append to the list.")
+
+        def _import_svg():
+            svg_path, _ = QFileDialog.getOpenFileName(
+                dlg, self.t("batch_import_svg"), "",
+                "SVG Files (*.svg);;All Files (*.*)")
+            if not svg_path:
+                return
+            try:
+                with open(svg_path, encoding="utf-8", errors="replace") as _f:
+                    svg_text = _f.read()
+            except Exception as _e:
+                QMessageBox.warning(dlg, self.t("dlg_error"), str(_e))
+                return
+            found = re.findall(r'fill=["\']#([0-9A-Fa-f]{6})["\']', svg_text)
+            # Deduplicate preserving order
+            seen = set()
+            unique = []
+            for c in found:
+                key = c.upper()
+                if key not in seen:
+                    seen.add(key)
+                    unique.append("#" + key)
+            if unique:
+                existing = txt_edit.toPlainText().strip()
+                separator = "\n" if existing else ""
+                txt_edit.setPlainText(existing + separator + "\n".join(unique))
+            else:
+                QMessageBox.information(dlg, self.t("dlg_note"),
+                                        "No fill=\"#RRGGBB\" attributes found in SVG.")
+
+        svg_btn.clicked.connect(_import_svg)
+        svg_row.addWidget(svg_btn)
+        svg_row.addStretch()
+        layout.addLayout(svg_row)
 
         prog_lbl = QLabel("")
         prog_lbl.setObjectName("hint")
@@ -6046,7 +6269,7 @@ class U1App(QMainWindow):
             QWidget, QMessageBox)
         from PySide6.QtGui import QColor
         dlg = QDialog(self)
-        dlg.setWindowTitle(self.t("grad_title"))
+        dlg.setWindowTitle(self.t("gradient_title"))
         dlg.resize(540, 420)
         lay = QVBoxLayout(dlg)
 
@@ -6093,7 +6316,7 @@ class U1App(QMainWindow):
 
         # Steps
         step_row = QHBoxLayout()
-        step_row.addWidget(QLabel(self.t("grad_steps")))
+        step_row.addWidget(QLabel(self.t("gradient_steps")))
         step_spin = QSpinBox()
         step_spin.setRange(3, 30)
         step_spin.setValue(8)
@@ -6136,7 +6359,7 @@ class U1App(QMainWindow):
             grad_css = f"background: linear-gradient(to right, {', '.join(css_parts)});"
             preview_frame.setStyleSheet(grad_css)
 
-        btn_gen = QPushButton(self.t("grad_generate"))
+        btn_gen = QPushButton(self.t("gradient_btn_calc"))
         btn_gen.clicked.connect(_generate)
         lay.addWidget(btn_gen)
 
@@ -6153,7 +6376,7 @@ class U1App(QMainWindow):
                 added += 1
             self._recalc_all_virtual()
             self._refresh_virtual_grid()
-            QMessageBox.information(dlg, "", self.t("grad_added").format(added))
+            QMessageBox.information(dlg, "", self.t("gradient_done").format(n=added))
 
         row = QHBoxLayout()
         btn_add = QPushButton(self.t("grad_add_virtual"))
@@ -6292,7 +6515,7 @@ class U1App(QMainWindow):
 
         harmony_combo = QComboBox()
         harmony_combo.addItems([
-            self.t("harm_complementary"),
+            self.t("harm_complement"),
             self.t("harm_split"),
             self.t("harm_triadic"),
             self.t("harm_analogous"),
@@ -6502,7 +6725,7 @@ class U1App(QMainWindow):
             QWidget, QFrame)
         from PySide6.QtGui import QColor
         dlg = QDialog(self)
-        dlg.setWindowTitle(self.t("multi_title"))
+        dlg.setWindowTitle(self.t("mt_title"))
         dlg.resize(520, 480)
         lay = QVBoxLayout(dlg)
         lay.addWidget(QLabel(self.t("multi_desc")))
@@ -6563,7 +6786,7 @@ class U1App(QMainWindow):
 
         def _optimize():
             if not targets:
-                QMessageBox.information(dlg, "", self.t("multi_no_targets"))
+                QMessageBox.information(dlg, "", self.t("mt_no_targets"))
                 return
             fils = self._slot_filaments()
             best_overall = None
@@ -7882,9 +8105,36 @@ class FullSpectrumExportDialog(QDialog):
 
     def _update_preview(self):
         lh = self._lh_spin.value()
-        defs, _ = build_mixed_filament_definitions(self._app._virtual, lh)
-        lines = [row for row in defs.split(";") if row]
-        self._preview.setPlainText("\n".join(lines))
+        defs, extra = build_mixed_filament_definitions(self._app._virtual, lh)
+        raw_rows = [row for row in defs.split(";") if row]
+
+        preview_lines = []
+        for i, (vf, row) in enumerate(
+                zip([v for v in self._app._virtual if v.get("sequence")], raw_rows)):
+            seq = vf.get("sequence", "")
+            unique_ids = list(dict.fromkeys(int(c) for c in seq)) if seq else []
+            n_unique = len(unique_ids)
+            label = vf.get("label", f"V{vf.get('vid', i + 5)}")
+
+            if n_unique == 2:
+                cad = calc_cadence(seq, lh)
+                fid_a, fid_b = unique_ids[0], unique_ids[1]
+                ca = cad.get(fid_a, lh)
+                cb = cad.get(fid_b, lh)
+                cadence_note = f"  # {label}: cad_a={ca}mm cad_b={cb}mm"
+            elif n_unique == 1:
+                cadence_note = f"  # {label}: pure"
+            else:
+                cadence_note = f"  # {label}: pattern ({n_unique} fils)"
+
+            preview_lines.append(row + cadence_note)
+
+        preview_lines.append("")
+        preview_lines.append(
+            f"# global: cad_a={extra.get('mixed_color_layer_height_a', lh)}mm"
+            f"  cad_b={extra.get('mixed_color_layer_height_b', lh)}mm  "
+            f"(median of {len([v for v in self._app._virtual if v.get('sequence')])} heads)")
+        self._preview.setPlainText("\n".join(preview_lines))
 
     def _do_write(self):
         app = self._app
@@ -7892,6 +8142,57 @@ class FullSpectrumExportDialog(QDialog):
         if not src:
             QMessageBox.warning(self, app.t("dlg_note"), app.t("fs_no_src"))
             return
+
+        # ── Version compatibility check ───────────────────────────────────────
+        try:
+            with zipfile.ZipFile(src, "r") as _zf:
+                _cfg_names = [n for n in _zf.namelist()
+                              if "project_settings" in n.lower() and n.endswith(".config")]
+                _ver_str = None
+                for _cfg_name in _cfg_names:
+                    try:
+                        _cfg_data = json.loads(_zf.read(_cfg_name).decode("utf-8", errors="replace"))
+                        _ver_str = (_cfg_data.get("orcaslicer_version")
+                                    or _cfg_data.get("version")
+                                    or _cfg_data.get("bambu_studio_version"))
+                        if _ver_str:
+                            break
+                    except Exception:
+                        pass
+                if _ver_str:
+                    # Parse version tuple: compare against 2.2.4 (FS v0.7-alpha threshold)
+                    _min_ver = (2, 2, 4)
+                    try:
+                        _parts = [int(x) for x in re.split(r"[.\-]", _ver_str)
+                                  if x.isdigit()][:3]
+                        while len(_parts) < 3:
+                            _parts.append(0)
+                        _is_old = tuple(_parts) < _min_ver
+                    except Exception:
+                        _is_old = False
+                    if _is_old:
+                        _warn_msg = (
+                            f"OrcaSlicer version detected: {_ver_str}\n\n"
+                            "This version may predate FullSpectrum v0.7-alpha "
+                            "(requires OrcaSlicer ≥ 2.2.4).\n"
+                            "Local-Z dithering (dithering_local_z_mode) may not be "
+                            "supported.\n\n"
+                            "Continue anyway?")
+                        if self._local_z_check.isChecked():
+                            _warn_msg = (
+                                "⚠  Local-Z Dithering is enabled, but the detected "
+                                f"OrcaSlicer version ({_ver_str}) may not support it.\n\n"
+                                "FullSpectrum v0.7-alpha requires OrcaSlicer ≥ 2.2.4.\n\n"
+                                "Continue anyway?")
+                        _reply = QMessageBox.warning(
+                            self, "Version Compatibility",
+                            _warn_msg,
+                            QMessageBox.Ok | QMessageBox.Cancel,
+                            QMessageBox.Cancel)
+                        if _reply != QMessageBox.Ok:
+                            return
+        except Exception:
+            pass  # If version check fails, proceed silently
 
         lh = self._lh_spin.value()
 
