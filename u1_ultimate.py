@@ -1290,6 +1290,11 @@ def rgb_to_lab(rgb):
     _LAB_CACHE[key] = result
     return result
 
+def rgb_to_hex(r, g, b):
+    return "#{:02X}{:02X}{:02X}".format(int(max(0, min(255, r))),
+                                         int(max(0, min(255, g))),
+                                         int(max(0, min(255, b))))
+
 def lab_to_hex(lab):
     L, a, b = lab
     fy = (L + 16) / 116
