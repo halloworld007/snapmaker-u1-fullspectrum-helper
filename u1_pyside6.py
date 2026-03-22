@@ -1478,7 +1478,13 @@ def build_mixed_filament_definitions(virtual_heads, layer_height=0.08,
         extra_cfg["mixed_color_layer_height_a"] = str(layer_height)
         extra_cfg["mixed_color_layer_height_b"] = str(layer_height)
 
-    extra_cfg["dithering_z_step_size"] = "0.0"
+    extra_cfg["dithering_z_step_size"] = str(layer_height)   # must match printer Z resolution
+    extra_cfg["dithering_step_size"] = str(layer_height)     # v0.9.4+ alias
+    # Process-level cadence heights (mirrors per-head values for compatibility)
+    cad_a = extra_cfg.get("mixed_color_layer_height_a", str(layer_height))
+    cad_b = extra_cfg.get("mixed_color_layer_height_b", str(layer_height))
+    extra_cfg["dithering_cadence_height_a"] = cad_a
+    extra_cfg["dithering_cadence_height_b"] = cad_b
     extra_cfg["dithering_local_z_mode"] = "1" if local_z else "0"
     extra_cfg["dithering_step_painted_zones_only"] = "1"
     extra_cfg["mixed_filament_advanced_dithering"] = "1" if advanced_dithering else "0"
@@ -2955,8 +2961,15 @@ class U1App(QMainWindow):
         lh_val = float(self._settings.value("layer_height", 0.08))
         self._lh_spin.setValue(lh_val)
         self._lh_spin.setSuffix(" mm")
+        self._lh_spin.setToolTip(
+            "Optimal 0.08–0.12 mm für FullSpectrum Farbblending.\n"
+            "Optimal 0.08–0.12 mm for FullSpectrum color blending.\n"
+            "> 0.15 mm → sichtbare Streifen / visible striping.")
         self._lh_spin.valueChanged.connect(self._on_lh_changed)
         lh_layout.addWidget(self._lh_spin)
+        self._lh_warn_main = QLabel("")
+        self._lh_warn_main.setStyleSheet("color: #fb923c; font-size: 11px;")
+        lh_layout.addWidget(self._lh_warn_main)
         # Print height input (for statistics)
         lh_layout.addWidget(QLabel("/" + self.t("lbl_print_height")))
         self._print_h_spin = QDoubleSpinBox()
@@ -3343,6 +3356,11 @@ class U1App(QMainWindow):
     # ── MISC HANDLERS ─────────────────────────────────────────────────────────
 
     def _on_lh_changed(self, val):
+        if hasattr(self, "_lh_warn_main"):
+            if val > 0.15:
+                self._lh_warn_main.setText("⚠ >0.15mm" if self.lang == "de" else "⚠ >0.15mm")
+            else:
+                self._lh_warn_main.setText("")
         self._refresh_virtual_grid()
 
     def _on_model_change(self, idx):
@@ -8333,7 +8351,16 @@ class FullSpectrumExportDialog(QDialog):
         except Exception:
             self._lh_spin.setValue(0.08)
         self._lh_spin.setFixedWidth(80)
+        self._lh_spin.setToolTip(
+            "Optimal: 0.08–0.12 mm für sauberes Farbblending.\n"
+            "Optimal: 0.08–0.12 mm for clean color blending.\n"
+            "> 0.15 mm → sichtbare Streifen / visible striping.")
+        self._lh_spin.valueChanged.connect(self._on_lh_changed)
         set_layout.addWidget(self._lh_spin)
+        self._lh_warn_lbl = QLabel("")
+        self._lh_warn_lbl.setStyleSheet("color: #fb923c; font-size: 11px;")
+        set_layout.addWidget(self._lh_warn_lbl)
+        self._on_lh_changed(self._lh_spin.value())
         set_layout.addSpacing(16)
         n_virt = len([v for v in app._virtual if v.get("sequence")])
         self._count_lbl = QLabel(app.t("fs_count", n=n_virt))
@@ -8380,6 +8407,13 @@ class FullSpectrumExportDialog(QDialog):
 
         # Initial preview
         QTimer.singleShot(100, self._update_preview)
+
+    def _on_lh_changed(self, val):
+        if val > 0.15:
+            self._lh_warn_lbl.setText("⚠ >0.15 mm → Streifen!" if self._app.lang == "de"
+                                       else "⚠ >0.15 mm → striping!")
+        else:
+            self._lh_warn_lbl.setText("")
 
     def _browse_src(self):
         p, _ = QFileDialog.getOpenFileName(
