@@ -190,6 +190,14 @@ STRINGS = {
     "orca_success": "✅ {n} Profile nach OrcaSlicer geschrieben!\nOrcaSlicer neu starten.",
     "orca_no_path": "OrcaSlicer-Ordner nicht gefunden.",
     "orca_no_virtual": "Keine virtuellen Druckköpfe.",
+    "btn_slot_compare": "🔀 Slot-Vergleich",
+    "slot_compare_title": "Slot-Vergleich — Live ΔE-Auswirkung",
+    "slot_compare_slot": "Zu vergleichender Slot:",
+    "slot_compare_alt": "Alternatives Filament:",
+    "slot_compare_col_vid": "V-Kopf",
+    "slot_compare_col_cur": "Aktuell ΔE",
+    "slot_compare_col_new": "Neu ΔE",
+    "slot_compare_col_delta": "Δ",
     "orca_overwrite_confirm": "{n} Profile werden überschrieben. Fortfahren?",
     "orca_filament_notes_t": "U1 FullSpectrum — T{i} | {brand} {name} | TD={td}",
     "orca_filament_notes_v": "U1 FullSpectrum Sequenz: {seq} | ΔE={de:.1f} | {hint}",
@@ -478,6 +486,14 @@ STRINGS = {
     "orca_success": "✅ {n} profiles written!\nRestart OrcaSlicer.",
     "orca_no_path": "OrcaSlicer folder not found.",
     "orca_no_virtual": "No virtual heads.",
+    "btn_slot_compare": "🔀 Slot Compare",
+    "slot_compare_title": "Slot Compare — Live ΔE Impact",
+    "slot_compare_slot": "Slot to compare:",
+    "slot_compare_alt": "Alternative filament:",
+    "slot_compare_col_vid": "V-Head",
+    "slot_compare_col_cur": "Current ΔE",
+    "slot_compare_col_new": "New ΔE",
+    "slot_compare_col_delta": "Δ",
     "orca_overwrite_confirm": "{n} profiles may be overwritten. Continue?",
     "orca_filament_notes_t": "U1 FullSpectrum — T{i} | {brand} {name} | TD={td}",
     "orca_filament_notes_v": "U1 FullSpectrum: {seq} | ΔE={de:.1f} | {hint}",
@@ -859,6 +875,15 @@ def rgb_to_hex(r, g, b):
     return "#{:02X}{:02X}{:02X}".format(int(max(0, min(255, r))),
                                          int(max(0, min(255, g))),
                                          int(max(0, min(255, b))))
+
+def estimate_td(hex_color):
+    """Estimate TD from hex brightness. Bright/saturated = higher TD (more transparent)."""
+    try:
+        r, g, b = hex_to_rgb(hex_color)
+        brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        return round(0.3 + brightness * 8.2, 1)
+    except Exception:
+        return 5.0
 
 _LAB_CACHE: dict = {}
 
@@ -4588,12 +4613,19 @@ class U1App(QMainWindow):
             f"{self.t('3mf_filetypes')} (*.3mf);;All Files (*.*)")
         if not path:
             return
+        self._open_3mf_with_path(path)
+
+    def _open_3mf_with_path(self, path):
+        """Open 3MF assistant with a given file path (used by DnD)."""
         colors, err = _parse_3mf_colors(path)
         if not colors:
             QMessageBox.information(self, self.t("dlg_3mf_title"),
                                     err if err else self.t("dlg_3mf_no_colors_fallback"))
             return
+        self._open_3mf_with_colors(path, colors)
 
+    def _open_3mf_with_colors(self, path, colors):
+        """Open 3MF assistant dialog with pre-loaded colors."""
         dlg = QDialog(self)
         dlg.setWindowTitle(f"{self.t('dlg_3mf_title')} — {os.path.basename(path)}")
         dlg.resize(860, 680)
@@ -5463,6 +5495,212 @@ class U1App(QMainWindow):
             return
         dlg = FullSpectrumExportDialog(self)
         self._fs_export_dlg = dlg
+        dlg.exec()
+
+    # ── EXPORT HINTS ─────────────────────────────────────────────────────────
+
+    def _show_export_hint_for_seq(self, seq):
+        """Show post-export slicer hint in the status bar."""
+        if not seq:
+            return
+        lh = self._lh_spin.value() if hasattr(self, "_lh_spin") else 0.08
+        n_f = _seq_filament_count(seq)
+        cad = calc_cadence(seq, lh)
+        ids = sorted(cad.keys())
+        if n_f <= 2 and len(ids) >= 2:
+            a = round(cad.get(ids[0], lh), 3)
+            b = round(cad.get(ids[1], lh), 3)
+            hint = f"OrcaSlicer: Others → Dithering → Cadence Height  A={a}mm / B={b}mm"
+        elif n_f >= 3:
+            hint = f"OrcaSlicer: Others → Dithering → Pattern Mode  {''.join(seq)}"
+        else:
+            hint = ""
+        if hint:
+            self._set_status(hint, 8000)
+
+    def _show_export_hint_for_virtual(self):
+        """Show post-export slicer hint for first virtual head."""
+        if not self._virtual:
+            return
+        vf = self._virtual[0]
+        self._show_export_hint_for_seq(vf.get("sequence", ""))
+
+    # ── AUTO SUGGESTION ───────────────────────────────────────────────────────
+
+    def _check_auto_suggestion(self, target_hex):
+        """Show status hint if a library filament is close to the target color."""
+        target_lab = rgb_to_lab(hex_to_rgb(target_hex.lstrip("#")))
+        best_de = float('inf')
+        best_fil = None
+        best_brand = None
+        loaded_hexes = {s["hex_edit"].text().strip().lstrip("#").upper()
+                        for s in self._slots}
+        for brand, filaments in self.library.items():
+            for fil in filaments:
+                fhex = fil.get("hex", "").lstrip("#")
+                if fhex.upper() in loaded_hexes:
+                    continue
+                try:
+                    flab = rgb_to_lab(hex_to_rgb(fhex))
+                    de = delta_e(target_lab, flab)
+                    if de < best_de:
+                        best_de = de
+                        best_fil = fil
+                        best_brand = brand
+                except Exception:
+                    pass
+        if best_fil and best_de < 15:
+            msg = (f"💡 Tipp: «{best_brand} {best_fil.get('name','')}»"
+                   f" könnte ΔE auf ~{best_de:.1f} senken")
+            self._set_status(msg, 8000)
+
+    # ── MATERIAL COMPATIBILITY ────────────────────────────────────────────────
+
+    def _check_material_compatibility(self, sequence_slot_indices):
+        """Return a warning string if incompatible materials are mixed, else None."""
+        used_slots = set(sequence_slot_indices)
+        types_used = set()
+        for idx in used_slots:
+            if idx < 0 or idx >= len(self._slots):
+                continue
+            slot_name = self._slots[idx]["fil_combo"].currentText()
+            slot_brand = self._slots[idx]["brand_combo"].currentText()
+            fil_type = None
+            for fil in self.library.get(slot_brand, []):
+                if fil.get("name") == slot_name:
+                    fil_type = fil.get("type", None)
+                    break
+            if fil_type is None:
+                n = slot_name.upper()
+                if "ABS" in n:
+                    fil_type = "ABS"
+                elif "PETG" in n:
+                    fil_type = "PETG"
+                elif "TPU" in n:
+                    fil_type = "TPU"
+                elif "ASA" in n:
+                    fil_type = "ASA"
+            if fil_type:
+                types_used.add(fil_type)
+        if len(types_used) < 2:
+            return None
+        incompatible_pairs = {("PLA", "ABS"), ("ABS", "PLA"),
+                               ("PLA", "ASA"), ("ASA", "PLA"),
+                               ("ABS", "PETG"), ("PETG", "ABS")}
+        for a, b in incompatible_pairs:
+            if a in types_used and b in types_used:
+                return f"⚠ Materialwarnung: {a} + {b} — unterschiedliche Drucktemperaturen!"
+        return None
+
+    # ── SLOT COMPARE ─────────────────────────────────────────────────────────
+
+    def open_slot_compare(self):
+        """Opens a dialog showing ΔE impact of replacing a slot with an alternative filament."""
+        if not self._virtual:
+            QMessageBox.information(self, self.t("dlg_note"), self.t("orca_no_virtual"))
+            return
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.t("slot_compare_title"))
+        dlg.resize(700, 520)
+        layout = QVBoxLayout(dlg)
+
+        title_lbl = QLabel(self.t("slot_compare_title"))
+        title_lbl.setStyleSheet("font-size: 13px; font-weight: bold; color: #38bdf8;")
+        layout.addWidget(title_lbl)
+
+        # Controls row
+        ctrl_row = QHBoxLayout()
+
+        slot_lbl = QLabel(self.t("slot_compare_slot"))
+        ctrl_row.addWidget(slot_lbl)
+        from PySide6.QtWidgets import QComboBox as _QCB
+        slot_combo = _QCB()
+        slot_combo.addItems([f"T{i+1}" for i in range(4)])
+        slot_combo.setFixedWidth(70)
+        ctrl_row.addWidget(slot_combo)
+
+        ctrl_row.addSpacing(16)
+        alt_lbl = QLabel(self.t("slot_compare_alt"))
+        ctrl_row.addWidget(alt_lbl)
+        all_fils = [(brand, fil) for brand, fils in self.library.items() for fil in fils]
+        alt_combo = _QCB()
+        alt_opts = [f"{b} — {f['name']}" for b, f in all_fils] if all_fils else ["(none)"]
+        alt_combo.addItems(alt_opts)
+        alt_combo.setMinimumWidth(240)
+        ctrl_row.addWidget(alt_combo, 1)
+
+        compare_btn = QPushButton("▶  Vergleichen")
+        compare_btn.setFixedHeight(36)
+        ctrl_row.addWidget(compare_btn)
+        layout.addLayout(ctrl_row)
+
+        # Results table
+        table = QTableWidget(0, 4)
+        table.setHorizontalHeaderLabels([
+            self.t("slot_compare_col_vid"),
+            self.t("slot_compare_col_cur"),
+            self.t("slot_compare_col_new"),
+            self.t("slot_compare_col_delta"),
+        ])
+        table.horizontalHeader().setStretchLastSection(True)
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        layout.addWidget(table, 1)
+
+        def run_compare():
+            table.setRowCount(0)
+            slot_idx = int(slot_combo.currentText()[1]) - 1
+            alt_label = alt_combo.currentText()
+            alt_fil = next((f for b, f in all_fils
+                            if f"{b} — {f['name']}" == alt_label), None)
+            if alt_fil is None:
+                return
+
+            fils_current = self._slot_filaments()
+            alt_hex = alt_fil.get("hex", "#888888")
+            alt_td = alt_fil.get("td", DEFAULT_TD)
+            alt_lab = rgb_to_lab(hex_to_rgb(alt_hex))
+
+            fils_alt = []
+            for f in fils_current:
+                if f["id"] == slot_idx + 1:
+                    fils_alt.append({"id": f["id"], "hex": alt_hex,
+                                     "td": alt_td, "lab": alt_lab})
+                else:
+                    fils_alt.append(f)
+
+            for vf in self._virtual:
+                seq = vf.get("sequence", "")
+                target_hex = vf.get("target_hex", "")
+                if not target_hex:
+                    continue
+                t_lab = rgb_to_lab(hex_to_rgb(target_hex))
+                cur_de = vf.get("de", 0.0)
+                seq_ids = [int(c) for c in seq]
+                new_sim = self._simulate_mix(seq_ids, fils_alt)
+                new_de = delta_e(new_sim, t_lab)
+                delta = new_de - cur_de
+
+                row = table.rowCount()
+                table.insertRow(row)
+                table.setItem(row, 0, QTableWidgetItem(f"V{vf['vid']}"))
+                cur_item = QTableWidgetItem(f"{cur_de:.1f}")
+                cur_item.setForeground(QColor(_de_color(cur_de)))
+                table.setItem(row, 1, cur_item)
+                new_item = QTableWidgetItem(f"{new_de:.1f}")
+                new_item.setForeground(QColor(_de_color(new_de)))
+                table.setItem(row, 2, new_item)
+                delta_col = "#4ade80" if delta < 0 else "#f87171" if delta > 0 else "#94a3b8"
+                delta_txt = f"+{delta:.1f}" if delta > 0 else f"{delta:.1f}"
+                delta_item = QTableWidgetItem(delta_txt)
+                delta_item.setForeground(QColor(delta_col))
+                table.setItem(row, 3, delta_item)
+
+        compare_btn.clicked.connect(run_compare)
+
+        close_btn = QPushButton(self.t("exp_cancel"))
+        close_btn.clicked.connect(dlg.reject)
+        layout.addWidget(close_btn)
         dlg.exec()
 
     # ── COPY ALL CADENCE ──────────────────────────────────────────────────────

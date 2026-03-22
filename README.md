@@ -2,6 +2,9 @@
 
 **[English](#english) | [Deutsch](#deutsch)**
 
+> **Aktiver Entwicklungszweig / Active development:** `u1_pyside6.py` (PySide6)
+> `u1_ultimate.py` (CustomTkinter) wird nicht mehr weiterentwickelt und dient nur noch als Referenz.
+
 ---
 
 ## English
@@ -135,22 +138,22 @@ Object painting (which surfaces get which print head) must still be done in the 
 
 ```
 Python 3.10+
-customtkinter
+PySide6
 ```
 
 ```bash
-pip install customtkinter
+pip install PySide6
 ```
 
 Optional (for extra features):
 ```bash
-pip install matplotlib scipy Pillow CTkColorPicker CTkToolTip
+pip install matplotlib scipy Pillow
 ```
 
 ### Usage
 
 ```bash
-python u1_ultimate.py
+python u1_pyside6.py
 ```
 
 1. **Load filaments** — set brand, filament name, hex color and TD for each of the 4 physical tools
@@ -165,7 +168,8 @@ To remap a BambuStudio/OrcaSlicer `.3mf` for the U1, click **✏️ 3MF schreibe
 ### File Structure
 
 ```
-u1_ultimate.py          — main application (single file)
+u1_pyside6.py           — main application (single file, actively maintained)
+u1_ultimate.py          — legacy CustomTkinter version (no longer developed)
 filament_db.json        — your saved custom filaments (auto-created)
 presets.json            — your saved slot presets (auto-created)
 *.u1proj                — saved project files (slots + virtual heads)
@@ -292,22 +296,22 @@ Die Objekt-Bemalung (welche Flächen welchen Kopf bekommen) muss weiterhin im Sl
 
 ```
 Python 3.10+
-customtkinter
+PySide6
 ```
 
 ```bash
-pip install customtkinter
+pip install PySide6
 ```
 
 Optional (für zusätzliche Funktionen):
 ```bash
-pip install matplotlib scipy Pillow CTkColorPicker CTkToolTip
+pip install matplotlib scipy Pillow
 ```
 
 ### Verwendung
 
 ```bash
-python u1_ultimate.py
+python u1_pyside6.py
 ```
 
 1. **Filamente laden** — Marke, Name, Hex-Farbe und TD für jeden der 4 physischen Werkzeugköpfe eintragen
@@ -322,7 +326,8 @@ Zum Remappen einer BambuStudio/OrcaSlicer-`.3mf` für den U1: **✏️ 3MF schre
 ### Dateistruktur
 
 ```
-u1_ultimate.py          — Hauptanwendung (einzelne Datei)
+u1_pyside6.py           — Hauptanwendung (single file, aktiv gepflegt)
+u1_ultimate.py          — Legacy CustomTkinter-Version (nicht mehr weiterentwickelt)
 filament_db.json        — Gespeicherte eigene Filamente (wird automatisch erstellt)
 presets.json            — Gespeicherte Slot-Presets (wird automatisch erstellt)
 *.u1proj                — Gespeicherte Projekt-Dateien (Slots + virtuelle Köpfe)
