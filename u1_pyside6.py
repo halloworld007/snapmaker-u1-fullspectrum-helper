@@ -469,6 +469,39 @@ STRINGS = {
     "de_quality_excellent": "ausgezeichnet",
     "de_quality_good": "gut",
     "de_quality_visible": "sichtbar",
+    # ── newly added translation keys ──
+    "slot_undo_btn": "↩ Slot",
+    "slot_undo_tip": "Slot-Änderung rückgängig",
+    "project_groupbox": "Projekt",
+    "transluc_check": "🔆 Transluz.",
+    "transluc_tip": "Per-Slot: Beer-Lambert TD-Modell für dieses Filament.\nÜberschreibt das globale Farbmodell für diesen Slot.",
+    "de_thresh_label": "ΔE≤",
+    "skin_tone_tip": "Hautton-Modus: Engere ΔE-Schwelle (1.5) global,\n1.0 für LAB im Bereich L*40–80 a*5–25 b*10–30.",
+    "mix_pct_tip": "Direkte Prozent-Eingabe für 2-Filament-Mischung.\nBeispiel: 30% → Sequenz 1222 (T2 dominiert)",
+    "mix_seq_btn": "→ Seq",
+    "mix_seq_tip": "Sequenz aus %-Verhältnis erzeugen (nur 2 Filamente)",
+    "seq_click_copy_hint": "(Klick zum Kopieren)",
+    "seq_label_click_tip": "Klick zum Kopieren",
+    "seq_preview_tip": "Sequenz-Vorschau: jeder Block = 1 Schicht im Zyklus",
+    "hist_groupbox": "🕘 Verlauf",
+    "sort_added": "Hinzugefügt",
+    "sort_de_asc": "ΔE ↑ (besser zuerst)",
+    "sort_de_desc": "ΔE ↓",
+    "sort_label_az": "Label A-Z",
+    "3mf_filetypes": "3MF-Dateien",
+    "wizard_cov_color": "Farbe",
+    "wizard_cov_hex": "Hex",
+    "wizard_cov_de": "ΔE",
+    "wizard_cov_quality": "Qualität",
+    "wizard_load_spinner": "⏳ Lade & analysiere 3MF …",
+    "fs_preview_groupbox": "mixed_filament_definitions Vorschau",
+    "fs_lh_warn": "⚠ >0.15 mm → Streifen!",
+    "head_label": "Kopf:",
+    "lh_warn_striping": "⚠ >0.15mm",
+    "auto_suggest_tip": "💡 Tipp: «{brand} {name}» könnte ΔE auf ~{de:.1f} senken",
+    "material_warn": "⚠ Materialwarnung: {a} + {b} — unterschiedliche Drucktemperaturen!",
+    "web_update_downloading": "⏳ Community-DB wird heruntergeladen…",
+    "web_update_added": "✅ {added} neue Filamente hinzugefügt.",
 },
 "en": {
     "app_title": "U1 FullSpectrum Ultimate — PySide6 Edition",
@@ -892,6 +925,39 @@ STRINGS = {
     "de_quality_excellent": "excellent",
     "de_quality_good": "good",
     "de_quality_visible": "visible",
+    # ── newly added translation keys ──
+    "slot_undo_btn": "↩ Slot",
+    "slot_undo_tip": "Undo slot change",
+    "project_groupbox": "Project",
+    "transluc_check": "🔆 Transluc.",
+    "transluc_tip": "Per-slot: use Beer-Lambert TD model.\nOverrides global model for this slot.",
+    "de_thresh_label": "ΔE≤",
+    "skin_tone_tip": "Skin-Tone Mode: tighter ΔE threshold (1.5) globally,\n1.0 for LAB in range L*40–80 a*5–25 b*10–30.",
+    "mix_pct_tip": "Direct percentage input for 2-filament mix.\nExample: 30% → sequence 1222 (T2 dominant)",
+    "mix_seq_btn": "→ Seq",
+    "mix_seq_tip": "Generate sequence from % ratio (2 filaments only)",
+    "seq_click_copy_hint": "(Click to copy)",
+    "seq_label_click_tip": "Click to copy",
+    "seq_preview_tip": "Sequence preview: each block = 1 layer in cycle",
+    "hist_groupbox": "🕘 History",
+    "sort_added": "Added",
+    "sort_de_asc": "ΔE ↑ (best first)",
+    "sort_de_desc": "ΔE ↓",
+    "sort_label_az": "Label A-Z",
+    "3mf_filetypes": "3MF Files",
+    "wizard_cov_color": "Color",
+    "wizard_cov_hex": "Hex",
+    "wizard_cov_de": "ΔE",
+    "wizard_cov_quality": "Quality",
+    "wizard_load_spinner": "⏳ Loading & analyzing 3MF …",
+    "fs_preview_groupbox": "mixed_filament_definitions preview",
+    "fs_lh_warn": "⚠ >0.15 mm → striping!",
+    "head_label": "Head:",
+    "lh_warn_striping": "⚠ >0.15mm",
+    "auto_suggest_tip": "💡 Tip: «{brand} {name}» could reduce ΔE to ~{de:.1f}",
+    "material_warn": "⚠ Material warning: {a} + {b} — different print temperatures!",
+    "web_update_downloading": "⏳ Downloading community DB…",
+    "web_update_added": "✅ {added} new filaments added.",
 },
 }
 
@@ -2745,12 +2811,12 @@ class U1App(QMainWindow):
             fils = [v for v in fils if ftext in v.get("label", "").lower()
                     or ftext in v.get("sequence", "").lower()
                     or ftext in v.get("target_hex", "").lower()]
-        sk = self._virt_sort.currentText() if hasattr(self, "_virt_sort") else ""
-        if "ΔE ↑" in sk:
+        si = self._virt_sort.currentIndex() if hasattr(self, "_virt_sort") else 0
+        if si == 1:
             fils.sort(key=lambda v: v.get("de", 99))
-        elif "ΔE ↓" in sk:
+        elif si == 2:
             fils.sort(key=lambda v: v.get("de", 0), reverse=True)
-        elif "Label" in sk or "A-Z" in sk:
+        elif si == 3:
             fils.sort(key=lambda v: v.get("label", ""))
         return fils
 
@@ -2939,9 +3005,9 @@ class U1App(QMainWindow):
         preset_btn_row = QHBoxLayout()
         load_preset_btn = QPushButton(self.t("btn_load"))
         save_preset_btn = QPushButton(self.t("btn_save"))
-        slot_undo_btn = QPushButton("↩ Slot")
+        slot_undo_btn = QPushButton(self.t("slot_undo_btn"))
         slot_undo_btn.setFixedHeight(26)
-        slot_undo_btn.setToolTip("Slot-Änderung rückgängig")
+        slot_undo_btn.setToolTip(self.t("slot_undo_tip"))
         slot_undo_btn.clicked.connect(self._undo_slot)
         load_preset_btn.clicked.connect(self._load_preset)
         save_preset_btn.clicked.connect(self._save_preset)
@@ -3003,7 +3069,7 @@ class U1App(QMainWindow):
         layout.addWidget(model_gb)
 
         # Project save/load
-        proj_gb = QGroupBox("Project")
+        proj_gb = QGroupBox(self.t("project_groupbox"))
         proj_layout = QHBoxLayout(proj_gb)
         proj_save_btn = QPushButton(self.t("btn_proj_save"))
         proj_load_btn = QPushButton(self.t("btn_proj_load"))
@@ -3103,11 +3169,8 @@ class U1App(QMainWindow):
         td_spin.valueChanged.connect(lambda v, i=idx: self._update_gamut_strip())
         hex_row.addWidget(td_spin)
 
-        translucent_check = QCheckBox("🔆 Transluc.")
-        translucent_check.setToolTip(
-            "Per-Slot: Beer-Lambert TD-Modell für dieses Filament.\n"
-            "Per-slot: use Beer-Lambert TD model for this filament.\n"
-            "Overrides global color model for this slot.")
+        translucent_check = QCheckBox(self.t("transluc_check"))
+        translucent_check.setToolTip(self.t("transluc_tip"))
         translucent_check.setFixedWidth(110)
         hex_row.addWidget(translucent_check)
         body_layout.addLayout(hex_row)
@@ -3358,7 +3421,7 @@ class U1App(QMainWindow):
     def _on_lh_changed(self, val):
         if hasattr(self, "_lh_warn_main"):
             if val > 0.15:
-                self._lh_warn_main.setText("⚠ >0.15mm" if self.lang == "de" else "⚠ >0.15mm")
+                self._lh_warn_main.setText(self.t("lh_warn_striping"))
             else:
                 self._lh_warn_main.setText("")
         self._refresh_virtual_grid()
@@ -3531,7 +3594,7 @@ class U1App(QMainWindow):
         self._len_spin.setVisible(False)
         self._auto_found_label.setVisible(True)
 
-        opts_layout.addWidget(QLabel("ΔE≤"))
+        opts_layout.addWidget(QLabel(self.t("de_thresh_label")))
         self._auto_thresh_spin = QDoubleSpinBox()
         self._auto_thresh_spin.setRange(0.5, 10.0)
         self._auto_thresh_spin.setSingleStep(0.5)
@@ -3543,11 +3606,7 @@ class U1App(QMainWindow):
         opts_layout.addWidget(self._optimizer_check)
 
         self._skin_tone_check = QCheckBox(self.t("skin_tone_check"))
-        self._skin_tone_check.setToolTip(
-            "Hautton-Modus: Engere ΔE-Schwelle (1.5) global,\n"
-            "1.0 für LAB im Bereich L*40–80 a*5–25 b*10–30.\n"
-            "Skin-Tone Mode: tighter ΔE threshold (1.5) globally,\n"
-            "1.0 for LAB in range L*40–80 a*5–25 b*10–30.")
+        self._skin_tone_check.setToolTip(self.t("skin_tone_tip"))
         opts_layout.addWidget(self._skin_tone_check)
 
         opts_layout.addSpacing(8)
@@ -3558,13 +3617,11 @@ class U1App(QMainWindow):
         self._mix_pct_spin.setValue(50.0)
         self._mix_pct_spin.setDecimals(0)
         self._mix_pct_spin.setMaximumWidth(70)
-        self._mix_pct_spin.setToolTip(
-            "Direkte Prozent-Eingabe für 2-Filament-Mischung.\n"
-            "Beispiel: 30% → Sequenz 1222 (T2 dominiert)")
+        self._mix_pct_spin.setToolTip(self.t("mix_pct_tip"))
         opts_layout.addWidget(self._mix_pct_spin)
-        mix_btn = QPushButton("→ Seq")
+        mix_btn = QPushButton(self.t("mix_seq_btn"))
         mix_btn.setFixedWidth(55)
-        mix_btn.setToolTip("Sequenz aus %-Verhältnis erzeugen (nur 2 Filamente)")
+        mix_btn.setToolTip(self.t("mix_seq_tip"))
         mix_btn.clicked.connect(self._apply_mix_pct)
         opts_layout.addWidget(mix_btn)
 
@@ -3646,9 +3703,9 @@ class U1App(QMainWindow):
         self._seq_label.setFont(font)
         self._seq_label.setStyleSheet("color: #4ade80;")
         self._seq_label.setAlignment(Qt.AlignCenter)
-        self._seq_label.setToolTip("Klick zum Kopieren" if self.lang == "de" else "Click to copy")
+        self._seq_label.setToolTip(self.t("seq_label_click_tip"))
         seq_col.addWidget(self._seq_label)
-        _copy_hint_lbl = QLabel("(Klick zum Kopieren)" if self.lang == "de" else "(Click to copy)")
+        _copy_hint_lbl = QLabel(self.t("seq_click_copy_hint"))
         _copy_hint_lbl.setObjectName("hint")
         _copy_hint_lbl.setAlignment(Qt.AlignCenter)
         seq_col.addWidget(_copy_hint_lbl)
@@ -3682,8 +3739,7 @@ class U1App(QMainWindow):
         self._seq_preview = QLabel()
         self._seq_preview.setFixedHeight(20)
         self._seq_preview.setMinimumWidth(200)
-        self._seq_preview.setToolTip("Sequenz-Vorschau: jeder Block = 1 Schicht im Zyklus" if self.lang == "de"
-                                      else "Sequence preview: each block = 1 layer in cycle")
+        self._seq_preview.setToolTip(self.t("seq_preview_tip"))
         seq_col.addWidget(self._seq_preview)
         copy_btn = QPushButton(self.t("btn_copy"))
         copy_btn.setFixedHeight(30)
@@ -3715,7 +3771,7 @@ class U1App(QMainWindow):
         layout.addWidget(self._top3_frame)
 
         # History section
-        hist_gb = QGroupBox("🕘 History")
+        hist_gb = QGroupBox(self.t("hist_groupbox"))
         hist_layout = QVBoxLayout(hist_gb)
         self._history_scroll = QScrollArea()
         self._history_scroll.setWidgetResizable(True)
@@ -3811,7 +3867,10 @@ class U1App(QMainWindow):
         sf_layout.setSpacing(6)
         sf_layout.addWidget(QLabel(self.t("lbl_sort")))
         self._virt_sort = QComboBox()
-        self._virt_sort.addItems(["Hinzugefügt", "ΔE ↑", "ΔE ↓", "Label A-Z"])
+        self._virt_sort.addItems([
+            self.t("sort_added"), self.t("sort_de_asc"),
+            self.t("sort_de_desc"), self.t("sort_label_az"),
+        ])
         self._virt_sort.setFixedWidth(130)
         self._virt_sort.currentIndexChanged.connect(self._refresh_virtual_grid)
         sf_layout.addWidget(self._virt_sort)
@@ -4682,7 +4741,7 @@ class U1App(QMainWindow):
         edit_btn = QPushButton("✏")
         edit_btn.setFixedSize(28, 30)
         edit_btn.setStyleSheet("background-color: #1e3a5f;")
-        edit_btn.clicked.connect(lambda checked, i=row_idx: self._open_sequence_editor(i))
+        edit_btn.clicked.connect(lambda checked: self._open_sequence_editor())
         top_row.addWidget(edit_btn)
 
         # Delete button
@@ -6047,8 +6106,8 @@ class U1App(QMainWindow):
                 except Exception:
                     pass
         if best_fil and best_de < 15:
-            msg = (f"💡 Tipp: «{best_brand} {best_fil.get('name','')}»"
-                   f" könnte ΔE auf ~{best_de:.1f} senken")
+            msg = self.t("auto_suggest_tip",
+                         brand=best_brand, name=best_fil.get("name", ""), de=best_de)
             self._set_status(msg, 8000)
 
     # ── MATERIAL COMPATIBILITY ────────────────────────────────────────────────
@@ -6086,7 +6145,7 @@ class U1App(QMainWindow):
                                ("ABS", "PETG"), ("PETG", "ABS")}
         for a, b in incompatible_pairs:
             if a in types_used and b in types_used:
-                return f"⚠ Materialwarnung: {a} + {b} — unterschiedliche Drucktemperaturen!"
+                return self.t("material_warn", a=a, b=b)
         return None
 
     # ── SLOT COMPARE ─────────────────────────────────────────────────────────
@@ -6310,7 +6369,7 @@ class U1App(QMainWindow):
         head_combo.addItem(self.t("sec1_title") if hasattr(self, "_result") else "Calculator", "calc")
         for vf in self._virtual:
             head_combo.addItem(f"V{vf['vid']}  {vf.get('label', '')}", f"v{vf['vid']}")
-        ctrl_row.addWidget(QLabel("Head:" if self.lang == "en" else "Kopf:"))
+        ctrl_row.addWidget(QLabel(self.t("head_label")))
         ctrl_row.addWidget(head_combo)
 
         ctrl_row.addSpacing(12)
@@ -7357,8 +7416,7 @@ class U1App(QMainWindow):
                 btn = child
                 break
 
-        self._set_status("⏳ " + ("Community-DB wird heruntergeladen…" if self.lang == "de"
-                                   else "Downloading community DB…"))
+        self._set_status(self.t("web_update_downloading"))
 
         class _FetchWorker(QThread):
             done = Signal(dict)   # {"added": N, "error": str|None, "data": [...]}
@@ -7405,8 +7463,7 @@ class U1App(QMainWindow):
                         self.library.setdefault(brand, []).append(entry)
                         added += 1
             self._save_db()
-            msg = (f"✅ {added} neue Filamente hinzugefügt." if self.lang == "de"
-                   else f"✅ {added} new filaments added.")
+            msg = self.t("web_update_added", added=added)
             self._set_status(msg, 6000)
             QMessageBox.information(self, "Community DB", msg)
 
@@ -7656,13 +7713,13 @@ class U1App(QMainWindow):
 
         def _calc():
             lh = lh_spin.value()
-            td = td_spin.value()
-            # Transmission coefficient per layer
-            tc = safe_td(td, lh)
+            td = safe_td(td_spin.value())
+            # Transmission coefficient per layer = TD / layer_height
+            tc_per_layer = round(td / lh, 4) if lh > 0 else 0
             layers_to_opaque = round(td / lh) if lh > 0 else 0
             result_lbl.setText(
                 self.t("tc_result").format(
-                    tc=round(tc, 4), n=layers_to_opaque
+                    tc=tc_per_layer, n=layers_to_opaque
                 )
             )
 
@@ -7972,14 +8029,14 @@ class ThreeMFWizardDialog(QDialog):
         path, _ = QFileDialog.getOpenFileName(
             self,
             app.t("wizard_load_btn"), "",
-            "3MF Files (*.3mf);;All Files (*.*)")
+            f"{app.t('3mf_filetypes')} (*.3mf);;All Files (*.*)")
         if not path:
             return
 
         # Show loading spinner, disable buttons
         self._p1_path_lbl.setText(os.path.basename(path))
         self._p1_count_lbl.setText("")
-        self._p1_spinner_lbl.setText("⏳ Lade & analysiere 3MF …")
+        self._p1_spinner_lbl.setText(app.t("wizard_load_spinner"))
         self._p1_next_btn.setEnabled(False)
 
         # Clear old swatches
@@ -8190,7 +8247,10 @@ class ThreeMFWizardDialog(QDialog):
         layout.addWidget(cov_title)
 
         table = QTableWidget(len(self._colors), 4)
-        table.setHorizontalHeaderLabels(["Color", "Hex", "ΔE", "Quality"])
+        table.setHorizontalHeaderLabels([
+            t("wizard_cov_color"), t("wizard_cov_hex"),
+            t("wizard_cov_de"), t("wizard_cov_quality"),
+        ])
         table.horizontalHeader().setStretchLastSection(True)
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setFixedHeight(130)
@@ -8378,7 +8438,7 @@ class FullSpectrumExportDialog(QDialog):
         layout.addWidget(set_grp)
 
         # Preview
-        prev_grp = QGroupBox("mixed_filament_definitions preview")
+        prev_grp = QGroupBox(app.t("fs_preview_groupbox"))
         prev_layout = QVBoxLayout(prev_grp)
         self._preview = QTextEdit()
         self._preview.setReadOnly(True)
@@ -8410,15 +8470,14 @@ class FullSpectrumExportDialog(QDialog):
 
     def _on_lh_changed(self, val):
         if val > 0.15:
-            self._lh_warn_lbl.setText("⚠ >0.15 mm → Streifen!" if self._app.lang == "de"
-                                       else "⚠ >0.15 mm → striping!")
+            self._lh_warn_lbl.setText(self._app.t("fs_lh_warn"))
         else:
             self._lh_warn_lbl.setText("")
 
     def _browse_src(self):
         p, _ = QFileDialog.getOpenFileName(
             self, self._app.t("fs_src_label"), "",
-            "3MF Files (*.3mf);;All Files (*.*)")
+            f"{self._app.t('3mf_filetypes')} (*.3mf);;All Files (*.*)")
         if p:
             self._src_edit.setText(p)
             if not self._dst_edit.text():
@@ -8427,7 +8486,7 @@ class FullSpectrumExportDialog(QDialog):
     def _browse_dst(self):
         p, _ = QFileDialog.getSaveFileName(
             self, self._app.t("fs_dst_label"), "",
-            "3MF Files (*.3mf);;All Files (*.*)")
+            f"{self._app.t('3mf_filetypes')} (*.3mf);;All Files (*.*)")
         if p:
             self._dst_edit.setText(p)
             self._rb_save_as.setChecked(True)
