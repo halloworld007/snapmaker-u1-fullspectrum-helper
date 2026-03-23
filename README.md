@@ -50,6 +50,21 @@ Load brand, filament, hex color and TD value for each physical tool. The sidebar
 
 ![Sidebar Slots](docs/screenshots/07_sidebar_slots.png)
 
+### 3MF Wizard
+Load a `.3mf` file — the wizard extracts all colors and starts batch calculation automatically.
+
+![3MF Wizard](docs/screenshots/08_3mf_wizard_step1.png)
+
+### FullSpectrum 3MF Export
+Inject all virtual heads as `mixed_filament_definitions` directly into a `.3mf` project file.
+
+![FS 3MF Export](docs/screenshots/09_fs_3mf_export.png)
+
+### Filament Search
+Search the full filament library by color, brand, or ΔE proximity to the current target.
+
+![Filament Search](docs/screenshots/11_filament_search.png)
+
 ### Features
 
 | Feature | Description |
@@ -267,6 +282,21 @@ Analyse, Farbgenerierung, Optimierung, Bibliothek und Export — alles an einem 
 Marke, Filament, Hex-Farbe und TD für jeden physischen Kopf eintragen. Die Sidebar ist durch Ziehen verbreiterbar.
 
 ![Slots](docs/screenshots/07_sidebar_slots.png)
+
+#### 3MF-Wizard
+Eine `.3mf`-Datei laden — der Wizard extrahiert alle Farben und startet die Batch-Berechnung automatisch.
+
+![3MF Wizard](docs/screenshots/08_3mf_wizard_step1.png)
+
+#### FullSpectrum 3MF Export
+Alle virtuellen Köpfe als `mixed_filament_definitions` direkt in eine `.3mf`-Projektdatei einschreiben.
+
+![FS 3MF Export](docs/screenshots/09_fs_3mf_export.png)
+
+#### Filament-Suche
+Die gesamte Filamentbibliothek nach Farbe, Marke oder ΔE-Nähe zur Zielfarbe durchsuchen.
+
+![Filament-Suche](docs/screenshots/11_filament_search.png)
 
 ### Farbwissenschaft
 
