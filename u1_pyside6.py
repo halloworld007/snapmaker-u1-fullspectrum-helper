@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QFileDialog, QColorDialog, QProgressDialog,
     QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem,
     QSizePolicy, QSpinBox, QDoubleSpinBox, QInputDialog, QAbstractItemView,
-    QTextBrowser, QProgressBar,
+    QTextBrowser, QProgressBar, QHeaderView,
 )
 from PySide6.QtCore import (
     Qt, QTimer, QThread, Signal, QSize, QSettings, QRect,
@@ -254,6 +254,9 @@ STRINGS = {
     "tc_result": "TC/Schicht: {tc}   Layers bis opak: {n}",
     "tc_time": "Zusatzzeit: ~{min:.0f} min  (bei {sec}s/Wechsel)",
     "tc_purge": "Purge: ~{g:.0f}g",
+    "stats_summary": "📊 {layers} Schichten · {changes} Werkzeugwechsel",
+    "stats_filament_row": "  T{fid}: {cnt} Lagen ({pct:.0f}%)",
+    "stats_change_time": "  ~{min:.0f} min Wechselzeit (30s/Wechsel)",
     "btn_harmonies": "🎨 Harmonien",
     "harm_title": "Farbharmonien",
     "harm_complement": "Komplementär",
@@ -710,6 +713,9 @@ STRINGS = {
     "tc_result": "TC/layer: {tc}   Layers to opaque: {n}",
     "tc_time": "Extra time: ~{min:.0f} min  (at {sec}s/change)",
     "tc_purge": "Purge: ~{g:.0f}g",
+    "stats_summary": "📊 {layers} layers · {changes} tool changes",
+    "stats_filament_row": "  T{fid}: {cnt} layers ({pct:.0f}%)",
+    "stats_change_time": "  ~{min:.0f} min change time (30s/change)",
     "btn_harmonies": "🎨 Harmonies",
     "harm_title": "Color Harmonies",
     "harm_complement": "Complement",
@@ -2101,15 +2107,22 @@ class SwatchLabel(QLabel):
         self._apply(hex_color)
 
     def _apply(self, hex_color):
+        self._hex = hex_color
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
         try:
-            r, g, b = hex_to_rgb(hex_color)
-            self.setStyleSheet(
-                f"background-color: #{r:02X}{g:02X}{b:02X};"
-                f"border-radius: {self._radius}px;"
-                f"border: 2px solid #334155;"
-            )
+            r, g, b = hex_to_rgb(self._hex)
+            color = QColor(r, g, b)
         except Exception:
-            pass
+            color = QColor(128, 128, 128)
+        # Border
+        painter.setPen(QColor(0x33, 0x41, 0x55))
+        painter.setBrush(color)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        painter.drawRoundedRect(rect, self._radius, self._radius)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -2371,7 +2384,7 @@ class FilamentSearchDialog(QDialog):
         self._debounce.timeout.connect(self._update_results)
         self.search_edit.textChanged.connect(lambda: self._debounce.start(200))
         self.brand_combo.currentIndexChanged.connect(self._update_results)
-        self.results_list.itemDoubleClicked.connect(self._on_select)
+        self.results_list.itemDoubleClicked.connect(lambda _: self._on_select())
         self.select_btn.clicked.connect(self._on_select)
         cancel_btn.clicked.connect(self.reject)
 
@@ -2943,7 +2956,8 @@ class U1App(QMainWindow):
         # Sidebar
         sidebar_scroll = QScrollArea()
         sidebar_scroll.setWidgetResizable(True)
-        sidebar_scroll.setFixedWidth(340)
+        sidebar_scroll.setMinimumWidth(360)
+        sidebar_scroll.setMaximumWidth(420)
         sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         sidebar_inner = QWidget()
         sidebar_layout = QVBoxLayout(sidebar_inner)
@@ -4488,18 +4502,11 @@ class U1App(QMainWindow):
         counts = Counter(extended)
         # estimate change time: ~30s per change
         change_time_min = tool_changes * 30 / 60
-        if self.lang == "de":
-            parts = [f"📊 {total_layers} Schichten · {tool_changes} Werkzeugwechsel"]
-            for fid, cnt in sorted(counts.items()):
-                pct = 100.0 * cnt / total_layers
-                parts.append(f"  T{fid}: {cnt} Lagen ({pct:.0f}%)")
-            parts.append(f"  ~{change_time_min:.0f} min Wechselzeit (30s/Wechsel)")
-        else:
-            parts = [f"📊 {total_layers} layers · {tool_changes} tool changes"]
-            for fid, cnt in sorted(counts.items()):
-                pct = 100.0 * cnt / total_layers
-                parts.append(f"  T{fid}: {cnt} layers ({pct:.0f}%)")
-            parts.append(f"  ~{change_time_min:.0f} min change time (30s/change)")
+        parts = [self.t("stats_summary").format(layers=total_layers, changes=tool_changes)]
+        for fid, cnt in sorted(counts.items()):
+            pct = 100.0 * cnt / total_layers
+            parts.append(self.t("stats_filament_row").format(fid=fid, cnt=cnt, pct=pct))
+        parts.append(self.t("stats_change_time").format(min=change_time_min))
         self._stats_label.setText("\n".join(parts))
 
     def _show_top3(self):
@@ -6298,7 +6305,7 @@ class U1App(QMainWindow):
         ]
         table = QTableWidget(0, len(col_headers))
         table.setHorizontalHeaderLabels(col_headers)
-        table.horizontalHeader().setSectionResizeMode(2, 1)  # stretch seq col
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)  # stretch seq col
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         layout.addWidget(table, 1)
 
