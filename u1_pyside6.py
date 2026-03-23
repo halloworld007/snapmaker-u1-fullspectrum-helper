@@ -2648,10 +2648,19 @@ class U1App(QMainWindow):
         self._theme = self._settings.value("theme", "dark")
         self._max_virtual = int(self._settings.value("max_virtual", MAX_VIRTUAL))
         self._virtual = []
-        self._history = []
+        # Restore history from settings
+        try:
+            self._history = json.loads(self._settings.value("history", "[]"))
+        except Exception:
+            self._history = []
         self._undo_stack = []
         self._slot_undo_stack = []
-        self._slot_expanded = [True, False, False, False]
+        # Restore slot expand states
+        try:
+            self._slot_expanded = json.loads(
+                self._settings.value("slot_expanded", "[true,false,false,false]"))
+        except Exception:
+            self._slot_expanded = [True, False, False, False]
         self._search_wins = {}
         self._last_result = {}
         self._last_sim_hex = None
@@ -2700,8 +2709,22 @@ class U1App(QMainWindow):
         last_tab = self._settings.value("last_tab", 0, int)
         QTimer.singleShot(300, lambda: self._tabs.setCurrentIndex(last_tab))
 
+        # Restore splitter position
+        splitter_state = self._settings.value("splitter_state")
+        if splitter_state and hasattr(self, "_main_splitter"):
+            QTimer.singleShot(0, lambda: self._main_splitter.restoreState(splitter_state))
+
+        # Restore history UI
+        QTimer.singleShot(100, self._refresh_history_ui)
+
         # Gamut strip initial update
         QTimer.singleShot(500, self._update_gamut_strip)
+
+        # Auto-recalculate debounce timer: fires 1.2s after last slot change
+        self._auto_calc_timer = QTimer()
+        self._auto_calc_timer.setSingleShot(True)
+        self._auto_calc_timer.setInterval(1200)
+        self._auto_calc_timer.timeout.connect(self._auto_recalc)
 
         # Keyboard shortcuts
         QShortcut(QKeySequence("Ctrl+Z"), self, self._undo_last)
@@ -2745,6 +2768,8 @@ class U1App(QMainWindow):
         self._settings.setValue("theme", self._theme)
         self._settings.setValue("max_virtual", self._max_virtual)
         self._settings.setValue("geometry", self.saveGeometry())
+        if hasattr(self, "_main_splitter"):
+            self._settings.setValue("splitter_state", self._main_splitter.saveState())
         if hasattr(self, "_target_hex") and self._target_hex:
             self._settings.setValue("last_color", self._target_hex)
         if hasattr(self, "_model_combo"):
@@ -2755,6 +2780,12 @@ class U1App(QMainWindow):
             self._settings.setValue("last_tab", self._tabs.currentIndex())
         lh = self._lh_spin.value() if hasattr(self, "_lh_spin") else 0.08
         self._settings.setValue("layer_height", lh)
+        # Persist history (max 10 entries)
+        if self._history:
+            self._settings.setValue("history", json.dumps(self._history[:10]))
+        # Persist slot expand states
+        self._settings.setValue("slot_expanded", json.dumps(
+            getattr(self, "_slot_expanded", [True, False, False, False])))
 
     def t(self, key, **kwargs):
         s = STRINGS[self.lang].get(key, STRINGS["de"].get(key, key))
@@ -2980,6 +3011,7 @@ class U1App(QMainWindow):
 
         # Splitter: sidebar | main — user can drag to resize
         splitter = QSplitter(Qt.Horizontal)
+        self._main_splitter = splitter
         splitter.setHandleWidth(5)
         splitter.setStyleSheet("QSplitter::handle { background-color: #334155; }")
 
@@ -3303,13 +3335,23 @@ class U1App(QMainWindow):
             r, g, b = hex_to_rgb(hex_val)
             s["preview_lbl"].setStyleSheet(
                 f"background-color: #{r:02X}{g:02X}{b:02X}; border-radius: 4px; border: 1px solid #334155;")
+            # Valid hex: normal border on input
+            s["hex_edit"].setStyleSheet("")
         except Exception:
-            pass
+            # Invalid hex: red border feedback
+            s["hex_edit"].setStyleSheet("border: 1px solid #dc2626;")
         self._update_slot_strip(idx)
-        # Update toggle button text when collapsed
         if not self._slot_expanded[idx]:
             s["toggle_btn"].setText(f"▶ T{idx+1}  {hex_val.upper()}")
         self._update_gamut_strip()
+        # Trigger auto-recalculate after 1.2s idle (only if target is set)
+        if getattr(self, "_target_hex", None) and hasattr(self, "_auto_calc_timer"):
+            self._auto_calc_timer.start()
+
+    def _auto_recalc(self):
+        """Triggered by debounce timer after slot changes — silently recalculates."""
+        if getattr(self, "_target_hex", None):
+            self._calc()
 
     def _pick_slot_color(self, idx):
         s = self._slots[idx]
@@ -3657,11 +3699,23 @@ class U1App(QMainWindow):
 
         row1.addWidget(QLabel(self.t("de_thresh_label")))
         self._auto_thresh_spin = QDoubleSpinBox()
-        self._auto_thresh_spin.setRange(0.5, 10.0)
+        self._auto_thresh_spin.setRange(0.5, 15.0)
         self._auto_thresh_spin.setSingleStep(0.5)
         self._auto_thresh_spin.setValue(2.0)
-        self._auto_thresh_spin.setMaximumWidth(60)
+        self._auto_thresh_spin.setMaximumWidth(55)
+        self._auto_thresh_spin.setToolTip("ΔE threshold: lower = more accurate, more layers")
         row1.addWidget(self._auto_thresh_spin)
+
+        # Quick-preset buttons for common thresholds
+        for label, val, tip in [("✦", 2.0, "Precise (ΔE≤2)"),
+                                  ("●", 4.0, "Good (ΔE≤4)"),
+                                  ("◌", 8.0, "Draft (ΔE≤8)")]:
+            btn = QPushButton(label)
+            btn.setFixedSize(22, 22)
+            btn.setToolTip(tip)
+            btn.setStyleSheet("QPushButton { font-size: 10px; padding: 0; }")
+            btn.clicked.connect(lambda _, v=val: self._auto_thresh_spin.setValue(v))
+            row1.addWidget(btn)
 
         self._optimizer_check = QCheckBox(self.t("optimizer_check").replace("\n", " "))
         row1.addWidget(self._optimizer_check)
