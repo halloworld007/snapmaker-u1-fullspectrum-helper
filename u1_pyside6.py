@@ -290,6 +290,14 @@ STRINGS = {
     "de_overview_col_quality": "Qualität",
     "auto_found": "Auto: Länge {n} gefunden",
     "auto_finding": "Auto — Länge wird berechnet",
+    "seq_reduced": "♻ Muster: {full}→{short} Layer (÷{factor}×)",
+    "seq_lookahead": "→ +{extra} Layer bringen ΔE {old:.1f}→{new:.1f}",
+    "suggest_filament": "💡 «{brand} {name}» könnte ΔE auf ~{de:.1f} reduzieren (Slot ersetzen?)",
+    "de_quality_excellent": "ausgezeichnet ✓",
+    "de_quality_good": "gut",
+    "de_quality_ok": "wahrnehmbar",
+    "de_quality_poor": "stark abweichend",
+    "de_quality_gamut": "außerhalb Gamut",
     "status_ready": "Bereit",
     "status_calculated": "Berechnet — ΔE {de:.1f} — Sequenz: {seq}",
     "status_added": "V{vid} hinzugefügt",
@@ -749,6 +757,14 @@ STRINGS = {
     "de_overview_col_quality": "Quality",
     "auto_found": "Auto: length {n} found",
     "auto_finding": "Auto — calculating length",
+    "seq_reduced": "♻ Pattern: {full}→{short} layers (÷{factor}×)",
+    "seq_lookahead": "→ +{extra} layers improve ΔE {old:.1f}→{new:.1f}",
+    "suggest_filament": "💡 «{brand} {name}» could reduce ΔE to ~{de:.1f} (replace a slot?)",
+    "de_quality_excellent": "excellent ✓",
+    "de_quality_good": "good",
+    "de_quality_ok": "noticeable",
+    "de_quality_poor": "strong deviation",
+    "de_quality_gamut": "outside gamut",
     "status_ready": "Ready",
     "status_calculated": "Calculated — ΔE {de:.1f} — Sequence: {seq}",
     "status_added": "V{vid} added",
@@ -4119,17 +4135,26 @@ class U1App(QMainWindow):
                         auto=False, auto_threshold=2.0):
         """Calculate sequence for a color — no UI side effects.
 
-        Improvements vs. original:
-        - Exponential weight formula (smoother, less extreme than 1/x)
-        - Auto mode is default when seq_len=None (finds shortest sufficient pattern)
-        - Optimizer also searches permutations for short lengths (<=8) cheaply
-        - Pattern canonicalization: reduces repeating units (e.g. 112233112233 → 112233)
+        - Exponential weight formula exp(-ΔE/15): smoother than 1/(ΔE+0.1)
+        - Memoized simulate_mix: each unique sequence computed at most once per call
+        - Auto mode default (seq_len=None): finds shortest pattern meeting threshold
+        - Permutation search for n<=8 even without optimizer flag (cheap, better results)
+        - Look-ahead after threshold hit: up to +5 layers checked for significant improvement
+        - Pattern canonicalization: e.g. 112233112233 → 112233
+        - Returns extra metadata: full_seq_len (before reduction), lookahead_improvement
         """
         t_lab = rgb_to_lab(hex_to_rgb(target_hex))
         fils = self._slot_filaments()
 
-        # Improved weight: exponential decay in ΔE + inverse TD
-        # exp(-ΔE/15) gives smoother gradient than 1/(ΔE+0.1), avoids extreme ratios
+        # Memoize _simulate_mix within this call — same sequence won't be simulated twice
+        _sim_cache: dict = {}
+        def sim(seq):
+            key = tuple(seq)
+            if key not in _sim_cache:
+                _sim_cache[key] = self._simulate_mix(seq, fils)
+            return _sim_cache[key]
+
+        # Exponential decay weight: smoother gradient, avoids extreme ratios
         scores = [
             {
                 "id": f["id"],
@@ -4146,23 +4171,23 @@ class U1App(QMainWindow):
 
         def best_seq_for_n(n):
             best, best_dv = None, float("inf")
-            # Always try sorted-by-weight as baseline
             greedy_order = sorted(scores, key=lambda x: x["w"], reverse=True)
             seq = self._build_sequence(greedy_order, tot, n)
-            dv = delta_e(self._simulate_mix(seq, fils), t_lab)
+            dv = delta_e(sim(seq), t_lab)
             best, best_dv = seq, dv
 
-            # Try all permutations when optimizer flag set OR sequence is short (cheap)
+            # Try all permutations when optimizer flag set OR short sequence (cheap)
             if optimizer or n <= 8:
                 for perm in iter_permutations(scores):
                     seq = self._build_sequence(list(perm), tot, n)
-                    dv = delta_e(self._simulate_mix(seq, fils), t_lab)
+                    lab = sim(seq)
+                    dv = delta_e(lab, t_lab)
                     if optimizer:
                         seq_str = "".join(map(str, seq))
                         all_opt_results.append({
                             "target_hex": target_hex,
                             "sequence": seq_str,
-                            "sim_hex": lab_to_hex(self._simulate_mix(seq, fils)),
+                            "sim_hex": lab_to_hex(lab),  # reuse cached lab, no double call
                             "de": dv,
                             "seq_len": n,
                         })
@@ -4171,34 +4196,48 @@ class U1App(QMainWindow):
                         best = seq
             return best
 
+        lookahead_info = None  # (extra_layers, old_de, new_de)
+
         if seq_len is not None and not auto:
-            # Fixed-length mode: exact length requested
             chosen_seq = best_seq_for_n(seq_len)
         else:
-            # Auto mode (default): find shortest pattern that meets threshold
             threshold = auto_threshold if auto else 2.0
             chosen_seq = None
-            best_de = float("inf")
-            best_at_max = None
+            found_n = None
+            best_de_overall = float("inf")
+            best_seq_overall = None
             for n in range(1, MAX_SEQ_LEN + 1):
                 seq = best_seq_for_n(n)
-                dv = delta_e(self._simulate_mix(seq, fils), t_lab)
-                if dv < best_de:
-                    best_de = dv
-                    best_at_max = seq
-                if dv <= threshold:
+                dv = delta_e(sim(seq), t_lab)
+                if dv < best_de_overall:
+                    best_de_overall = dv
+                    best_seq_overall = seq
+                if dv <= threshold and chosen_seq is None:
                     chosen_seq = seq
+                    found_n = n
+                    # Look-ahead: check if +1..+5 layers give significantly better ΔE
+                    found_dv = dv
+                    for extra in range(1, 6):
+                        if n + extra > MAX_SEQ_LEN:
+                            break
+                        longer = best_seq_for_n(n + extra)
+                        longer_dv = delta_e(sim(longer), t_lab)
+                        if longer_dv < found_dv - 1.0:  # >1 ΔE improvement = worth it
+                            lookahead_info = (extra, found_dv, longer_dv)
+                            chosen_seq = longer
+                            found_dv = longer_dv
                     break
             if chosen_seq is None:
-                chosen_seq = best_at_max or best_seq_for_n(MAX_SEQ_LEN)
+                chosen_seq = best_seq_overall or best_seq_for_n(MAX_SEQ_LEN)
 
-        # Canonicalize: reduce repeating patterns (e.g. 112233112233 → 112233)
+        # Canonicalize: reduce repeating patterns
+        full_len = len(chosen_seq)
         canonical = _seq_canonical(chosen_seq)
-        canon_dv = delta_e(self._simulate_mix(canonical, fils), t_lab)
-        # Only use canonical if color result stays equivalent (ΔE change < 0.5)
-        original_dv = delta_e(self._simulate_mix(chosen_seq, fils), t_lab)
-        if abs(canon_dv - original_dv) < 0.5:
-            chosen_seq = canonical
+        if len(canonical) < full_len:
+            canon_dv = delta_e(sim(canonical), t_lab)
+            orig_dv = delta_e(sim(chosen_seq), t_lab)
+            if abs(canon_dv - orig_dv) < 0.5:
+                chosen_seq = canonical
 
         if optimizer and all_opt_results:
             all_opt_results.sort(key=lambda x: x["de"])
@@ -4212,7 +4251,7 @@ class U1App(QMainWindow):
         else:
             self._top3_results = []
 
-        sim_lab = self._simulate_mix(chosen_seq, fils)
+        sim_lab = sim(chosen_seq)
         dv = delta_e(sim_lab, t_lab)
         return {
             "target_hex": target_hex,
@@ -4220,6 +4259,8 @@ class U1App(QMainWindow):
             "sim_hex": lab_to_hex(sim_lab),
             "de": dv,
             "seq_len": len(chosen_seq),
+            "full_seq_len": full_len,          # length before canonicalization
+            "lookahead": lookahead_info,        # (extra, old_de, new_de) or None
         }
 
     # ── GAMUT STRIP ───────────────────────────────────────────────────────────
@@ -4416,9 +4457,16 @@ class U1App(QMainWindow):
             # ΔE display
             self._de_label.setText(f"ΔE {dv:.1f}")
             self._de_label.setStyleSheet(f"color: {_de_color(dv)}; font-size: 22pt; font-weight: bold;")
-            quality = ("excellent ✓" if dv < 3.0 else "good" if dv < 6.0 else "visible") \
-                if self.lang == "en" else \
-                ("ausgezeichnet ✓" if dv < 3.0 else "gut" if dv < 6.0 else "sichtbar")
+            if dv < DE_GOOD:
+                quality = self.t("de_quality_excellent")
+            elif dv < DE_OK:
+                quality = self.t("de_quality_good")
+            elif dv < 12.0:
+                quality = self.t("de_quality_ok")
+            elif dv < GAMUT_WARN_DE:
+                quality = self.t("de_quality_poor")
+            else:
+                quality = self.t("de_quality_gamut")
             self._de_quality_lbl.setText(quality)
             self._de_quality_lbl.setStyleSheet(f"color: {_de_color(dv)};")
 
@@ -4439,6 +4487,15 @@ class U1App(QMainWindow):
                               b=cad[ids[1]] if len(ids) > 1 else lh, p=pat_str)
             else:
                 hint = self.t("hint_pattern", p=pat_str)
+            # Show reduction info if pattern was canonicalized
+            full_len = result.get("full_seq_len", len(seq))
+            if full_len > len(seq) and full_len > 0:
+                factor = full_len // len(seq)
+                hint += "\n" + self.t("seq_reduced", full=full_len, short=len(seq), factor=factor)
+            # Show look-ahead improvement info
+            la = result.get("lookahead")
+            if la:
+                hint += "\n" + self.t("seq_lookahead", extra=la[0], old=la[1], new=la[2])
             self._hint_label.setText(hint)
 
             self._last_result = result
@@ -6141,7 +6198,11 @@ class U1App(QMainWindow):
     # ── AUTO SUGGESTION ───────────────────────────────────────────────────────
 
     def _check_auto_suggestion(self, target_hex):
-        """Show status hint if a library filament is close to the target color."""
+        """Show status hint if a library filament is close to the target color.
+
+        Extended: when current ΔE > DE_OK, also simulate which library filament
+        would give the best improvement if swapped into any slot.
+        """
         target_lab = rgb_to_lab(hex_to_rgb(target_hex.lstrip("#")))
         best_de = float('inf')
         best_fil = None
@@ -6166,6 +6227,50 @@ class U1App(QMainWindow):
             msg = self.t("auto_suggest_tip",
                          brand=best_brand, name=best_fil.get("name", ""), de=best_de)
             self._set_status(msg, 8000)
+
+        # Deeper suggestion: if result ΔE is poor, find the best swap from library
+        last_de = getattr(self, "_last_de", None)
+        if last_de is not None and last_de > DE_OK:
+            self._find_best_slot_swap(target_hex, last_de)
+
+    def _find_best_slot_swap(self, target_hex, current_de):
+        """Scan library: simulate swapping each slot with each filament, find best improvement."""
+        fils = self._slot_filaments()
+        if not fils:
+            return
+        t_lab = rgb_to_lab(hex_to_rgb(target_hex.lstrip("#")))
+        best_improvement = 0.5  # Minimum improvement to report (ΔE units)
+        best_msg = None
+        for slot_idx, slot_fil in enumerate(fils):
+            for brand, filaments in self.library.items():
+                for candidate in filaments:
+                    chex = candidate.get("hex", "").lstrip("#")
+                    if chex.upper() == slot_fil["hex"].lstrip("#").upper():
+                        continue
+                    try:
+                        # Build trial filament list with this swap
+                        trial = list(fils)
+                        trial[slot_idx] = {
+                            **slot_fil,
+                            "hex": candidate["hex"],
+                            "lab": rgb_to_lab(hex_to_rgb(chex)),
+                            "td": float(candidate.get("td", DEFAULT_TD)),
+                        }
+                        # Quick 4-layer sequence test
+                        trial_seq = [f["id"] for f in trial]
+                        trial_lab = self._simulate_mix(trial_seq, trial)
+                        trial_de = delta_e(trial_lab, t_lab)
+                        improvement = current_de - trial_de
+                        if improvement > best_improvement:
+                            best_improvement = improvement
+                            best_msg = self.t("suggest_filament",
+                                brand=brand,
+                                name=candidate.get("name", ""),
+                                de=trial_de)
+                    except Exception:
+                        pass
+        if best_msg:
+            self._set_status(best_msg, 12000)
 
     # ── MATERIAL COMPATIBILITY ────────────────────────────────────────────────
 
