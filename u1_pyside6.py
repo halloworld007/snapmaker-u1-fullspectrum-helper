@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QFileDialog, QColorDialog, QProgressDialog,
     QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem,
     QSizePolicy, QSpinBox, QDoubleSpinBox, QInputDialog, QAbstractItemView,
-    QTextBrowser, QProgressBar,
+    QTextBrowser, QProgressBar, QHeaderView,
 )
 from PySide6.QtCore import (
     Qt, QTimer, QThread, Signal, QSize, QSettings, QRect,
@@ -254,6 +254,9 @@ STRINGS = {
     "tc_result": "TC/Schicht: {tc}   Layers bis opak: {n}",
     "tc_time": "Zusatzzeit: ~{min:.0f} min  (bei {sec}s/Wechsel)",
     "tc_purge": "Purge: ~{g:.0f}g",
+    "stats_summary": "📊 {layers} Schichten · {changes} Werkzeugwechsel",
+    "stats_filament_row": "  T{fid}: {cnt} Lagen ({pct:.0f}%)",
+    "stats_change_time": "  ~{min:.0f} min Wechselzeit (30s/Wechsel)",
     "btn_harmonies": "🎨 Harmonien",
     "harm_title": "Farbharmonien",
     "harm_complement": "Komplementär",
@@ -287,6 +290,15 @@ STRINGS = {
     "de_overview_col_quality": "Qualität",
     "auto_found": "Auto: Länge {n} gefunden",
     "auto_finding": "Auto — Länge wird berechnet",
+    "seq_reduced": "♻ Muster: {full}→{short} Layer (÷{factor}×)",
+    "seq_lookahead": "→ +{extra} Layer bringen ΔE {old:.1f}→{new:.1f}",
+    "suggest_filament": "💡 «{brand} {name}» könnte ΔE auf ~{de:.1f} reduzieren (Slot ersetzen?)",
+    "de_quality_excellent": "ausgezeichnet ✓",
+    "de_quality_good": "gut",
+    "de_quality_ok": "wahrnehmbar",
+    "de_quality_poor": "stark abweichend",
+    "de_quality_gamut": "außerhalb Gamut",
+    "print_h_tip": "Druckhöhe für Statistik (0 = deaktiviert)",
     "status_ready": "Bereit",
     "status_calculated": "Berechnet — ΔE {de:.1f} — Sequenz: {seq}",
     "status_added": "V{vid} hinzugefügt",
@@ -710,6 +722,9 @@ STRINGS = {
     "tc_result": "TC/layer: {tc}   Layers to opaque: {n}",
     "tc_time": "Extra time: ~{min:.0f} min  (at {sec}s/change)",
     "tc_purge": "Purge: ~{g:.0f}g",
+    "stats_summary": "📊 {layers} layers · {changes} tool changes",
+    "stats_filament_row": "  T{fid}: {cnt} layers ({pct:.0f}%)",
+    "stats_change_time": "  ~{min:.0f} min change time (30s/change)",
     "btn_harmonies": "🎨 Harmonies",
     "harm_title": "Color Harmonies",
     "harm_complement": "Complement",
@@ -743,6 +758,15 @@ STRINGS = {
     "de_overview_col_quality": "Quality",
     "auto_found": "Auto: length {n} found",
     "auto_finding": "Auto — calculating length",
+    "seq_reduced": "♻ Pattern: {full}→{short} layers (÷{factor}×)",
+    "seq_lookahead": "→ +{extra} layers improve ΔE {old:.1f}→{new:.1f}",
+    "suggest_filament": "💡 «{brand} {name}» could reduce ΔE to ~{de:.1f} (replace a slot?)",
+    "de_quality_excellent": "excellent ✓",
+    "de_quality_good": "good",
+    "de_quality_ok": "noticeable",
+    "de_quality_poor": "strong deviation",
+    "de_quality_gamut": "outside gamut",
+    "print_h_tip": "Print height for statistics (0 = disabled)",
     "status_ready": "Ready",
     "status_calculated": "Calculated — ΔE {de:.1f} — Sequence: {seq}",
     "status_added": "V{vid} added",
@@ -1420,6 +1444,24 @@ def seq_to_runs(sequence):
     runs.append((cur, cnt))
     return runs
 
+
+def _seq_canonical(seq):
+    """Return shortest repeating unit of a sequence list.
+
+    e.g. [1,2,1,2,1,2] → [1,2]   [1,1,2,2,1,1,2,2] → [1,1,2,2]
+    Falls back to original if no shorter period found.
+    """
+    n = len(seq)
+    if n == 0:
+        return seq
+    for period in range(1, n // 2 + 1):
+        if n % period == 0:
+            unit = seq[:period]
+            if unit * (n // period) == seq:
+                return unit
+    return seq
+
+
 def calc_cadence(sequence, layer_height):
     """Cadence Heights matching FullSpectrum slicer v0.92+ logic.
 
@@ -1982,6 +2024,7 @@ QTabBar::tab:hover:!selected { background-color: #263048; color: #e2e8f0; }
 
 QFrame#slot_frame { background-color: #1e293b; border: 1px solid #334155; border-radius: 6px; }
 QFrame#card { background-color: #1e293b; border: 1px solid #334155; border-radius: 6px; }
+QFrame#result_card { background-color: #1e293b; border: 2px solid #334155; border-radius: 6px; }
 QFrame#dark_card { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 6px; }
 
 QLabel#section_title { color: #38bdf8; font-size: 13pt; font-weight: bold; }
@@ -2035,6 +2078,7 @@ QTabBar::tab { background-color: #e2e8f0; color: #64748b; padding: 8px 20px; bor
 QTabBar::tab:selected { background-color: #f8fafc; color: #1e293b; border-bottom: 2px solid #3b82f6; }
 QFrame#slot_frame { background-color: white; border: 1px solid #cbd5e1; border-radius: 6px; }
 QFrame#card { background-color: white; border: 1px solid #cbd5e1; border-radius: 6px; }
+QFrame#result_card { background-color: white; border: 2px solid #cbd5e1; border-radius: 6px; }
 QLabel#section_title { color: #1d4ed8; font-size: 13pt; font-weight: bold; }
 QGroupBox { border: 1px solid #cbd5e1; border-radius: 6px; margin-top: 10px; }
 QTextEdit { background-color: white; border: 1px solid #cbd5e1; border-radius: 4px; }
@@ -2101,15 +2145,22 @@ class SwatchLabel(QLabel):
         self._apply(hex_color)
 
     def _apply(self, hex_color):
+        self._hex = hex_color
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
         try:
-            r, g, b = hex_to_rgb(hex_color)
-            self.setStyleSheet(
-                f"background-color: #{r:02X}{g:02X}{b:02X};"
-                f"border-radius: {self._radius}px;"
-                f"border: 2px solid #334155;"
-            )
+            r, g, b = hex_to_rgb(self._hex)
+            color = QColor(r, g, b)
         except Exception:
-            pass
+            color = QColor(128, 128, 128)
+        # Border
+        painter.setPen(QColor(0x33, 0x41, 0x55))
+        painter.setBrush(color)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        painter.drawRoundedRect(rect, self._radius, self._radius)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -2371,7 +2422,7 @@ class FilamentSearchDialog(QDialog):
         self._debounce.timeout.connect(self._update_results)
         self.search_edit.textChanged.connect(lambda: self._debounce.start(200))
         self.brand_combo.currentIndexChanged.connect(self._update_results)
-        self.results_list.itemDoubleClicked.connect(self._on_select)
+        self.results_list.itemDoubleClicked.connect(lambda _: self._on_select())
         self.select_btn.clicked.connect(self._on_select)
         cancel_btn.clicked.connect(self.reject)
 
@@ -2597,10 +2648,19 @@ class U1App(QMainWindow):
         self._theme = self._settings.value("theme", "dark")
         self._max_virtual = int(self._settings.value("max_virtual", MAX_VIRTUAL))
         self._virtual = []
-        self._history = []
+        # Restore history from settings
+        try:
+            self._history = json.loads(self._settings.value("history", "[]"))
+        except Exception:
+            self._history = []
         self._undo_stack = []
         self._slot_undo_stack = []
-        self._slot_expanded = [True, False, False, False]
+        # Restore slot expand states
+        try:
+            self._slot_expanded = json.loads(
+                self._settings.value("slot_expanded", "[true,false,false,false]"))
+        except Exception:
+            self._slot_expanded = [True, False, False, False]
         self._search_wins = {}
         self._last_result = {}
         self._last_sim_hex = None
@@ -2649,8 +2709,22 @@ class U1App(QMainWindow):
         last_tab = self._settings.value("last_tab", 0, int)
         QTimer.singleShot(300, lambda: self._tabs.setCurrentIndex(last_tab))
 
+        # Restore splitter position
+        splitter_state = self._settings.value("splitter_state")
+        if splitter_state and hasattr(self, "_main_splitter"):
+            QTimer.singleShot(0, lambda: self._main_splitter.restoreState(splitter_state))
+
+        # Restore history UI
+        QTimer.singleShot(100, self._refresh_history_ui)
+
         # Gamut strip initial update
         QTimer.singleShot(500, self._update_gamut_strip)
+
+        # Auto-recalculate debounce timer: fires 1.2s after last slot change
+        self._auto_calc_timer = QTimer()
+        self._auto_calc_timer.setSingleShot(True)
+        self._auto_calc_timer.setInterval(1200)
+        self._auto_calc_timer.timeout.connect(self._auto_recalc)
 
         # Keyboard shortcuts
         QShortcut(QKeySequence("Ctrl+Z"), self, self._undo_last)
@@ -2694,6 +2768,8 @@ class U1App(QMainWindow):
         self._settings.setValue("theme", self._theme)
         self._settings.setValue("max_virtual", self._max_virtual)
         self._settings.setValue("geometry", self.saveGeometry())
+        if hasattr(self, "_main_splitter"):
+            self._settings.setValue("splitter_state", self._main_splitter.saveState())
         if hasattr(self, "_target_hex") and self._target_hex:
             self._settings.setValue("last_color", self._target_hex)
         if hasattr(self, "_model_combo"):
@@ -2704,6 +2780,12 @@ class U1App(QMainWindow):
             self._settings.setValue("last_tab", self._tabs.currentIndex())
         lh = self._lh_spin.value() if hasattr(self, "_lh_spin") else 0.08
         self._settings.setValue("layer_height", lh)
+        # Persist history (max 10 entries)
+        if self._history:
+            self._settings.setValue("history", json.dumps(self._history[:10]))
+        # Persist slot expand states
+        self._settings.setValue("slot_expanded", json.dumps(
+            getattr(self, "_slot_expanded", [True, False, False, False])))
 
     def t(self, key, **kwargs):
         s = STRINGS[self.lang].get(key, STRINGS["de"].get(key, key))
@@ -2778,29 +2860,16 @@ class U1App(QMainWindow):
     # ── RESULT BORDER ──────────────────────────────────────────────────────────
 
     def _set_result_border(self, de):
-        if de < 3.0:
+        if de < DE_GOOD:
             color = "#16a34a"
-        elif de < 6.0:
+        elif de < DE_OK:
             color = "#d97706"
         else:
             color = "#dc2626"
-            QTimer.singleShot(0, lambda: self._pulse_result(3))
         if hasattr(self, "_result_frame"):
+            # Use objectName selector so border only applies to THIS frame, not children
             self._result_frame.setStyleSheet(
-                f"QFrame {{ border: 2px solid {color}; border-radius: 6px; }}")
-
-    def _pulse_result(self, n):
-        if n <= 0 or not hasattr(self, "_result_frame"):
-            return
-        cur = self._result_frame.styleSheet()
-        if "4px" in cur:
-            new_w = "2px"
-        else:
-            new_w = "4px"
-        import re as _re
-        new_style = _re.sub(r'\d+px solid', f'{new_w} solid', cur)
-        self._result_frame.setStyleSheet(new_style)
-        QTimer.singleShot(500, lambda: self._pulse_result(n - 1))
+                f"QFrame#result_card {{ border: 2px solid {color}; border-radius: 6px; }}")
 
     # ── VIRTUAL SORT / FILTER ──────────────────────────────────────────────────
 
@@ -2938,26 +3007,40 @@ class U1App(QMainWindow):
         self.setCentralWidget(central)
         root_layout = QHBoxLayout(central)
         root_layout.setContentsMargins(8, 8, 8, 8)
-        root_layout.setSpacing(6)
+        root_layout.setSpacing(0)
+
+        # Splitter: sidebar | main — user can drag to resize
+        splitter = QSplitter(Qt.Horizontal)
+        self._main_splitter = splitter
+        splitter.setHandleWidth(5)
+        splitter.setStyleSheet("QSplitter::handle { background-color: #334155; }")
 
         # Sidebar
         sidebar_scroll = QScrollArea()
         sidebar_scroll.setWidgetResizable(True)
-        sidebar_scroll.setFixedWidth(340)
-        sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        sidebar_scroll.setMinimumWidth(320)
+        sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        sidebar_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         sidebar_inner = QWidget()
         sidebar_layout = QVBoxLayout(sidebar_inner)
         sidebar_layout.setContentsMargins(6, 6, 6, 6)
         sidebar_layout.setSpacing(6)
         sidebar_scroll.setWidget(sidebar_inner)
-        root_layout.addWidget(sidebar_scroll)
+        splitter.addWidget(sidebar_scroll)
 
         self._build_sidebar(sidebar_layout)
         sidebar_layout.addStretch()
 
         # Main tabs
         self._tabs = QTabWidget()
-        root_layout.addWidget(self._tabs, 1)
+        splitter.addWidget(self._tabs)
+
+        # Default split ratio: sidebar ~400px, rest for main content
+        splitter.setSizes([420, 9999])
+        splitter.setStretchFactor(0, 0)   # sidebar: don't auto-stretch
+        splitter.setStretchFactor(1, 1)   # main: takes all extra space
+
+        root_layout.addWidget(splitter)
 
         self._build_tab_calculator()
         self._build_tab_virtual()
@@ -3044,8 +3127,7 @@ class U1App(QMainWindow):
         self._print_h_spin.setDecimals(1)
         self._print_h_spin.setValue(0.0)
         self._print_h_spin.setSuffix(" mm")
-        self._print_h_spin.setToolTip("Druckhöhe für Statistik (0 = deaktiviert)" if self.lang == "de"
-                                       else "Print height for statistics (0 = disabled)")
+        self._print_h_spin.setToolTip(self.t("print_h_tip"))
         self._print_h_spin.valueChanged.connect(self._update_print_stats)
         lh_layout.addWidget(self._print_h_spin)
         lh_hint = QLabel(self.t("lh_hint"))
@@ -3119,61 +3201,67 @@ class U1App(QMainWindow):
         body_layout.setSpacing(4)
         body.setVisible(is_expanded)
 
-        # Header row inside body
-        hdr = QHBoxLayout()
-        search_btn = QPushButton("🔍")
-        search_btn.setFixedSize(26, 26)
-        search_btn.clicked.connect(lambda checked, i=idx: self._open_filament_search(i))
-        hdr.addStretch()
-        hdr.addWidget(search_btn)
-        body_layout.addLayout(hdr)
-
-        # Brand combo
+        # Brand combo — limited width so long names don't overflow sidebar
         brand_combo = QComboBox()
+        brand_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        brand_combo.setMinimumContentsLength(16)
         brand_combo.addItems(list(self.library.keys()))
         brand_combo.currentTextChanged.connect(lambda t, i=idx: self._update_filament_combo(i))
         body_layout.addWidget(brand_combo)
 
         # Filament combo
         fil_combo = QComboBox()
+        fil_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        fil_combo.setMinimumContentsLength(16)
         fil_combo.currentTextChanged.connect(lambda t, i=idx: self._apply_filament(i))
         body_layout.addWidget(fil_combo)
 
-        # Hex + preview + TD row
+        # Row A: [color preview swatch] [hex input — expanding] [🎨 picker]
         hex_row = QHBoxLayout()
-        hex_edit = QLineEdit()
-        hex_edit.setPlaceholderText("#RRGGBB")
-        hex_edit.setMaximumWidth(90)
-        hex_edit.textChanged.connect(lambda t, i=idx: self._update_slot_preview(i))
-        hex_row.addWidget(hex_edit)
+        hex_row.setSpacing(4)
 
         preview_lbl = QLabel()
-        preview_lbl.setFixedSize(36, 36)
+        preview_lbl.setFixedSize(32, 32)
         preview_lbl.setStyleSheet("background-color: #808080; border-radius: 4px; border: 1px solid #334155;")
         hex_row.addWidget(preview_lbl)
 
+        hex_edit = QLineEdit()
+        hex_edit.setPlaceholderText("#RRGGBB")
+        hex_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        hex_edit.textChanged.connect(lambda t, i=idx: self._update_slot_preview(i))
+        hex_row.addWidget(hex_edit)
+
         pick_btn = QPushButton("🎨")
-        pick_btn.setFixedSize(26, 26)
+        pick_btn.setFixedSize(28, 28)
         pick_btn.clicked.connect(lambda checked, i=idx: self._pick_slot_color(i))
         hex_row.addWidget(pick_btn)
 
-        hex_row.addStretch()
+        search_slot_btn = QPushButton("🔍")
+        search_slot_btn.setFixedSize(28, 28)
+        search_slot_btn.clicked.connect(lambda checked, i=idx: self._open_filament_search(i))
+        hex_row.addWidget(search_slot_btn)
+
+        body_layout.addLayout(hex_row)
+
+        # Row B: TD label + spinner | translucent checkbox — all on one compact line
+        td_row = QHBoxLayout()
+        td_row.setSpacing(4)
         td_lbl = QLabel(self.t("lbl_td"))
-        hex_row.addWidget(td_lbl)
+        td_row.addWidget(td_lbl)
         td_spin = QDoubleSpinBox()
         td_spin.setRange(0.1, 10.0)
         td_spin.setSingleStep(0.1)
         td_spin.setDecimals(1)
         td_spin.setValue(DEFAULT_TD)
-        td_spin.setMaximumWidth(70)
+        td_spin.setFixedWidth(62)
         td_spin.valueChanged.connect(lambda v, i=idx: self._update_gamut_strip())
-        hex_row.addWidget(td_spin)
-
-        body_layout.addLayout(hex_row)
-
+        td_row.addWidget(td_spin)
+        td_row.addSpacing(8)
         translucent_check = QCheckBox(self.t("transluc_check"))
         translucent_check.setToolTip(self.t("transluc_tip"))
-        body_layout.addWidget(translucent_check)
+        td_row.addWidget(translucent_check)
+        td_row.addStretch()
+        body_layout.addLayout(td_row)
 
         frame_layout.addWidget(body)
 
@@ -3247,13 +3335,23 @@ class U1App(QMainWindow):
             r, g, b = hex_to_rgb(hex_val)
             s["preview_lbl"].setStyleSheet(
                 f"background-color: #{r:02X}{g:02X}{b:02X}; border-radius: 4px; border: 1px solid #334155;")
+            # Valid hex: normal border on input
+            s["hex_edit"].setStyleSheet("")
         except Exception:
-            pass
+            # Invalid hex: red border feedback
+            s["hex_edit"].setStyleSheet("border: 1px solid #dc2626;")
         self._update_slot_strip(idx)
-        # Update toggle button text when collapsed
         if not self._slot_expanded[idx]:
             s["toggle_btn"].setText(f"▶ T{idx+1}  {hex_val.upper()}")
         self._update_gamut_strip()
+        # Trigger auto-recalculate after 1.2s idle (only if target is set)
+        if getattr(self, "_target_hex", None) and hasattr(self, "_auto_calc_timer"):
+            self._auto_calc_timer.start()
+
+    def _auto_recalc(self):
+        """Triggered by debounce timer after slot changes — silently recalculates."""
+        if getattr(self, "_target_hex", None):
+            self._calc()
 
     def _pick_slot_color(self, idx):
         s = self._slots[idx]
@@ -3570,65 +3668,86 @@ class U1App(QMainWindow):
         gamut_frame_layout.addWidget(self._gamut_strip, 1)
         layout.addWidget(gamut_frame)
 
-        # Options row: length + auto + optimizer
+        # Options block: two compact rows
         opts_frame = QFrame()
         opts_frame.setObjectName("card")
-        opts_layout = QHBoxLayout(opts_frame)
-        opts_layout.setContentsMargins(8, 6, 8, 6)
+        opts_vbox = QVBoxLayout(opts_frame)
+        opts_vbox.setContentsMargins(8, 6, 8, 6)
+        opts_vbox.setSpacing(4)
 
-        opts_layout.addWidget(QLabel(self.t("lbl_length")))
+        # ── Row 1: Length / Auto / ΔE threshold / Optimizer / Skin-Tone ──
+        row1 = QHBoxLayout()
+        row1.setSpacing(6)
+
+        row1.addWidget(QLabel(self.t("lbl_length")))
         self._len_spin = QSpinBox()
         self._len_spin.setRange(1, 48)
         self._len_spin.setValue(10)
-        opts_layout.addWidget(self._len_spin)
+        self._len_spin.setMaximumWidth(60)
+        row1.addWidget(self._len_spin)
 
         self._auto_found_label = QLabel(self.t("auto_finding"))
         self._auto_found_label.setObjectName("hint")
-        opts_layout.addWidget(self._auto_found_label)
+        row1.addWidget(self._auto_found_label)
 
         self._auto_check = QCheckBox(self.t("auto_check").replace("\n", " "))
         self._auto_check.setChecked(True)
         self._auto_check.toggled.connect(self._on_auto_toggle)
-        opts_layout.addWidget(self._auto_check)
-        # Apply initial state: auto is default True
+        row1.addWidget(self._auto_check)
         self._len_spin.setVisible(False)
         self._auto_found_label.setVisible(True)
 
-        opts_layout.addWidget(QLabel(self.t("de_thresh_label")))
+        row1.addWidget(QLabel(self.t("de_thresh_label")))
         self._auto_thresh_spin = QDoubleSpinBox()
-        self._auto_thresh_spin.setRange(0.5, 10.0)
+        self._auto_thresh_spin.setRange(0.5, 15.0)
         self._auto_thresh_spin.setSingleStep(0.5)
         self._auto_thresh_spin.setValue(2.0)
-        self._auto_thresh_spin.setMaximumWidth(70)
-        opts_layout.addWidget(self._auto_thresh_spin)
+        self._auto_thresh_spin.setMaximumWidth(55)
+        self._auto_thresh_spin.setToolTip("ΔE threshold: lower = more accurate, more layers")
+        row1.addWidget(self._auto_thresh_spin)
+
+        # Quick-preset buttons for common thresholds
+        for label, val, tip in [("✦", 2.0, "Precise (ΔE≤2)"),
+                                  ("●", 4.0, "Good (ΔE≤4)"),
+                                  ("◌", 8.0, "Draft (ΔE≤8)")]:
+            btn = QPushButton(label)
+            btn.setFixedSize(22, 22)
+            btn.setToolTip(tip)
+            btn.setStyleSheet("QPushButton { font-size: 10px; padding: 0; }")
+            btn.clicked.connect(lambda _, v=val: self._auto_thresh_spin.setValue(v))
+            row1.addWidget(btn)
 
         self._optimizer_check = QCheckBox(self.t("optimizer_check").replace("\n", " "))
-        opts_layout.addWidget(self._optimizer_check)
+        row1.addWidget(self._optimizer_check)
 
         self._skin_tone_check = QCheckBox(self.t("skin_tone_check"))
         self._skin_tone_check.setToolTip(self.t("skin_tone_tip"))
-        opts_layout.addWidget(self._skin_tone_check)
+        row1.addWidget(self._skin_tone_check)
+        row1.addStretch()
+        opts_vbox.addLayout(row1)
 
-        opts_layout.addSpacing(8)
-        opts_layout.addWidget(QLabel(self.t("lbl_mix_pct")))
+        # ── Row 2: Mix % / Color model ──
+        row2 = QHBoxLayout()
+        row2.setSpacing(6)
+
+        row2.addWidget(QLabel(self.t("lbl_mix_pct")))
         self._mix_pct_spin = QDoubleSpinBox()
         self._mix_pct_spin.setRange(1.0, 99.0)
         self._mix_pct_spin.setSingleStep(5.0)
         self._mix_pct_spin.setValue(50.0)
         self._mix_pct_spin.setDecimals(0)
-        self._mix_pct_spin.setMaximumWidth(70)
+        self._mix_pct_spin.setMaximumWidth(60)
         self._mix_pct_spin.setToolTip(self.t("mix_pct_tip"))
-        opts_layout.addWidget(self._mix_pct_spin)
+        row2.addWidget(self._mix_pct_spin)
         mix_btn = QPushButton(self.t("mix_seq_btn"))
         mix_btn.setFixedWidth(55)
         mix_btn.setToolTip(self.t("mix_seq_tip"))
         mix_btn.clicked.connect(self._apply_mix_pct)
-        opts_layout.addWidget(mix_btn)
+        row2.addWidget(mix_btn)
 
-        opts_layout.addStretch()
+        row2.addStretch()
 
-        # Color model in options
-        opts_layout.addWidget(QLabel(self.t("model_label")))
+        row2.addWidget(QLabel(self.t("model_label")))
         if not hasattr(self, "_model_combo"):
             self._model_combo = QComboBox()
             self._model_combo.addItems([
@@ -3638,7 +3757,10 @@ class U1App(QMainWindow):
                 self.t("model_filamentmixer"),
             ])
             self._model_combo.currentIndexChanged.connect(self._on_model_change)
-        opts_layout.addWidget(self._model_combo)
+        self._model_combo.setMinimumWidth(160)
+        row2.addWidget(self._model_combo)
+        opts_vbox.addLayout(row2)
+
         layout.addWidget(opts_frame)
 
         # Calculate button
@@ -3656,7 +3778,7 @@ class U1App(QMainWindow):
 
         # Result area
         self._result_frame = QFrame()
-        self._result_frame.setObjectName("card")
+        self._result_frame.setObjectName("result_card")
         result_frame = self._result_frame
         result_layout = QHBoxLayout(result_frame)
         result_layout.setContentsMargins(16, 12, 16, 12)
@@ -4085,13 +4207,32 @@ class U1App(QMainWindow):
 
     def _calc_for_color(self, target_hex, optimizer=False, seq_len=None,
                         auto=False, auto_threshold=2.0):
-        """Calculate sequence for a color — no UI side effects."""
+        """Calculate sequence for a color — no UI side effects.
+
+        - Exponential weight formula exp(-ΔE/15): smoother than 1/(ΔE+0.1)
+        - Memoized simulate_mix: each unique sequence computed at most once per call
+        - Auto mode default (seq_len=None): finds shortest pattern meeting threshold
+        - Permutation search for n<=8 even without optimizer flag (cheap, better results)
+        - Look-ahead after threshold hit: up to +5 layers checked for significant improvement
+        - Pattern canonicalization: e.g. 112233112233 → 112233
+        - Returns extra metadata: full_seq_len (before reduction), lookahead_improvement
+        """
         t_lab = rgb_to_lab(hex_to_rgb(target_hex))
         fils = self._slot_filaments()
+
+        # Memoize _simulate_mix within this call — same sequence won't be simulated twice
+        _sim_cache: dict = {}
+        def sim(seq):
+            key = tuple(seq)
+            if key not in _sim_cache:
+                _sim_cache[key] = self._simulate_mix(seq, fils)
+            return _sim_cache[key]
+
+        # Exponential decay weight: smoother gradient, avoids extreme ratios
         scores = [
             {
                 "id": f["id"],
-                "w": (1 / (delta_e(t_lab, f["lab"]) + 0.1)) * (10 / f["td"]),
+                "w": math.exp(-delta_e(t_lab, f["lab"]) / 15.0) * (10.0 / max(f["td"], 0.1)),
                 "h": f["hex"],
             }
             for f in fils
@@ -4103,39 +4244,74 @@ class U1App(QMainWindow):
         all_opt_results = []
 
         def best_seq_for_n(n):
-            if optimizer:
-                best, best_dv = None, float("inf")
+            best, best_dv = None, float("inf")
+            greedy_order = sorted(scores, key=lambda x: x["w"], reverse=True)
+            seq = self._build_sequence(greedy_order, tot, n)
+            dv = delta_e(sim(seq), t_lab)
+            best, best_dv = seq, dv
+
+            # Try all permutations when optimizer flag set OR short sequence (cheap)
+            if optimizer or n <= 8:
                 for perm in iter_permutations(scores):
                     seq = self._build_sequence(list(perm), tot, n)
-                    dv = delta_e(self._simulate_mix(seq, fils), t_lab)
-                    seq_str = "".join(map(str, seq))
-                    all_opt_results.append({
-                        "target_hex": target_hex,
-                        "sequence": seq_str,
-                        "sim_hex": lab_to_hex(self._simulate_mix(seq, fils)),
-                        "de": dv,
-                        "seq_len": n,
-                    })
+                    lab = sim(seq)
+                    dv = delta_e(lab, t_lab)
+                    if optimizer:
+                        seq_str = "".join(map(str, seq))
+                        all_opt_results.append({
+                            "target_hex": target_hex,
+                            "sequence": seq_str,
+                            "sim_hex": lab_to_hex(lab),  # reuse cached lab, no double call
+                            "de": dv,
+                            "seq_len": n,
+                        })
                     if dv < best_dv:
                         best_dv = dv
                         best = seq
-                return best
-            return self._build_sequence(
-                sorted(scores, key=lambda x: x["w"], reverse=True), tot, n)
+            return best
 
-        if auto:
+        lookahead_info = None  # (extra_layers, old_de, new_de)
+
+        if seq_len is not None and not auto:
+            chosen_seq = best_seq_for_n(seq_len)
+        else:
+            threshold = auto_threshold if auto else 2.0
             chosen_seq = None
+            found_n = None
+            best_de_overall = float("inf")
+            best_seq_overall = None
             for n in range(1, MAX_SEQ_LEN + 1):
                 seq = best_seq_for_n(n)
-                dv = delta_e(self._simulate_mix(seq, fils), t_lab)
-                if dv <= auto_threshold:
+                dv = delta_e(sim(seq), t_lab)
+                if dv < best_de_overall:
+                    best_de_overall = dv
+                    best_seq_overall = seq
+                if dv <= threshold and chosen_seq is None:
                     chosen_seq = seq
+                    found_n = n
+                    # Look-ahead: check if +1..+5 layers give significantly better ΔE
+                    found_dv = dv
+                    for extra in range(1, 6):
+                        if n + extra > MAX_SEQ_LEN:
+                            break
+                        longer = best_seq_for_n(n + extra)
+                        longer_dv = delta_e(sim(longer), t_lab)
+                        if longer_dv < found_dv - 1.0:  # >1 ΔE improvement = worth it
+                            lookahead_info = (extra, found_dv, longer_dv)
+                            chosen_seq = longer
+                            found_dv = longer_dv
                     break
             if chosen_seq is None:
-                chosen_seq = best_seq_for_n(MAX_SEQ_LEN)
-        else:
-            n = seq_len if seq_len is not None else MAX_SEQ_LEN
-            chosen_seq = best_seq_for_n(n)
+                chosen_seq = best_seq_overall or best_seq_for_n(MAX_SEQ_LEN)
+
+        # Canonicalize: reduce repeating patterns
+        full_len = len(chosen_seq)
+        canonical = _seq_canonical(chosen_seq)
+        if len(canonical) < full_len:
+            canon_dv = delta_e(sim(canonical), t_lab)
+            orig_dv = delta_e(sim(chosen_seq), t_lab)
+            if abs(canon_dv - orig_dv) < 0.5:
+                chosen_seq = canonical
 
         if optimizer and all_opt_results:
             all_opt_results.sort(key=lambda x: x["de"])
@@ -4149,7 +4325,7 @@ class U1App(QMainWindow):
         else:
             self._top3_results = []
 
-        sim_lab = self._simulate_mix(chosen_seq, fils)
+        sim_lab = sim(chosen_seq)
         dv = delta_e(sim_lab, t_lab)
         return {
             "target_hex": target_hex,
@@ -4157,6 +4333,8 @@ class U1App(QMainWindow):
             "sim_hex": lab_to_hex(sim_lab),
             "de": dv,
             "seq_len": len(chosen_seq),
+            "full_seq_len": full_len,          # length before canonicalization
+            "lookahead": lookahead_info,        # (extra, old_de, new_de) or None
         }
 
     # ── GAMUT STRIP ───────────────────────────────────────────────────────────
@@ -4353,9 +4531,16 @@ class U1App(QMainWindow):
             # ΔE display
             self._de_label.setText(f"ΔE {dv:.1f}")
             self._de_label.setStyleSheet(f"color: {_de_color(dv)}; font-size: 22pt; font-weight: bold;")
-            quality = ("excellent ✓" if dv < 3.0 else "good" if dv < 6.0 else "visible") \
-                if self.lang == "en" else \
-                ("ausgezeichnet ✓" if dv < 3.0 else "gut" if dv < 6.0 else "sichtbar")
+            if dv < DE_GOOD:
+                quality = self.t("de_quality_excellent")
+            elif dv < DE_OK:
+                quality = self.t("de_quality_good")
+            elif dv < 12.0:
+                quality = self.t("de_quality_ok")
+            elif dv < GAMUT_WARN_DE:
+                quality = self.t("de_quality_poor")
+            else:
+                quality = self.t("de_quality_gamut")
             self._de_quality_lbl.setText(quality)
             self._de_quality_lbl.setStyleSheet(f"color: {_de_color(dv)};")
 
@@ -4376,6 +4561,15 @@ class U1App(QMainWindow):
                               b=cad[ids[1]] if len(ids) > 1 else lh, p=pat_str)
             else:
                 hint = self.t("hint_pattern", p=pat_str)
+            # Show reduction info if pattern was canonicalized
+            full_len = result.get("full_seq_len", len(seq))
+            if full_len > len(seq) and full_len > 0:
+                factor = full_len // len(seq)
+                hint += "\n" + self.t("seq_reduced", full=full_len, short=len(seq), factor=factor)
+            # Show look-ahead improvement info
+            la = result.get("lookahead")
+            if la:
+                hint += "\n" + self.t("seq_lookahead", extra=la[0], old=la[1], new=la[2])
             self._hint_label.setText(hint)
 
             self._last_result = result
@@ -4488,18 +4682,11 @@ class U1App(QMainWindow):
         counts = Counter(extended)
         # estimate change time: ~30s per change
         change_time_min = tool_changes * 30 / 60
-        if self.lang == "de":
-            parts = [f"📊 {total_layers} Schichten · {tool_changes} Werkzeugwechsel"]
-            for fid, cnt in sorted(counts.items()):
-                pct = 100.0 * cnt / total_layers
-                parts.append(f"  T{fid}: {cnt} Lagen ({pct:.0f}%)")
-            parts.append(f"  ~{change_time_min:.0f} min Wechselzeit (30s/Wechsel)")
-        else:
-            parts = [f"📊 {total_layers} layers · {tool_changes} tool changes"]
-            for fid, cnt in sorted(counts.items()):
-                pct = 100.0 * cnt / total_layers
-                parts.append(f"  T{fid}: {cnt} layers ({pct:.0f}%)")
-            parts.append(f"  ~{change_time_min:.0f} min change time (30s/change)")
+        parts = [self.t("stats_summary").format(layers=total_layers, changes=tool_changes)]
+        for fid, cnt in sorted(counts.items()):
+            pct = 100.0 * cnt / total_layers
+            parts.append(self.t("stats_filament_row").format(fid=fid, cnt=cnt, pct=pct))
+        parts.append(self.t("stats_change_time").format(min=change_time_min))
         self._stats_label.setText("\n".join(parts))
 
     def _show_top3(self):
@@ -6085,7 +6272,11 @@ class U1App(QMainWindow):
     # ── AUTO SUGGESTION ───────────────────────────────────────────────────────
 
     def _check_auto_suggestion(self, target_hex):
-        """Show status hint if a library filament is close to the target color."""
+        """Show status hint if a library filament is close to the target color.
+
+        Extended: when current ΔE > DE_OK, also simulate which library filament
+        would give the best improvement if swapped into any slot.
+        """
         target_lab = rgb_to_lab(hex_to_rgb(target_hex.lstrip("#")))
         best_de = float('inf')
         best_fil = None
@@ -6110,6 +6301,50 @@ class U1App(QMainWindow):
             msg = self.t("auto_suggest_tip",
                          brand=best_brand, name=best_fil.get("name", ""), de=best_de)
             self._set_status(msg, 8000)
+
+        # Deeper suggestion: if result ΔE is poor, find the best swap from library
+        last_de = getattr(self, "_last_de", None)
+        if last_de is not None and last_de > DE_OK:
+            self._find_best_slot_swap(target_hex, last_de)
+
+    def _find_best_slot_swap(self, target_hex, current_de):
+        """Scan library: simulate swapping each slot with each filament, find best improvement."""
+        fils = self._slot_filaments()
+        if not fils:
+            return
+        t_lab = rgb_to_lab(hex_to_rgb(target_hex.lstrip("#")))
+        best_improvement = 0.5  # Minimum improvement to report (ΔE units)
+        best_msg = None
+        for slot_idx, slot_fil in enumerate(fils):
+            for brand, filaments in self.library.items():
+                for candidate in filaments:
+                    chex = candidate.get("hex", "").lstrip("#")
+                    if chex.upper() == slot_fil["hex"].lstrip("#").upper():
+                        continue
+                    try:
+                        # Build trial filament list with this swap
+                        trial = list(fils)
+                        trial[slot_idx] = {
+                            **slot_fil,
+                            "hex": candidate["hex"],
+                            "lab": rgb_to_lab(hex_to_rgb(chex)),
+                            "td": float(candidate.get("td", DEFAULT_TD)),
+                        }
+                        # Quick 4-layer sequence test
+                        trial_seq = [f["id"] for f in trial]
+                        trial_lab = self._simulate_mix(trial_seq, trial)
+                        trial_de = delta_e(trial_lab, t_lab)
+                        improvement = current_de - trial_de
+                        if improvement > best_improvement:
+                            best_improvement = improvement
+                            best_msg = self.t("suggest_filament",
+                                brand=brand,
+                                name=candidate.get("name", ""),
+                                de=trial_de)
+                    except Exception:
+                        pass
+        if best_msg:
+            self._set_status(best_msg, 12000)
 
     # ── MATERIAL COMPATIBILITY ────────────────────────────────────────────────
 
@@ -6298,7 +6533,7 @@ class U1App(QMainWindow):
         ]
         table = QTableWidget(0, len(col_headers))
         table.setHorizontalHeaderLabels(col_headers)
-        table.horizontalHeader().setSectionResizeMode(2, 1)  # stretch seq col
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)  # stretch seq col
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         layout.addWidget(table, 1)
 
@@ -6599,9 +6834,12 @@ class U1App(QMainWindow):
             cad = calc_cadence(seq, lh)
             ids = sorted(cad.keys())
             label = vf.get("label", f"V{vf['vid']}")
-            q_str = ("excellent" if de < DE_GOOD else "good" if de < DE_OK else "visible") \
-                if self.lang == "en" else \
-                ("ausgezeichnet" if de < DE_GOOD else "gut" if de < DE_OK else "sichtbar")
+            if de < DE_GOOD:
+                q_str = self.t("de_quality_excellent")
+            elif de < DE_OK:
+                q_str = self.t("de_quality_good")
+            else:
+                q_str = self.t("de_quality_ok")
             lines.append(f"V{vf['vid']}  \"{label}\"")
             lines.append(f"  Target: {vf['target_hex']}   Simulated: {vf['sim_hex']}   dE = {de:.1f} ({q_str})")
             lines.append(f"  Sequence: {''.join(seq)}   ({len(seq)} layers/cycle)")
