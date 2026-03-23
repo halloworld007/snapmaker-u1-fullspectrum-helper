@@ -1426,6 +1426,24 @@ def seq_to_runs(sequence):
     runs.append((cur, cnt))
     return runs
 
+
+def _seq_canonical(seq):
+    """Return shortest repeating unit of a sequence list.
+
+    e.g. [1,2,1,2,1,2] → [1,2]   [1,1,2,2,1,1,2,2] → [1,1,2,2]
+    Falls back to original if no shorter period found.
+    """
+    n = len(seq)
+    if n == 0:
+        return seq
+    for period in range(1, n // 2 + 1):
+        if n % period == 0:
+            unit = seq[:period]
+            if unit * (n // period) == seq:
+                return unit
+    return seq
+
+
 def calc_cadence(sequence, layer_height):
     """Cadence Heights matching FullSpectrum slicer v0.92+ logic.
 
@@ -4099,13 +4117,23 @@ class U1App(QMainWindow):
 
     def _calc_for_color(self, target_hex, optimizer=False, seq_len=None,
                         auto=False, auto_threshold=2.0):
-        """Calculate sequence for a color — no UI side effects."""
+        """Calculate sequence for a color — no UI side effects.
+
+        Improvements vs. original:
+        - Exponential weight formula (smoother, less extreme than 1/x)
+        - Auto mode is default when seq_len=None (finds shortest sufficient pattern)
+        - Optimizer also searches permutations for short lengths (<=8) cheaply
+        - Pattern canonicalization: reduces repeating units (e.g. 112233112233 → 112233)
+        """
         t_lab = rgb_to_lab(hex_to_rgb(target_hex))
         fils = self._slot_filaments()
+
+        # Improved weight: exponential decay in ΔE + inverse TD
+        # exp(-ΔE/15) gives smoother gradient than 1/(ΔE+0.1), avoids extreme ratios
         scores = [
             {
                 "id": f["id"],
-                "w": (1 / (delta_e(t_lab, f["lab"]) + 0.1)) * (10 / f["td"]),
+                "w": math.exp(-delta_e(t_lab, f["lab"]) / 15.0) * (10.0 / max(f["td"], 0.1)),
                 "h": f["hex"],
             }
             for f in fils
@@ -4117,39 +4145,60 @@ class U1App(QMainWindow):
         all_opt_results = []
 
         def best_seq_for_n(n):
-            if optimizer:
-                best, best_dv = None, float("inf")
+            best, best_dv = None, float("inf")
+            # Always try sorted-by-weight as baseline
+            greedy_order = sorted(scores, key=lambda x: x["w"], reverse=True)
+            seq = self._build_sequence(greedy_order, tot, n)
+            dv = delta_e(self._simulate_mix(seq, fils), t_lab)
+            best, best_dv = seq, dv
+
+            # Try all permutations when optimizer flag set OR sequence is short (cheap)
+            if optimizer or n <= 8:
                 for perm in iter_permutations(scores):
                     seq = self._build_sequence(list(perm), tot, n)
                     dv = delta_e(self._simulate_mix(seq, fils), t_lab)
-                    seq_str = "".join(map(str, seq))
-                    all_opt_results.append({
-                        "target_hex": target_hex,
-                        "sequence": seq_str,
-                        "sim_hex": lab_to_hex(self._simulate_mix(seq, fils)),
-                        "de": dv,
-                        "seq_len": n,
-                    })
+                    if optimizer:
+                        seq_str = "".join(map(str, seq))
+                        all_opt_results.append({
+                            "target_hex": target_hex,
+                            "sequence": seq_str,
+                            "sim_hex": lab_to_hex(self._simulate_mix(seq, fils)),
+                            "de": dv,
+                            "seq_len": n,
+                        })
                     if dv < best_dv:
                         best_dv = dv
                         best = seq
-                return best
-            return self._build_sequence(
-                sorted(scores, key=lambda x: x["w"], reverse=True), tot, n)
+            return best
 
-        if auto:
+        if seq_len is not None and not auto:
+            # Fixed-length mode: exact length requested
+            chosen_seq = best_seq_for_n(seq_len)
+        else:
+            # Auto mode (default): find shortest pattern that meets threshold
+            threshold = auto_threshold if auto else 2.0
             chosen_seq = None
+            best_de = float("inf")
+            best_at_max = None
             for n in range(1, MAX_SEQ_LEN + 1):
                 seq = best_seq_for_n(n)
                 dv = delta_e(self._simulate_mix(seq, fils), t_lab)
-                if dv <= auto_threshold:
+                if dv < best_de:
+                    best_de = dv
+                    best_at_max = seq
+                if dv <= threshold:
                     chosen_seq = seq
                     break
             if chosen_seq is None:
-                chosen_seq = best_seq_for_n(MAX_SEQ_LEN)
-        else:
-            n = seq_len if seq_len is not None else MAX_SEQ_LEN
-            chosen_seq = best_seq_for_n(n)
+                chosen_seq = best_at_max or best_seq_for_n(MAX_SEQ_LEN)
+
+        # Canonicalize: reduce repeating patterns (e.g. 112233112233 → 112233)
+        canonical = _seq_canonical(chosen_seq)
+        canon_dv = delta_e(self._simulate_mix(canonical, fils), t_lab)
+        # Only use canonical if color result stays equivalent (ΔE change < 0.5)
+        original_dv = delta_e(self._simulate_mix(chosen_seq, fils), t_lab)
+        if abs(canon_dv - original_dv) < 0.5:
+            chosen_seq = canonical
 
         if optimizer and all_opt_results:
             all_opt_results.sort(key=lambda x: x["de"])
