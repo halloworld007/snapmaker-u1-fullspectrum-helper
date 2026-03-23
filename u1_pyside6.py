@@ -3156,61 +3156,67 @@ class U1App(QMainWindow):
         body_layout.setSpacing(4)
         body.setVisible(is_expanded)
 
-        # Header row inside body
-        hdr = QHBoxLayout()
-        search_btn = QPushButton("🔍")
-        search_btn.setFixedSize(26, 26)
-        search_btn.clicked.connect(lambda checked, i=idx: self._open_filament_search(i))
-        hdr.addStretch()
-        hdr.addWidget(search_btn)
-        body_layout.addLayout(hdr)
-
-        # Brand combo
+        # Brand combo — limited width so long names don't overflow sidebar
         brand_combo = QComboBox()
+        brand_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        brand_combo.setMinimumContentsLength(16)
         brand_combo.addItems(list(self.library.keys()))
         brand_combo.currentTextChanged.connect(lambda t, i=idx: self._update_filament_combo(i))
         body_layout.addWidget(brand_combo)
 
         # Filament combo
         fil_combo = QComboBox()
+        fil_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        fil_combo.setMinimumContentsLength(16)
         fil_combo.currentTextChanged.connect(lambda t, i=idx: self._apply_filament(i))
         body_layout.addWidget(fil_combo)
 
-        # Hex + preview + TD row
+        # Row A: [color preview swatch] [hex input — expanding] [🎨 picker]
         hex_row = QHBoxLayout()
-        hex_edit = QLineEdit()
-        hex_edit.setPlaceholderText("#RRGGBB")
-        hex_edit.setMaximumWidth(90)
-        hex_edit.textChanged.connect(lambda t, i=idx: self._update_slot_preview(i))
-        hex_row.addWidget(hex_edit)
+        hex_row.setSpacing(4)
 
         preview_lbl = QLabel()
-        preview_lbl.setFixedSize(36, 36)
+        preview_lbl.setFixedSize(32, 32)
         preview_lbl.setStyleSheet("background-color: #808080; border-radius: 4px; border: 1px solid #334155;")
         hex_row.addWidget(preview_lbl)
 
+        hex_edit = QLineEdit()
+        hex_edit.setPlaceholderText("#RRGGBB")
+        hex_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        hex_edit.textChanged.connect(lambda t, i=idx: self._update_slot_preview(i))
+        hex_row.addWidget(hex_edit)
+
         pick_btn = QPushButton("🎨")
-        pick_btn.setFixedSize(26, 26)
+        pick_btn.setFixedSize(28, 28)
         pick_btn.clicked.connect(lambda checked, i=idx: self._pick_slot_color(i))
         hex_row.addWidget(pick_btn)
 
-        hex_row.addStretch()
+        search_slot_btn = QPushButton("🔍")
+        search_slot_btn.setFixedSize(28, 28)
+        search_slot_btn.clicked.connect(lambda checked, i=idx: self._open_filament_search(i))
+        hex_row.addWidget(search_slot_btn)
+
+        body_layout.addLayout(hex_row)
+
+        # Row B: TD label + spinner | translucent checkbox — all on one compact line
+        td_row = QHBoxLayout()
+        td_row.setSpacing(4)
         td_lbl = QLabel(self.t("lbl_td"))
-        hex_row.addWidget(td_lbl)
+        td_row.addWidget(td_lbl)
         td_spin = QDoubleSpinBox()
         td_spin.setRange(0.1, 10.0)
         td_spin.setSingleStep(0.1)
         td_spin.setDecimals(1)
         td_spin.setValue(DEFAULT_TD)
-        td_spin.setMaximumWidth(70)
+        td_spin.setFixedWidth(62)
         td_spin.valueChanged.connect(lambda v, i=idx: self._update_gamut_strip())
-        hex_row.addWidget(td_spin)
-
-        body_layout.addLayout(hex_row)
-
+        td_row.addWidget(td_spin)
+        td_row.addSpacing(8)
         translucent_check = QCheckBox(self.t("transluc_check"))
         translucent_check.setToolTip(self.t("transluc_tip"))
-        body_layout.addWidget(translucent_check)
+        td_row.addWidget(translucent_check)
+        td_row.addStretch()
+        body_layout.addLayout(td_row)
 
         frame_layout.addWidget(body)
 
