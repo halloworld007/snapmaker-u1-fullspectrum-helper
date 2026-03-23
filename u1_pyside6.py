@@ -298,6 +298,7 @@ STRINGS = {
     "de_quality_ok": "wahrnehmbar",
     "de_quality_poor": "stark abweichend",
     "de_quality_gamut": "außerhalb Gamut",
+    "print_h_tip": "Druckhöhe für Statistik (0 = deaktiviert)",
     "status_ready": "Bereit",
     "status_calculated": "Berechnet — ΔE {de:.1f} — Sequenz: {seq}",
     "status_added": "V{vid} hinzugefügt",
@@ -765,6 +766,7 @@ STRINGS = {
     "de_quality_ok": "noticeable",
     "de_quality_poor": "strong deviation",
     "de_quality_gamut": "outside gamut",
+    "print_h_tip": "Print height for statistics (0 = disabled)",
     "status_ready": "Ready",
     "status_calculated": "Calculated — ΔE {de:.1f} — Sequence: {seq}",
     "status_added": "V{vid} added",
@@ -2974,27 +2976,39 @@ class U1App(QMainWindow):
         self.setCentralWidget(central)
         root_layout = QHBoxLayout(central)
         root_layout.setContentsMargins(8, 8, 8, 8)
-        root_layout.setSpacing(6)
+        root_layout.setSpacing(0)
+
+        # Splitter: sidebar | main — user can drag to resize
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.setHandleWidth(5)
+        splitter.setStyleSheet("QSplitter::handle { background-color: #334155; }")
 
         # Sidebar
         sidebar_scroll = QScrollArea()
         sidebar_scroll.setWidgetResizable(True)
-        sidebar_scroll.setMinimumWidth(400)
-        sidebar_scroll.setMaximumWidth(460)
-        sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        sidebar_scroll.setMinimumWidth(320)
+        sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        sidebar_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         sidebar_inner = QWidget()
         sidebar_layout = QVBoxLayout(sidebar_inner)
         sidebar_layout.setContentsMargins(6, 6, 6, 6)
         sidebar_layout.setSpacing(6)
         sidebar_scroll.setWidget(sidebar_inner)
-        root_layout.addWidget(sidebar_scroll)
+        splitter.addWidget(sidebar_scroll)
 
         self._build_sidebar(sidebar_layout)
         sidebar_layout.addStretch()
 
         # Main tabs
         self._tabs = QTabWidget()
-        root_layout.addWidget(self._tabs, 1)
+        splitter.addWidget(self._tabs)
+
+        # Default split ratio: sidebar ~400px, rest for main content
+        splitter.setSizes([420, 9999])
+        splitter.setStretchFactor(0, 0)   # sidebar: don't auto-stretch
+        splitter.setStretchFactor(1, 1)   # main: takes all extra space
+
+        root_layout.addWidget(splitter)
 
         self._build_tab_calculator()
         self._build_tab_virtual()
@@ -3081,8 +3095,7 @@ class U1App(QMainWindow):
         self._print_h_spin.setDecimals(1)
         self._print_h_spin.setValue(0.0)
         self._print_h_spin.setSuffix(" mm")
-        self._print_h_spin.setToolTip("Druckhöhe für Statistik (0 = deaktiviert)" if self.lang == "de"
-                                       else "Print height for statistics (0 = disabled)")
+        self._print_h_spin.setToolTip(self.t("print_h_tip"))
         self._print_h_spin.valueChanged.connect(self._update_print_stats)
         lh_layout.addWidget(self._print_h_spin)
         lh_hint = QLabel(self.t("lh_hint"))
@@ -6767,9 +6780,12 @@ class U1App(QMainWindow):
             cad = calc_cadence(seq, lh)
             ids = sorted(cad.keys())
             label = vf.get("label", f"V{vf['vid']}")
-            q_str = ("excellent" if de < DE_GOOD else "good" if de < DE_OK else "visible") \
-                if self.lang == "en" else \
-                ("ausgezeichnet" if de < DE_GOOD else "gut" if de < DE_OK else "sichtbar")
+            if de < DE_GOOD:
+                q_str = self.t("de_quality_excellent")
+            elif de < DE_OK:
+                q_str = self.t("de_quality_good")
+            else:
+                q_str = self.t("de_quality_ok")
             lines.append(f"V{vf['vid']}  \"{label}\"")
             lines.append(f"  Target: {vf['target_hex']}   Simulated: {vf['sim_hex']}   dE = {de:.1f} ({q_str})")
             lines.append(f"  Sequence: {''.join(seq)}   ({len(seq)} layers/cycle)")
