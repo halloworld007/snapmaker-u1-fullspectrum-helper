@@ -23,15 +23,32 @@ This tool helps you:
 
 ## Screenshots
 
-> *Screenshots werden noch hinzugefügt / Screenshots will be added.*
+### Calculator — Single Color Mode
+Pick a target color, load your filaments, and calculate the optimal layer sequence.
 
-| Hauptfenster / Main Window | 3MF Farb-Wizard |
-|---|---|
-| ![Main](docs/screenshots/main.png) | ![Wizard](docs/screenshots/wizard.png) |
+![Calculator](docs/screenshots/01_start.png)
 
-| Filament-Suche mit ΔE | Sequenz-Vorschau |
+### Result — Color Match with ΔE
+The result card shows Target vs. Simulated color, ΔE quality, sequence string, and layer preview bar.
+
+| Red target (out of gamut) | Blue target |
 |---|---|
-| ![Search](docs/screenshots/search.png) | ![Preview](docs/screenshots/preview.png) |
+| ![Result Red](docs/screenshots/03_result_red.png) | ![Result Blue](docs/screenshots/04_result_blue.png) |
+
+### Virtual Print Heads (V5–V24)
+Calculated sequences are added as virtual heads — ready for OrcaSlicer export or FS 3MF injection.
+
+![Virtual Heads](docs/screenshots/05_virtual_heads.png)
+
+### Tools Tab
+Analysis, color generation, optimization, library management and export — all in one place.
+
+![Tools](docs/screenshots/06_tools_tab.png)
+
+### Sidebar — Physical Slots T1–T4
+Load brand, filament, hex color and TD value for each physical tool. The sidebar is resizable by dragging.
+
+![Sidebar Slots](docs/screenshots/07_sidebar_slots.png)
 
 ### Features
 
@@ -221,6 +238,35 @@ Dieses Tool hilft dabei:
 | **Alle Cadence-Werte kopieren** | Ein-Klick-Kopie aller Dithering-Werte als formatierten Text |
 | **Werkzeugwechsel-Schätzer** | Schätzt Werkzeugwechsel, Zusatzzeit und Purge-Volumen |
 | **Verlauf** | Die letzten 5 berechneten Sequenzen werden direkt angezeigt |
+
+### Screenshots
+
+#### Rechner — Einzelfarb-Modus
+Zielfarbe wählen, Filamente laden, Sequenz berechnen.
+
+![Calculator](docs/screenshots/01_start.png)
+
+#### Ergebnis — Farbabgleich mit ΔE
+Die Ergebniskarte zeigt Ziel- vs. Simulierfarbe, ΔE-Qualität, Sequenz und Schichtvorschau.
+
+| Rotes Ziel (außerhalb Gamut) | Blaues Ziel |
+|---|---|
+| ![Ergebnis Rot](docs/screenshots/03_result_red.png) | ![Ergebnis Blau](docs/screenshots/04_result_blue.png) |
+
+#### Virtuelle Druckköpfe (V5–V24)
+Berechnete Sequenzen werden als virtuelle Köpfe gespeichert — bereit für OrcaSlicer-Export oder FS-3MF-Einschreiben.
+
+![Virtuelle Köpfe](docs/screenshots/05_virtual_heads.png)
+
+#### Tools-Tab
+Analyse, Farbgenerierung, Optimierung, Bibliothek und Export — alles an einem Ort.
+
+![Tools](docs/screenshots/06_tools_tab.png)
+
+#### Sidebar — Physische Slots T1–T4
+Marke, Filament, Hex-Farbe und TD für jeden physischen Kopf eintragen. Die Sidebar ist durch Ziehen verbreiterbar.
+
+![Slots](docs/screenshots/07_sidebar_slots.png)
 
 ### Farbwissenschaft
 
