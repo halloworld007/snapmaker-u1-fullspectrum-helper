@@ -2022,6 +2022,7 @@ QTabBar::tab:hover:!selected { background-color: #263048; color: #e2e8f0; }
 
 QFrame#slot_frame { background-color: #1e293b; border: 1px solid #334155; border-radius: 6px; }
 QFrame#card { background-color: #1e293b; border: 1px solid #334155; border-radius: 6px; }
+QFrame#result_card { background-color: #1e293b; border: 2px solid #334155; border-radius: 6px; }
 QFrame#dark_card { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 6px; }
 
 QLabel#section_title { color: #38bdf8; font-size: 13pt; font-weight: bold; }
@@ -2075,6 +2076,7 @@ QTabBar::tab { background-color: #e2e8f0; color: #64748b; padding: 8px 20px; bor
 QTabBar::tab:selected { background-color: #f8fafc; color: #1e293b; border-bottom: 2px solid #3b82f6; }
 QFrame#slot_frame { background-color: white; border: 1px solid #cbd5e1; border-radius: 6px; }
 QFrame#card { background-color: white; border: 1px solid #cbd5e1; border-radius: 6px; }
+QFrame#result_card { background-color: white; border: 2px solid #cbd5e1; border-radius: 6px; }
 QLabel#section_title { color: #1d4ed8; font-size: 13pt; font-weight: bold; }
 QGroupBox { border: 1px solid #cbd5e1; border-radius: 6px; margin-top: 10px; }
 QTextEdit { background-color: white; border: 1px solid #cbd5e1; border-radius: 4px; }
@@ -2825,29 +2827,16 @@ class U1App(QMainWindow):
     # ── RESULT BORDER ──────────────────────────────────────────────────────────
 
     def _set_result_border(self, de):
-        if de < 3.0:
+        if de < DE_GOOD:
             color = "#16a34a"
-        elif de < 6.0:
+        elif de < DE_OK:
             color = "#d97706"
         else:
             color = "#dc2626"
-            QTimer.singleShot(0, lambda: self._pulse_result(3))
         if hasattr(self, "_result_frame"):
+            # Use objectName selector so border only applies to THIS frame, not children
             self._result_frame.setStyleSheet(
-                f"QFrame {{ border: 2px solid {color}; border-radius: 6px; }}")
-
-    def _pulse_result(self, n):
-        if n <= 0 or not hasattr(self, "_result_frame"):
-            return
-        cur = self._result_frame.styleSheet()
-        if "4px" in cur:
-            new_w = "2px"
-        else:
-            new_w = "4px"
-        import re as _re
-        new_style = _re.sub(r'\d+px solid', f'{new_w} solid', cur)
-        self._result_frame.setStyleSheet(new_style)
-        QTimer.singleShot(500, lambda: self._pulse_result(n - 1))
+                f"QFrame#result_card {{ border: 2px solid {color}; border-radius: 6px; }}")
 
     # ── VIRTUAL SORT / FILTER ──────────────────────────────────────────────────
 
@@ -2990,8 +2979,8 @@ class U1App(QMainWindow):
         # Sidebar
         sidebar_scroll = QScrollArea()
         sidebar_scroll.setWidgetResizable(True)
-        sidebar_scroll.setMinimumWidth(360)
-        sidebar_scroll.setMaximumWidth(420)
+        sidebar_scroll.setMinimumWidth(400)
+        sidebar_scroll.setMaximumWidth(460)
         sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         sidebar_inner = QWidget()
         sidebar_layout = QVBoxLayout(sidebar_inner)
@@ -3618,65 +3607,74 @@ class U1App(QMainWindow):
         gamut_frame_layout.addWidget(self._gamut_strip, 1)
         layout.addWidget(gamut_frame)
 
-        # Options row: length + auto + optimizer
+        # Options block: two compact rows
         opts_frame = QFrame()
         opts_frame.setObjectName("card")
-        opts_layout = QHBoxLayout(opts_frame)
-        opts_layout.setContentsMargins(8, 6, 8, 6)
+        opts_vbox = QVBoxLayout(opts_frame)
+        opts_vbox.setContentsMargins(8, 6, 8, 6)
+        opts_vbox.setSpacing(4)
 
-        opts_layout.addWidget(QLabel(self.t("lbl_length")))
+        # ── Row 1: Length / Auto / ΔE threshold / Optimizer / Skin-Tone ──
+        row1 = QHBoxLayout()
+        row1.setSpacing(6)
+
+        row1.addWidget(QLabel(self.t("lbl_length")))
         self._len_spin = QSpinBox()
         self._len_spin.setRange(1, 48)
         self._len_spin.setValue(10)
-        opts_layout.addWidget(self._len_spin)
+        self._len_spin.setMaximumWidth(60)
+        row1.addWidget(self._len_spin)
 
         self._auto_found_label = QLabel(self.t("auto_finding"))
         self._auto_found_label.setObjectName("hint")
-        opts_layout.addWidget(self._auto_found_label)
+        row1.addWidget(self._auto_found_label)
 
         self._auto_check = QCheckBox(self.t("auto_check").replace("\n", " "))
         self._auto_check.setChecked(True)
         self._auto_check.toggled.connect(self._on_auto_toggle)
-        opts_layout.addWidget(self._auto_check)
-        # Apply initial state: auto is default True
+        row1.addWidget(self._auto_check)
         self._len_spin.setVisible(False)
         self._auto_found_label.setVisible(True)
 
-        opts_layout.addWidget(QLabel(self.t("de_thresh_label")))
+        row1.addWidget(QLabel(self.t("de_thresh_label")))
         self._auto_thresh_spin = QDoubleSpinBox()
         self._auto_thresh_spin.setRange(0.5, 10.0)
         self._auto_thresh_spin.setSingleStep(0.5)
         self._auto_thresh_spin.setValue(2.0)
-        self._auto_thresh_spin.setMaximumWidth(70)
-        opts_layout.addWidget(self._auto_thresh_spin)
+        self._auto_thresh_spin.setMaximumWidth(60)
+        row1.addWidget(self._auto_thresh_spin)
 
         self._optimizer_check = QCheckBox(self.t("optimizer_check").replace("\n", " "))
-        opts_layout.addWidget(self._optimizer_check)
+        row1.addWidget(self._optimizer_check)
 
         self._skin_tone_check = QCheckBox(self.t("skin_tone_check"))
         self._skin_tone_check.setToolTip(self.t("skin_tone_tip"))
-        opts_layout.addWidget(self._skin_tone_check)
+        row1.addWidget(self._skin_tone_check)
+        row1.addStretch()
+        opts_vbox.addLayout(row1)
 
-        opts_layout.addSpacing(8)
-        opts_layout.addWidget(QLabel(self.t("lbl_mix_pct")))
+        # ── Row 2: Mix % / Color model ──
+        row2 = QHBoxLayout()
+        row2.setSpacing(6)
+
+        row2.addWidget(QLabel(self.t("lbl_mix_pct")))
         self._mix_pct_spin = QDoubleSpinBox()
         self._mix_pct_spin.setRange(1.0, 99.0)
         self._mix_pct_spin.setSingleStep(5.0)
         self._mix_pct_spin.setValue(50.0)
         self._mix_pct_spin.setDecimals(0)
-        self._mix_pct_spin.setMaximumWidth(70)
+        self._mix_pct_spin.setMaximumWidth(60)
         self._mix_pct_spin.setToolTip(self.t("mix_pct_tip"))
-        opts_layout.addWidget(self._mix_pct_spin)
+        row2.addWidget(self._mix_pct_spin)
         mix_btn = QPushButton(self.t("mix_seq_btn"))
         mix_btn.setFixedWidth(55)
         mix_btn.setToolTip(self.t("mix_seq_tip"))
         mix_btn.clicked.connect(self._apply_mix_pct)
-        opts_layout.addWidget(mix_btn)
+        row2.addWidget(mix_btn)
 
-        opts_layout.addStretch()
+        row2.addStretch()
 
-        # Color model in options
-        opts_layout.addWidget(QLabel(self.t("model_label")))
+        row2.addWidget(QLabel(self.t("model_label")))
         if not hasattr(self, "_model_combo"):
             self._model_combo = QComboBox()
             self._model_combo.addItems([
@@ -3686,7 +3684,10 @@ class U1App(QMainWindow):
                 self.t("model_filamentmixer"),
             ])
             self._model_combo.currentIndexChanged.connect(self._on_model_change)
-        opts_layout.addWidget(self._model_combo)
+        self._model_combo.setMinimumWidth(160)
+        row2.addWidget(self._model_combo)
+        opts_vbox.addLayout(row2)
+
         layout.addWidget(opts_frame)
 
         # Calculate button
@@ -3704,7 +3705,7 @@ class U1App(QMainWindow):
 
         # Result area
         self._result_frame = QFrame()
-        self._result_frame.setObjectName("card")
+        self._result_frame.setObjectName("result_card")
         result_frame = self._result_frame
         result_layout = QHBoxLayout(result_frame)
         result_layout.setContentsMargins(16, 12, 16, 12)
